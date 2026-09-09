@@ -61,7 +61,11 @@
     <div class="practice-stage">
       <div class="practice-toolbar">
         <div class="ex-stepper" id="ex-stepper" role="tablist" aria-label="Übungen"></div>
-        <p class="practice-tip muted">Eine Aufgabe nach der anderen. Rechts die Tabelle — <strong>Spalte klicken</strong> fügt sie nach SELECT ein.</p>
+        <ol class="do-steps">
+          <li>Baustein mit Nummer klicken</li>
+          <li>Gelbes Feld im SQL füllt sich</li>
+          <li><strong>Ausführen</strong>, dann <strong>Stimmt das?</strong></li>
+        </ol>
       </div>
       <div class="practice-layout">
         <div class="practice-main">
@@ -79,9 +83,40 @@
             {% if ex.why %}
             <p class="exercise-why">{{ ex.why }}</p>
             {% endif %}
+            {% if ex.pieces %}
+            <div class="exercise-pieces">
+              <span class="pieces-label">Diese Bausteine klicken — Nummer = gelbes Feld</span>
+              <div class="piece-row">
+                {% for p in ex.pieces %}
+                  {% if p is mapping %}
+                  <button type="button" class="piece-chip" data-insert="{{ p.insert }}" data-into="{{ p.into or 'select' }}" data-after="{{ p.after or '' }}" data-slot="{{ p.slot or 'SELECT' }}">
+                    <span class="piece-num">{{ loop.index }}</span>
+                    {% if p.slot %}<span class="piece-slot">{{ p.slot }}</span>{% endif %}
+                    {{ p.label or p.insert }}
+                  </button>
+                  {% else %}
+                  <button type="button" class="piece-chip" data-insert="{{ p }}" data-into="select" data-slot="SELECT">
+                    <span class="piece-num">{{ loop.index }}</span>
+                    <span class="piece-slot">SELECT</span> {{ p }}
+                  </button>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            </div>
+            {% endif %}
+            {% if ex.kind == 'write' %}
+            <p class="exercise-write-note muted">Schreibübung: Wenn der Datenstand schon verändert ist, zuerst <button type="button" class="text-btn js-reset-db">Datenbank zurücksetzen</button>.</p>
+            {% endif %}
+            <div class="sql-worksheet">
+              <p class="sql-fill-label">SQL — gelb = noch leer</p>
+              <p class="sql-do"></p>
+              <div class="sql-fill" role="group" aria-label="SQL-Lückentext"></div>
+              <p class="sql-fill-status" hidden></p>
+              <p class="sql-fill-note muted">Lange Schema-Namen sind gekürzt. Beim Ausführen schickt die App den vollen Namen.</p>
+            </div>
             {% if ex.look %}
-            <details class="exercise-guide"{% if loop.first %} open{% endif %}>
-              <summary>So gehst du vor</summary>
+            <details class="exercise-guide">
+              <summary>Wenn du feststeckst</summary>
               <ol class="exercise-look">
                 {% for step in ex.look %}
                 <li>{{ step }}</li>
@@ -89,18 +124,18 @@
               </ol>
             </details>
             {% endif %}
-            {% if ex.kind == 'write' %}
-            <p class="exercise-write-note muted">Schreibübung: Wenn der Datenstand schon verändert ist, zuerst <button type="button" class="text-btn js-reset-db">Datenbank zurücksetzen</button>.</p>
-            {% endif %}
-            <label class="sr-only" for="sql-{{ ex.id }}">SQL für Aufgabe {{ loop.index }}</label>
-            <textarea class="sql-editor" id="sql-{{ ex.id }}" spellcheck="false">{{ ex.starter }}</textarea>
+            <details class="sql-raw">
+              <summary>SQL selbst tippen</summary>
+              <label class="sr-only" for="sql-{{ ex.id }}">SQL für Aufgabe {{ loop.index }}</label>
+              <textarea class="sql-editor" id="sql-{{ ex.id }}" spellcheck="false">{{ ex.starter }}</textarea>
+            </details>
             <div class="exercise-actions">
               <button class="btn btn-primary" data-action="run">Ausführen</button>
               <button class="btn btn-check" data-action="check">Stimmt das?</button>
               <button class="btn ghost" data-action="hint">Hinweis</button>
               <span class="muted editor-kbd"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> führt aus</span>
             </div>
-            <div class="exercise-result"></div>
+            <div class="exercise-result"><p class="muted result-placeholder">Hier erscheint dein Ergebnis — erst Lücken füllen, dann Ausführen.</p></div>
             <div class="exercise-pager">
               <button class="btn" type="button" data-ex-prev{% if loop.first %} hidden{% endif %}>← Vorherige Aufgabe</button>
               <button class="btn btn-primary" type="button" data-ex-next{% if loop.last %} hidden{% endif %}>Nächste Aufgabe →</button>
@@ -113,12 +148,16 @@
         </div>
         <aside class="schema-rail" id="schema-rail">
           <div class="schema-rail-head">
-            <h2>Tabellen</h2>
-            <p class="muted">Spalte klicken → nach SELECT. Den Rest (JOIN, WHERE, AT TIME ZONE) tippst du.</p>
+            <h2>Nachschauen</h2>
+            <p class="muted">Optional. Zum Lösen klickst du die Bausteine — hier musst du nichts tun.</p>
           </div>
-          <p class="schema-insert-status" id="schema-rail-status" hidden></p>
-          <div id="schema-rail-list"></div>
-          <button class="btn ghost schema-rail-all" type="button" id="schema-rail-all">Alle Tabellen zeigen</button>
+          <p class="schema-need-label">In dieser Aufgabe</p>
+          <ul class="schema-need" id="schema-rail-need"></ul>
+          <details class="schema-more">
+            <summary>Spalten dieser Tabellen</summary>
+            <div id="schema-rail-list"></div>
+            <button class="btn ghost schema-rail-all" type="button" id="schema-rail-all">Ganze Datenbank zeigen</button>
+          </details>
         </aside>
       </div>
     </div>
