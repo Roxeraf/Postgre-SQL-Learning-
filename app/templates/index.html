@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="hero">
+  <p class="eyebrow">PostgreSQL für FlowApp/WMX</p>
+  <h1>plx.learnSQL</h1>
+  <p class="lede">16 Lektionen aus der Einarbeitung. Du liest kurz, schreibst SQL gegen eine Übungsdatenbank und prüfst mit ein paar Fragen, ob es sitzt.</p>
+  <div class="hero-actions">
+    <a class="btn btn-primary" id="continue-btn" href="/lesson/a">Mit Teil A beginnen</a>
+    <a class="btn" href="/wissen">Nur nachschlagen</a>
+  </div>
+</header>
+
+<section class="stat-row" id="stat-row">
+  <div class="stat-card">
+    <div class="stat-value" id="stat-done">0/{{ lessons|length }}</div>
+    <div class="stat-label">Lektionen fertig</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ exercise_count }}</div>
+    <div class="stat-label">SQL-Übungen</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ quiz_count }}</div>
+    <div class="stat-label">Quizfragen</div>
+  </div>
+</section>
+
+<section class="card howto">
+  <h2>So arbeitest du hier</h2>
+  <ol class="howto-steps howto-flow">
+    <li>
+      <span class="howto-num">1</span>
+      <div>
+        <strong>Verstehen</strong>
+        <p>Jede Lektion startet mit kurzen Abschnitten. Nicht scrollen und überfliegen — unten auf Weiter, dann die nächste Idee.</p>
+      </div>
+    </li>
+    <li>
+      <span class="howto-num">2</span>
+      <div>
+        <strong>Eine SQL-Aufgabe</strong>
+        <p>Du siehst immer nur eine Aufgabe. Rechts die zugehörige Tabelle. Spalte anklicken, SQL ergänzen, Ausführen, dann „Stimmt das?“.</p>
+      </div>
+    </li>
+    <li>
+      <span class="howto-num">3</span>
+      <div>
+        <strong>Kurzcheck</strong>
+        <p>Ein paar Fragen sichern den Abschnitt. Danach die nächste Lektion — oder in der Wissensbasis nachschlagen.</p>
+      </div>
+    </li>
+  </ol>
+  <p class="howto-foot muted">UPDATE/DELETE verdrehen die Beispieldaten. Dann in der Seitenleiste „Datenbank zurücksetzen“. Freies Rumspielen: SQL-Playground.</p>
+</section>
+
+{% for track in tracks %}
+<section>
+  <div class="section-head">
+    <h2>{{ track.label }}</h2>
+    <p class="muted">{{ track.blurb }}</p>
+  </div>
+  <div class="path">
+    {% for l in track.lessons %}
+    <a class="path-card" href="/lesson/{{ l.id }}" data-lesson-id="{{ l.id }}">
+      <div class="path-top">
+        <span class="path-letter">{{ l.letter or l.id|upper }}</span>
+        <span class="path-mins">{{ l.minutes or 8 }} Min</span>
+      </div>
+      <h3>{{ l.title }}</h3>
+      <p class="path-goals">
+        {% if l.goals %}{{ l.goals[0] }}{% endif %}
+      </p>
+      <div class="path-meta">
+        {% if l.exercises %}<span>{{ l.exercises|length }} Übung{{ 'en' if l.exercises|length != 1 else '' }}</span>{% endif %}
+        {% if l.quiz %}<span>{{ l.quiz|length }} Quiz</span>{% endif %}
+        {% if not l.exercises and not l.quiz %}<span>Lesen + Checkliste</span>{% endif %}
+        <span class="path-state">Offen</span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endfor %}
+{% endblock %}
