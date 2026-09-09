@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}SQL-Playground — plx.learnSQL{% endblock %}
+{% block content %}
+<header class="page-header">
+  <p class="eyebrow">Freies Üben</p>
+  <h1>SQL-Playground</h1>
+  <p class="lede">Dieselbe Lern-Datenbank wie in den Lektionen. SELECT, UPDATE und DELETE sind erlaubt — DROP/ALTER nicht. Schema rechts oder über den Button.</p>
+</header>
+
+<section class="card playground-card">
+  <div class="playground-toolbar">
+    <span class="muted">SELECT · UPDATE · DELETE · BEGIN/COMMIT · max. 200 Zeilen</span>
+    <div class="exercise-actions">
+      <button class="btn btn-primary" type="button" id="pg-run">Ausführen <kbd>Ctrl</kbd>+<kbd>Enter</kbd></button>
+      <button class="btn" type="button" data-open-schema>Schema</button>
+    </div>
+  </div>
+  <textarea class="sql-editor sql-editor-lg" id="pg-editor" spellcheck="false">-- Beispiele aus der Wissensbasis:
+-- SELECT code, alias, name->>'de' AS name FROM instance_1.flowapp_13d663_client;
+-- SELECT oh.order_number, oc.alias FROM instance_1.flowapp_13d663_order_head oh
+--   JOIN instance_1.flowapp_13d663_order_class oc ON oc.id = oh.order_class_id;
+-- SELECT event_type, payload FROM subscription.processevents_printer;
+
+SELECT
+</textarea>
+  <div class="exercise-result" id="pg-result"></div>
+</section>
+{% endblock %}

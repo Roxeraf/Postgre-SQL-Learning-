@@ -1,0 +1,23 @@
+plx.learnSQL — Installation für Kollegen
+========================================
+
+Das ist die lokale Lern-App zur PostgreSQL/FlowApp-Einarbeitung.
+Du brauchst KEIN Docker und KEIN Python.
+
+1. plx.learnSQL-Setup.exe starten.
+   Falls Windows SmartScreen warnt: "Weitere Informationen" und
+   danach "Trotzdem ausführen".
+2. Durch den Assistenten klicken (keine Admin-Rechte nötig).
+3. Nach der Installation Desktop-Verknüpfung "plx.learnSQL" nutzen.
+
+Beim ersten Start dauert es etwas länger (Datenbank wird eingerichtet).
+Danach öffnet sich der Browser unter http://localhost:8080
+
+SELECT, UPDATE und DELETE machst du in der App (Lektionen und
+SQL-Playground). Wenn Beispieldaten durcheinandergeraten:
+in der Seitenleiste "Datenbank zurücksetzen".
+
+Beenden: Rechtsklick auf das Symbol in der Taskleiste
+(unten rechts, ggf. bei "^" ausgeblendete Symbole) → Beenden.
+
+Deinstallation: Windows-Einstellungen → Apps → plx.learnSQL.

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Wissensbasis — plx.learnSQL{% endblock %}
+{% block content %}
+<header class="page-header">
+  <p class="eyebrow">Nachschlagen</p>
+  <h1>Wissensbasis</h1>
+  <p class="lede">{{ index_count }} Einträge aus der Einarbeitungs-Dokumentation (Teile A–P, Glossar, Übungen, Karteikarten). Tippe einen Begriff wie <em>TARIC</em>, <em>shipment_number</em> oder <em>ProcessModelFactory</em>.</p>
+</header>
+
+<section class="card">
+  <label class="sr-only" for="wissen-q">Suche</label>
+  <input class="search-input wissen-input" id="wissen-q" type="search" placeholder="Begriff, Tabelle, Statuscode, Alias…" autocomplete="off">
+  <p class="muted" id="wissen-meta">Mindestens zwei Zeichen — Suche läuft über alle Lektionen.</p>
+  <div class="chip-row" id="wissen-chips">
+    <button type="button" class="section-chip" data-q="alias">alias statt UUID</button>
+    <button type="button" class="section-chip" data-q="timestamptz">Zeitzone</button>
+    <button type="button" class="section-chip" data-q="order_consolidation">Zonen</button>
+    <button type="button" class="section-chip" data-q="X0">Storno X0</button>
+    <button type="button" class="section-chip" data-q="TARIC">TARIC</button>
+    <button type="button" class="section-chip" data-q="TNR">TNR</button>
+    <button type="button" class="section-chip" data-q="ProcessModelFactory">ProcessModelFactory</button>
+    <button type="button" class="section-chip" data-q="subscription">Print-Schema</button>
+  </div>
+  <div id="wissen-results"></div>
+</section>
+{% endblock %}

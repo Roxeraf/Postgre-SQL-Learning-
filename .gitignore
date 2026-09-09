@@ -1,0 +1,6 @@
+dist/
+installer/cache/
+installer/staging/
+installer/flowapp.ico
+__pycache__/
+*.pyc

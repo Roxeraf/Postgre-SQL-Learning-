@@ -1,0 +1,2846 @@
+{
+  "billing_protocol": {
+    "label": "Abrechnungsprotokoll",
+    "label_plural": "Abrechnungsprotokolle",
+    "kind": "Bewegungsdaten",
+    "parent": ""
+  },
+  "51abbd": {
+    "label": "ADR",
+    "label_plural": "ADR",
+    "kind": "Stammdaten",
+    "parent": "Gefahrrechtliche Grundlage"
+  },
+  "address_data": {
+    "label": "Adresse",
+    "label_plural": "Adressen",
+    "kind": "Bewegungsdaten",
+    "parent": "Auftrag"
+  },
+  "customs_address": {
+    "label": "Adresse",
+    "label_plural": "Adressen",
+    "kind": "Bewegungsdaten",
+    "parent": "Verzollung"
+  },
+  "freight_address": {
+    "label": "Adresse",
+    "label_plural": "Adressen",
+    "kind": "Bewegungsdaten",
+    "parent": "Ladung"
+  },
+  "tour_address": {
+    "label": "Adresse",
+    "label_plural": "Adressen",
+    "kind": "Bewegungsdaten",
+    "parent": "Tour"
+  },
+  "order_matrix_address": {
+    "label": "Adresse (Auftragsmatrix)",
+    "label_plural": "Adressen (Auftragsmatrix)",
+    "kind": "Stammdaten",
+    "parent": "Matrix (Auftrag)"
+  },
+  "address_master": {
+    "label": "Adressestamm",
+    "label_plural": "Adressestämme",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Adressstamm"
+  },
+  "order_pool_action": {
+    "label": "Aktion",
+    "label_plural": "Aktionen",
+    "kind": "Stammdaten",
+    "parent": "Pool (Auftrag)"
+  },
+  "task_pool_action": {
+    "label": "Aktion",
+    "label_plural": "Aktionen",
+    "kind": "Stammdaten",
+    "parent": "Pool (Vorgang)"
+  },
+  "trigger_action_stock_qualification": {
+    "label": "Aktion",
+    "label_plural": "Aktionen",
+    "kind": "Stammdaten",
+    "parent": "Aktionstrigger"
+  },
+  "trigger_action": {
+    "label": "Aktionstrigger",
+    "label_plural": "Aktionstrigger",
+    "kind": "Stammdaten",
+    "parent": "Profil (Bestandsarten)"
+  },
+  "task_attachment": {
+    "label": "Anhang",
+    "label_plural": "Anhänge",
+    "kind": "Bewegungsdaten",
+    "parent": "Vorgang"
+  },
+  "vehicle_master_attachment": {
+    "label": "Anhang",
+    "label_plural": "Anhänge",
+    "kind": "Stammdaten",
+    "parent": "Stamm (Fahrzeug)"
+  },
+  "handling_unit_attachment": {
+    "label": "Anhang",
+    "label_plural": "Anhänge",
+    "kind": "Bewegungsdaten",
+    "parent": "Handling-Unit"
+  },
+  "order_attachment": {
+    "label": "Anhang",
+    "label_plural": "Anhänge",
+    "kind": "Bewegungsdaten",
+    "parent": "Auftrag"
+  },
+  "freight_attachment": {
+    "label": "Anhang",
+    "label_plural": "Anhänge",
+    "kind": "Bewegungsdaten",
+    "parent": "Ladung"
+  },
+  "transport_operator_attachment": {
+    "label": "Anhang",
+    "label_plural": "Anhänge",
+    "kind": "Stammdaten",
+    "parent": "Stamm (Unternehmer)"
+  },
+  "tour_attachment": {
+    "label": "Anhang",
+    "label_plural": "Anhänge",
+    "kind": "Bewegungsdaten",
+    "parent": "Tour"
+  },
+  "item_master_attachment": {
+    "label": "Anhang",
+    "label_plural": "Anhänge",
+    "kind": "Stammdaten",
+    "parent": "Artikelstamm"
+  },
+  "salutation": {
+    "label": "Anrede",
+    "label_plural": "Anreden",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Adressstamm"
+  },
+  "stock_characteristics_display": {
+    "label": "Anzeige (Bestandsmerkmale)",
+    "label_plural": "Anzeigen (Bestandsmerkmale)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Bestandsmerkmal)"
+  },
+  "working_area": {
+    "label": "Arbeitszone",
+    "label_plural": "Arbeitszonen",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "order_sub_type": {
+    "label": "Art (Auftrag)",
+    "label_plural": "Arten (Auftrag)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "order_position_sub_type": {
+    "label": "Art (Auftragsposition)",
+    "label_plural": "Arten (Auftragsposition)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "stock_sub_type": {
+    "label": "Art (Bestand)",
+    "label_plural": "Arten (Bestand)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Artikelstamm"
+  },
+  "freight_sub_type": {
+    "label": "Art (Fracht)",
+    "label_plural": "Arten (Fracht)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "task_evaluation_item_category": {
+    "label": "Artikelkategorie",
+    "label_plural": "Artikelkategorien",
+    "kind": "Stammdaten",
+    "parent": "Vorgangseinstufung II"
+  },
+  "item_master": {
+    "label": "Artikelstamm",
+    "label_plural": "Artikelstämme",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Artikelstamm"
+  },
+  "type_serial_number": {
+    "label": "Art (Seriennummer)",
+    "label_plural": "Arten (Seriennummer)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Seriennummer)"
+  },
+  "shipping_sub_type": {
+    "label": "Art (Versand)",
+    "label_plural": "Arten (Versand)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "task_sub_type": {
+    "label": "Art (Vorgang)",
+    "label_plural": "Arten (Vorgang)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Vorgang"
+  },
+  "order_head": {
+    "label": "Auftrag",
+    "label_plural": "Aufträge",
+    "kind": "Bewegungsdaten",
+    "parent": ""
+  },
+  "order_wave": {
+    "label": "Auftragswelle",
+    "label_plural": "Auftragswellen",
+    "kind": "Bewegungsdaten",
+    "parent": ""
+  },
+  "locating_search_order_zoning": {
+    "label": "Auftragszonierung",
+    "label_plural": "Auftragszonierungen",
+    "kind": "Stammdaten",
+    "parent": "Lokationssuche"
+  },
+  "base_message": {
+    "label": "Base Message",
+    "label_plural": "Base Messages",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "base_config": {
+    "label": "Basiskonfiguration",
+    "label_plural": "Basiskonfigurationen",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "base_shipping_type": {
+    "label": "Basisversandart",
+    "label_plural": "Basisversandarten",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "hazard_transportation_categories": {
+    "label": "Beförderungskategorie",
+    "label_plural": "Beförderungskategorien",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "limiter": {
+    "label": "Begrenzer",
+    "label_plural": "Begrenzer",
+    "kind": "Stammdaten",
+    "parent": "Gruppe (Begrenzer)"
+  },
+  "receipt": {
+    "label": "Beleg",
+    "label_plural": "Belege",
+    "kind": "Bewegungsdaten",
+    "parent": "Inventur"
+  },
+  "f672af": {
+    "label": "Bestandskonto",
+    "label_plural": "Bestandskonten",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lademittelkonto"
+  },
+  "inventory_characteristic_validation": {
+    "label": "Bestandsmerkmalvalidierung",
+    "label_plural": "Bestandsmerkmalvalidierungen",
+    "kind": "Stammdaten",
+    "parent": "Profil (Bestandsmerkmal)"
+  },
+  "733fc9": {
+    "label": "Bestandsprotokoll",
+    "label_plural": "Bestandsprotokolle",
+    "kind": "Bewegungsdaten",
+    "parent": ""
+  },
+  "quant_stock_qualification": {
+    "label": "Bestandsqualifikation",
+    "label_plural": "Bestandsqualifikationen",
+    "kind": "Bewegungsdaten",
+    "parent": "Quant"
+  },
+  "f26712": {
+    "label": "Bestandsqualifikation",
+    "label_plural": "Bestandsqualifikationen",
+    "kind": "Bewegungsdaten",
+    "parent": "Bestandsprotokoll"
+  },
+  "allocation_stock_qualification": {
+    "label": "Bestandsqualifikation",
+    "label_plural": "Bestandsqualifikationen",
+    "kind": "Bewegungsdaten",
+    "parent": "Zuteilung"
+  },
+  "task_stock_qualification": {
+    "label": "Bestandsqualifikation",
+    "label_plural": "Bestandsqualifikationen",
+    "kind": "Bewegungsdaten",
+    "parent": "Position"
+  },
+  "stock_qualification": {
+    "label": "Bestandsqualifikation",
+    "label_plural": "Bestandsqualifikationen",
+    "kind": "Stammdaten",
+    "parent": "Art (Bestand)"
+  },
+  "reservation_run_stock_qualification": {
+    "label": "Bestandsqualifikation",
+    "label_plural": "Bestandsqualifikationen",
+    "kind": "Stammdaten",
+    "parent": "Durchlauf"
+  },
+  "allocation_type_stock_qualification": {
+    "label": "Bestandsqualifikation",
+    "label_plural": "Bestandsqualifikationen",
+    "kind": "Stammdaten",
+    "parent": "Typ (Zuteilung)"
+  },
+  "order_position_stock_qualification": {
+    "label": "Bestandsqualifikation",
+    "label_plural": "Bestandsqualifikationen",
+    "kind": "Bewegungsdaten",
+    "parent": "Position"
+  },
+  "replenishment_rule": {
+    "label": "Bestandsregel",
+    "label_plural": "Bestandsregeln",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "application_identifier": {
+    "label": "Bezeichner (Daten)",
+    "label_plural": "Bezeichner (Daten)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "identifier_reference": {
+    "label": "Bezeichner (Referenz)",
+    "label_plural": "Bezeichner (Referenz)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "vas_image": {
+    "label": "Bild",
+    "label_plural": "Bilder",
+    "kind": "Stammdaten",
+    "parent": "Stamm (VAS)"
+  },
+  "vas_step_image": {
+    "label": "Bild",
+    "label_plural": "Bilder",
+    "kind": "Stammdaten",
+    "parent": "VAS-Schritt"
+  },
+  "accounting_area_billing": {
+    "label": "Buchungskreis Abrechnung",
+    "label_plural": "Buchungskreise Abrechnung",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "accounting_area_addresses": {
+    "label": "Buchungskreis Adressstamm",
+    "label_plural": "Buchungskreise Adressestamm",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "accounting_area_item_master": {
+    "label": "Buchungskreis Artikelstamm",
+    "label_plural": "Buchungskreise Artikelstamm",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "accounting_area_order_handling": {
+    "label": "Buchungskreis Auftrag",
+    "label_plural": "Buchungskreise Auftrag",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "accounting_area_order_wave": {
+    "label": "Buchungskreis Auftragswelle",
+    "label_plural": "Buchungskreise Auftragswelle",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "accounting_area_scheduling": {
+    "label": "Buchungskreis Disposition",
+    "label_plural": "Buchungskreise Disposition",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "accounting_area_handling_unit": {
+    "label": "Buchungskreis Handling-Unit",
+    "label_plural": "Buchungskreise Handling-Unit",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "accounting_area_loading_equipment_account": {
+    "label": "Buchungskreis Lademittelkonto",
+    "label_plural": "Buchungskreise Lademittelkonto",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "accounting_area_storage_topology": {
+    "label": "Buchungskreis Lagertopologie",
+    "label_plural": "Buchungskreise Lagertopologie",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "accounting_area_loading": {
+    "label": "Buchungskreis Tour/Ladung",
+    "label_plural": "Buchungskreise Tour/Ladung",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "accounting_area_task_handling": {
+    "label": "Buchungskreis Vorgang",
+    "label_plural": "Buchungskreise Vorgang",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "accounting_area_customs": {
+    "label": "Buchungskreis Zoll",
+    "label_plural": "Buchungskreise Zoll",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "stock_qualification_booking_matrix": {
+    "label": "Buchungsmatrix",
+    "label_plural": "Buchungsmatrix",
+    "kind": "Stammdaten",
+    "parent": "Profil (Bestandsarten)"
+  },
+  "cas_number": {
+    "label": "CAS-Nummer",
+    "label_plural": "CAS-Nummern",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "allocation_catch_weight": {
+    "label": "Catch Weight",
+    "label_plural": "Catch Weights",
+    "kind": "Bewegungsdaten",
+    "parent": "Zuteilung"
+  },
+  "order_position_catch_weight": {
+    "label": "Catch Weight",
+    "label_plural": "Catch Weights",
+    "kind": "Bewegungsdaten",
+    "parent": "Position"
+  },
+  "storage_location_sort": {
+    "label": "Cluster (Platz)",
+    "label_plural": "Cluster (Platz)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lagertopologie"
+  },
+  "cluster_resource": {
+    "label": "Cluster (Ressource)",
+    "label_plural": "Cluster (Ressource)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lagertopologie"
+  },
+  "cluster_routing": {
+    "label": "Cluster (Routing)",
+    "label_plural": "Cluster (Routing)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lagertopologie"
+  },
+  "storage_zone_sort": {
+    "label": "Cluster (Zone)",
+    "label_plural": "Cluster (Zone)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lagertopologie"
+  },
+  "0e62ad": {
+    "label": "DataMatrix Codes",
+    "label_plural": "",
+    "kind": "Stammdaten",
+    "parent": "Mandant"
+  },
+  "vas_step_file": {
+    "label": "Datei",
+    "label_plural": "Dateien",
+    "kind": "Stammdaten",
+    "parent": "VAS-Schritt"
+  },
+  "vas_file": {
+    "label": "Datei",
+    "label_plural": "Dateien",
+    "kind": "Stammdaten",
+    "parent": "Stamm (VAS)"
+  },
+  "application_identifier_profil_entry": {
+    "label": "Datenbezeichnerprofileintrag",
+    "label_plural": "Datenbezeichnerprofileinträge",
+    "kind": "Stammdaten",
+    "parent": "Profil (GS1)"
+  },
+  "reservation_run": {
+    "label": "Durchlauf",
+    "label_plural": "Durchläufe",
+    "kind": "Stammdaten",
+    "parent": "Typ (Zuteilung)"
+  },
+  "task_evaluation_iteration": {
+    "label": "Durchlauf",
+    "label_plural": "Durchläufe",
+    "kind": "Stammdaten",
+    "parent": "Vorgangseinstufung II"
+  },
+  "273434": {
+    "label": "Durchlauf",
+    "label_plural": "Durchläufe",
+    "kind": "Stammdaten",
+    "parent": "Lokationsoptimierung (Defragmentieren)"
+  },
+  "matrix_group": {
+    "label": "Durchlauf (Matrix)",
+    "label_plural": "Durchläufe (Matrix)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "er_number": {
+    "label": "EG-Nummer",
+    "label_plural": "EG-Nummern",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "billing_unit": {
+    "label": "Einheit (Abrechnung)",
+    "label_plural": "Einheiten (Abrechnung)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Abrechnung"
+  },
+  "bundling_unit": {
+    "label": "Einheit (Gebinde)",
+    "label_plural": "Einheiten (Gebinde)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Artikelstamm"
+  },
+  "quantity_unit": {
+    "label": "Einheit (Mengen)",
+    "label_plural": "Einheiten (Mengen)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Artikelstamm"
+  },
+  "customs_quantity_units": {
+    "label": "Einheit (Zoll)",
+    "label_plural": "Einheiten (Zoll)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Zoll"
+  },
+  "compartment": {
+    "label": "Fach",
+    "label_plural": "Fächer",
+    "kind": "Stammdaten",
+    "parent": "Zone"
+  },
+  "fine_relation": {
+    "label": "Feinrelation",
+    "label_plural": "Feinrelationen",
+    "kind": "Stammdaten",
+    "parent": "Grobrelation"
+  },
+  "storage_location_field": {
+    "label": "Feld",
+    "label_plural": "Felder",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "locating_search_filter": {
+    "label": "Filter",
+    "label_plural": "Filter",
+    "kind": "Stammdaten",
+    "parent": "Sortierung (Lokationssuche)"
+  },
+  "task_ordering_filter": {
+    "label": "Filter",
+    "label_plural": "Filter",
+    "kind": "Stammdaten",
+    "parent": "Sortierung (Vorgang)"
+  },
+  "compartment_hu_assignment": {
+    "label": "Fixe/Dynamische HU-Zuordnung",
+    "label_plural": "Fixe/Dynamische HU-Zuordnungen",
+    "kind": "Stammdaten",
+    "parent": "Typ (Fach)"
+  },
+  "storage_location_hu_assignment": {
+    "label": "Fixe/Dynamische HU-Zuordnung",
+    "label_plural": "Fixe/Dynamische HU-Zuordnungen",
+    "kind": "Stammdaten",
+    "parent": "Typ (Platz)"
+  },
+  "handling_unit_location_assignment": {
+    "label": "Fixe HU-Zuordnung (ohne Raster)",
+    "label_plural": "Fixe HU-Zuordnung (ohne Raster)",
+    "kind": "Stammdaten",
+    "parent": "Typ (Platz)"
+  },
+  "freight_pieces": {
+    "label": "Frachtstück",
+    "label_plural": "Frachtstücke",
+    "kind": "Bewegungsdaten",
+    "parent": "Ladeziel"
+  },
+  "delivery_terms": {
+    "label": "Frankatur",
+    "label_plural": "Frankaturen",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "aisle": {
+    "label": "Gang",
+    "label_plural": "Gänge",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "task_evaluation_location_shelve": {
+    "label": "Gang / Regal",
+    "label_plural": "Gänge / Regale",
+    "kind": "Stammdaten",
+    "parent": "Vorgangseinstufung II"
+  },
+  "degree_of_hazard": {
+    "label": "Gefahrengrad",
+    "label_plural": "Gefahrengrade",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "danger_class": {
+    "label": "Gefahrenklasse",
+    "label_plural": "Gefahrenklassen",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "dangerous_goods_class": {
+    "label": "Gefahrgutklasse",
+    "label_plural": "Gefahrgutklassen",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "dangerous_goods_classification": {
+    "label": "Gefahrgutklassifizierung",
+    "label_plural": "Gefahrgutklassifizierungen",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "hazard_identification_number": {
+    "label": "Gefahrnummer",
+    "label_plural": "Gefahrnummern",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "legal_basis_hazards": {
+    "label": "Gefahrrechtliche Grundlage",
+    "label_plural": "Gefahrrechtliche Grundlagen",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "ghs_labelling": {
+    "label": "Gefahrstoffkennzeichnung",
+    "label_plural": "Gefahrstoffkennzeichnungen",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "coarse_relation": {
+    "label": "Grobrelation",
+    "label_plural": "Grobrelationen",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Tour/Ladung"
+  },
+  "return_delivery_reason": {
+    "label": "Grund (Retouren)",
+    "label_plural": "Gründe (Retouren)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Retoure)"
+  },
+  "billing_group": {
+    "label": "Gruppe (Abrechnung)",
+    "label_plural": "Gruppen (Abrechnung)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Abrechnung"
+  },
+  "address_group": {
+    "label": "Gruppe (Adressaktion)",
+    "label_plural": "Gruppen (Adressaktion)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Adressstamm"
+  },
+  "action_group_item": {
+    "label": "Gruppe (Artikelaktion)",
+    "label_plural": "Gruppen (Artikelaktion)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Artikelstamm"
+  },
+  "limiter_group": {
+    "label": "Gruppe (Begrenzer)",
+    "label_plural": "Gruppen (Begrenzer)",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "task_release_group": {
+    "label": "Gruppe (Freigabe)",
+    "label_plural": "Gruppen (Freigabe)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Vorgang"
+  },
+  "commodity_grouping": {
+    "label": "Gruppe (Ware)",
+    "label_plural": "Gruppen (Ware)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Artikelstamm"
+  },
+  "gtin_master": {
+    "label": "GTIN-Stamm",
+    "label_plural": "GTIN-Stämme",
+    "kind": "Stammdaten",
+    "parent": "Artikelstamm"
+  },
+  "order_position_handling_unit": {
+    "label": "Handling Unit",
+    "label_plural": "Handling Units",
+    "kind": "Bewegungsdaten",
+    "parent": "Position"
+  },
+  "allocation_handling_unit": {
+    "label": "Handling Unit",
+    "label_plural": "Handling Units",
+    "kind": "Bewegungsdaten",
+    "parent": "Zuteilung"
+  },
+  "handling_unit": {
+    "label": "Handling-Unit",
+    "label_plural": "Handling-Units",
+    "kind": "Bewegungsdaten",
+    "parent": ""
+  },
+  "h_statements": {
+    "label": "H-Satz",
+    "label_plural": "H-Sätze",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "occupancy_pattern": {
+    "label": "HU-Belegungsmuster",
+    "label_plural": "HU-Belegungsmuster",
+    "kind": "Stammdaten",
+    "parent": "Profil (Belegungsvaldierung)"
+  },
+  "pack_hu_data_validation": {
+    "label": "HU-Daten Validierung",
+    "label_plural": "HU Daten Validierungen",
+    "kind": "Stammdaten",
+    "parent": "Profil (Verpackung)"
+  },
+  "handling_unit_binding_structure_assignment": {
+    "label": "HU-Gebinde-Zuordnung",
+    "label_plural": "HU-Gebinde-Zuordnungen",
+    "kind": "Stammdaten",
+    "parent": "Typ (HU-Suche)"
+  },
+  "handling_unit_height_type_assignment_2": {
+    "label": "HU-Höhentyp-Zuordnung",
+    "label_plural": "HU-Höhentyp-Zuordnung",
+    "kind": "Stammdaten",
+    "parent": "HU-Rekalkulation"
+  },
+  "handling_unit_height_type_assignment": {
+    "label": "HU-Höhentyp-Zuordnung",
+    "label_plural": "HU-Höhentyp-Zuordnung",
+    "kind": "Stammdaten",
+    "parent": "HU-Gebinde-Zuordnung"
+  },
+  "handling_unit_calculation": {
+    "label": "HU-Kalkulation",
+    "label_plural": "HU-Kalkulationen",
+    "kind": "Stammdaten",
+    "parent": "Typ (HU-Suche)"
+  },
+  "task_handling_unit_calculation": {
+    "label": "HU-Kalkulation",
+    "label_plural": "HU-Kalkulationen",
+    "kind": "Bewegungsdaten",
+    "parent": "Vorgang"
+  },
+  "handling_unit_optimization": {
+    "label": "HU-Optimierung",
+    "label_plural": "HU-Optimierungen",
+    "kind": "Stammdaten",
+    "parent": "Typ (HU-Suche)"
+  },
+  "handling_unit_calculations": {
+    "label": "HU-Rekalkulation",
+    "label_plural": "HU-Rekalkulation",
+    "kind": "Stammdaten",
+    "parent": "Typ (HU-Suche)"
+  },
+  "handling_unit_segmentation_type_assignment": {
+    "label": "HU-Segmentierungs-Zuordnung",
+    "label_plural": "HU-Segmentierungs-Zuordnungen",
+    "kind": "Stammdaten",
+    "parent": "Typ (HU)"
+  },
+  "task_handling_unit_calculation_identification": {
+    "label": "Identifikation",
+    "label_plural": "Identifikationen",
+    "kind": "Bewegungsdaten",
+    "parent": "HU-Kalkulation"
+  },
+  "handling_unit_identification": {
+    "label": "Identifikation",
+    "label_plural": "Identifikationen",
+    "kind": "Bewegungsdaten",
+    "parent": "Handling-Unit"
+  },
+  "import_inventories": {
+    "label": "Import Bestand",
+    "label_plural": "Import Bestände",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "incoterm": {
+    "label": "Incoterm",
+    "label_plural": "Incoterms",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "packaging_information_display": {
+    "label": "Informationsanzeige",
+    "label_plural": "Informationsanzeigen",
+    "kind": "Stammdaten",
+    "parent": "Profil (Verpackung)"
+  },
+  "input_mask": {
+    "label": "Input (Maske)",
+    "label_plural": "Input (Maske)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "input_template": {
+    "label": "Input (Schablone)",
+    "label_plural": "Input (Schablone)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "stocktaking": {
+    "label": "Inventur",
+    "label_plural": "Inventuren",
+    "kind": "Bewegungsdaten",
+    "parent": ""
+  },
+  "stocktaking_profile": {
+    "label": "Inventurprofil",
+    "label_plural": "Inventurprofile",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "address_category": {
+    "label": "Kategorie (Adresse)",
+    "label_plural": "Kategorien (Adresse)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Adressstamm"
+  },
+  "item_category": {
+    "label": "Kategorie (Artikel)",
+    "label_plural": "Kategorien (Artikel)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Artikelstamm"
+  },
+  "handling_unit_category": {
+    "label": "Kategorie (HU)",
+    "label_plural": "Kategorien (HU)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Handling-Unit"
+  },
+  "category_freight_address": {
+    "label": "Kategorie (Ladungsadresse)",
+    "label_plural": "Kategorien (Ladungsadresse)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Tour/Ladung"
+  },
+  "storage_location_category": {
+    "label": "Kategorie (Platz)",
+    "label_plural": "Kategorien (Platz)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lagertopologie"
+  },
+  "category_tour_address": {
+    "label": "Kategorie (Touradresse)",
+    "label_plural": "Kategorien (Touradresse)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Tour/Ladung"
+  },
+  "category_customs_address": {
+    "label": "Kategorie (Zolladresse)",
+    "label_plural": "Kategorien (Zolladresse)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Zoll"
+  },
+  "storage_zone_group": {
+    "label": "Kategorie (Zone)",
+    "label_plural": "Kategorien (Zone)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lagertopologie"
+  },
+  "address_class": {
+    "label": "Klasse (Adresse)",
+    "label_plural": "Klassen (Adresse)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "attachment_class": {
+    "label": "Klasse (Anhang)",
+    "label_plural": "Klassen (Anhang)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "order_class": {
+    "label": "Klasse (Auftrag)",
+    "label_plural": "Klassen (Auftrag)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "order_wave_class": {
+    "label": "Klasse (Auftragswelle)",
+    "label_plural": "Klassen (Auftragswelle)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "freight_class": {
+    "label": "Klasse (Fracht)",
+    "label_plural": "Klassen (Fracht)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "handling_unit_class": {
+    "label": "Klasse (HU)",
+    "label_plural": "Klassen (HU)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "identifications": {
+    "label": "Klasse (Identifikator)",
+    "label_plural": "Klasse (Identifikatoren)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "storage_location_class": {
+    "label": "Klasse (Platz)",
+    "label_plural": "Klassen (Platz)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "resource_class": {
+    "label": "Klasse (Ressource)",
+    "label_plural": "Klassen (Ressource)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "vas_class": {
+    "label": "Klasse (VAS)",
+    "label_plural": "Klassen (VAS)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "task_class": {
+    "label": "Klasse (Vorgang)",
+    "label_plural": "Klassen (Vorgang)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "task_booking_class": {
+    "label": "Klasse (Vorgangsbuchung)",
+    "label_plural": "Klassen (Vorgangsbuchung)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "task_position_class": {
+    "label": "Klasse (Vorgangsposition)",
+    "label_plural": "Klassen (Vorgangsposition)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "storage_zone_class": {
+    "label": "Klasse (Zone)",
+    "label_plural": "Klassen (Zone)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "allocation_class": {
+    "label": "Klasse (Zuteilung)",
+    "label_plural": "Klassen (Zuteilung)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "hazard_classification_code": {
+    "label": "Klassifizierungscode",
+    "label_plural": "Klassifizierungscodes",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "consignment_booking": {
+    "label": "Konsignationsbuchung",
+    "label_plural": "Konsignationsbuchungen",
+    "kind": "Stammdaten",
+    "parent": "Artikelstamm"
+  },
+  "contact_person": {
+    "label": "Kontaktperson",
+    "label_plural": "Kontaktpersonen",
+    "kind": "Stammdaten",
+    "parent": "Adressestamm"
+  },
+  "9283_dufhhf": {
+    "label": "Kontobuchung",
+    "label_plural": "Kontobuchungen",
+    "kind": "Bewegungsdaten",
+    "parent": ""
+  },
+  "converter_entry": {
+    "label": "Konvertierungseintrag",
+    "label_plural": "Konvertierungseinträge",
+    "kind": "Stammdaten",
+    "parent": "Profil (REST-API)"
+  },
+  "cost_centre": {
+    "label": "Kostenstelle (Abrechnung)",
+    "label_plural": "Kostenstellen (Abrechnung)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Abrechnung"
+  },
+  "loading_plan": {
+    "label": "Ladeliste",
+    "label_plural": "Ladeliste",
+    "kind": "Bewegungsdaten",
+    "parent": "Ladung"
+  },
+  "freight_target": {
+    "label": "Ladeziel",
+    "label_plural": "Ladeziele",
+    "kind": "Bewegungsdaten",
+    "parent": "Ladung"
+  },
+  "freight": {
+    "label": "Ladung",
+    "label_plural": "Ladungen",
+    "kind": "Bewegungsdaten",
+    "parent": ""
+  },
+  "hazard_storage_class": {
+    "label": "Lagerklasse",
+    "label_plural": "Lagerklassen",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "country_code": {
+    "label": "Länderkennzeichen",
+    "label_plural": "Länderkennzeichen",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "print_layout_item": {
+    "label": "Layout (Artikeletikett)",
+    "label_plural": "Layouts (Artikeletikett)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Artikelstamm"
+  },
+  "print_layout_order_note": {
+    "label": "Layout (Auftragsbeleg)",
+    "label_plural": "Layouts (Auftragsbeleg)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "print_layout_handling_unit": {
+    "label": "Layout (HU-Beleg)",
+    "label_plural": "Layouts (HU-Beleg)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Handling-Unit"
+  },
+  "layout_stock_taking": {
+    "label": "Layout (Inventurbeleg)",
+    "label_plural": "Layouts (Inventurbeleg)",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "print_layout_freight": {
+    "label": "Layout (Ladung)",
+    "label_plural": "Layouts (Ladung)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Tour/Ladung"
+  },
+  "print_layout_location": {
+    "label": "Layout (Platz-/Ressourcenetikett)",
+    "label_plural": "Layouts (Platz-/Ressourcenetikett)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lagertopologie"
+  },
+  "print_layout_tour": {
+    "label": "Layout (Tourbeleg)",
+    "label_plural": "Layouts (Tourbeleg)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "print_layout_task_document": {
+    "label": "Layout (Vorgangsbeleg)",
+    "label_plural": "Layouts (Vorgangsbeleg)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Vorgang"
+  },
+  "32b82c": {
+    "label": "Logik (Adressvalidierung)",
+    "label_plural": "Logiken (Adressvalidierung)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "order_reconciliation_logics": {
+    "label": "Logik (Auftragsabgleich)",
+    "label_plural": "Logiken (Auftragsabgleich)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "order_sorting_logic": {
+    "label": "Logik (Auftragssortierung)",
+    "label_plural": "Logiken (Auftragssortierung)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "handling_unit_finding_logic": {
+    "label": "Logik (HU)",
+    "label_plural": "Logiken (HU)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "locating_search_logic": {
+    "label": "Logik (Lokation)",
+    "label_plural": "Logiken (Lokation)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "reservation_logic": {
+    "label": "Logik (Reservierung)",
+    "label_plural": "Logiken (Reservierung)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "logic_task_position_sorting": {
+    "label": "Logik (Vorgangspositionssortierung)",
+    "label_plural": "Logiken (Vorgangspositionssortierung)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "task_sorting_logic": {
+    "label": "Logik (Vorgangssortierung)",
+    "label_plural": "Logiken (Vorgangssortierung)",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "location_reorg_strategy_defragmentation": {
+    "label": "Lokationsoptimierung (Defragmentieren)",
+    "label_plural": "Lokationsoptimierungen (Defragmentieren)",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "location_reorg_strategy_compact_hu": {
+    "label": "Lokationsoptimierung (Quant-Verdichtung)",
+    "label_plural": "Lokationsoptimierungen (Quant-Verdichtung)",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "location_reorg_strategy_clean_up": {
+    "label": "Lokationsoptimierung (Räumen)",
+    "label_plural": "Lokationsoptimierungen (Räumen)",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "location_optimization_backfilling": {
+    "label": "Lokationsoptimierung (Zuschütten)",
+    "label_plural": "Lokationsoptimierungen (Zuschütten)",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "location_lock": {
+    "label": "Lokationssperre",
+    "label_plural": "Lokationssperre",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lagertopologie"
+  },
+  "locating_search": {
+    "label": "Lokationssuche",
+    "label_plural": "Lokationssuchen",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "client": {
+    "label": "Mandant",
+    "label_plural": "Mandanten",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "order_matrix": {
+    "label": "Matrix (Auftrag)",
+    "label_plural": "Matrix (Auftrag)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "order_position_matrix": {
+    "label": "Matrix (Auftragsposition)",
+    "label_plural": "Matrix (Auftragsposition)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "hu_master_matrix": {
+    "label": "Matrix (HU-Master)",
+    "label_plural": "Matrix (HU-Master)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Handling-Unit"
+  },
+  "correction_matrix": {
+    "label": "Matrix (Korrektur)",
+    "label_plural": "Matrix (Korrektur)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Vorgang"
+  },
+  "ac35ea": {
+    "label": "Matrix (Prüfplan)",
+    "label_plural": "Matrix (Prüfplan)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "text_matrix": {
+    "label": "Matrix (Text)",
+    "label_plural": "Matrix (Text)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "vas_matrix": {
+    "label": "Matrix (VAS)",
+    "label_plural": "Matrix (VAS)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "task_matrix": {
+    "label": "Matrix (Vorgang)",
+    "label_plural": "Matrix (Vorgang)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Vorgang"
+  },
+  "matrix_economic_zone": {
+    "label": "Matrix (Wirtschaftszone)",
+    "label_plural": "Matrix (Wirtschaftszone)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Zoll"
+  },
+  "matrix_customs_procedure": {
+    "label": "Matrix (Zollverfahren)",
+    "label_plural": "Matrix (Zollverfahren)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Zoll"
+  },
+  "26bdf3": {
+    "label": "Meldung",
+    "label_plural": "Meldungen",
+    "kind": "Bewegungsdaten",
+    "parent": "Handling-Unit"
+  },
+  "modification_cause": {
+    "label": "Modifikationgrund (Bestandsart)",
+    "label_plural": "Modifikationgründe (Bestandsart)",
+    "kind": "Stammdaten",
+    "parent": "Art (Bestand)"
+  },
+  "modification_reason": {
+    "label": "Modifikationsgrund (Auftrag)",
+    "label_plural": "Modifikationsgründe (Auftrag)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "modification_reason_quant": {
+    "label": "Modifikationsgrund (Quant)",
+    "label_plural": "Modifikationsgründe (Quant)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Artikelstamm"
+  },
+  "modification_reason_tour": {
+    "label": "Modifikationsgrund (Tour)",
+    "label_plural": "Modifikationsgründe (Tour)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Tour)"
+  },
+  "695949": {
+    "label": "Optimierungseintrag",
+    "label_plural": "Optimierungseinträge",
+    "kind": "Stammdaten",
+    "parent": "Lokationsoptimierung (Zuschütten)"
+  },
+  "vas_matrix_output": {
+    "label": "Output",
+    "label_plural": "Outputs",
+    "kind": "Stammdaten",
+    "parent": "Matrix (VAS)"
+  },
+  "text_matrix_output": {
+    "label": "Output",
+    "label_plural": "Outputs",
+    "kind": "Stammdaten",
+    "parent": "Matrix (Text)"
+  },
+  "packing_schema_structure": {
+    "label": "Packschemastruktur",
+    "label_plural": "Packschemastrukturen",
+    "kind": "Stammdaten",
+    "parent": "Profil (Packschema)"
+  },
+  "9a3fe3": {
+    "label": "Partnerkonto",
+    "label_plural": "Partnerkonten",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lademittelkonto"
+  },
+  "planned_bundling_units": {
+    "label": "Plan-Soll-Gebinde",
+    "label_plural": "Plan-Soll-Gebinde",
+    "kind": "Bewegungsdaten",
+    "parent": "Auftrag"
+  },
+  "storage_location": {
+    "label": "Platz",
+    "label_plural": "Plätze",
+    "kind": "Stammdaten",
+    "parent": "Zone"
+  },
+  "storage_location_sort_overflow": {
+    "label": "Platzclusterüberlauf",
+    "label_plural": "Platzclusterüberläufe",
+    "kind": "Stammdaten",
+    "parent": "Zonierung"
+  },
+  "task_evaluation_location_cluster": {
+    "label": "Platz-/ Zonencluster",
+    "label_plural": "Platz-/ Zonencluster",
+    "kind": "Stammdaten",
+    "parent": "Vorgangseinstufung II"
+  },
+  "order_pool": {
+    "label": "Pool (Auftrag)",
+    "label_plural": "Pool (Auftrag)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "task_pool": {
+    "label": "Pool (Vorgang)",
+    "label_plural": "Pool (Vorgang)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Vorgang"
+  },
+  "handling_unit_position": {
+    "label": "Position",
+    "label_plural": "Positionen",
+    "kind": "Bewegungsdaten",
+    "parent": "Handling-Unit"
+  },
+  "task_handling_unit_calculation_position": {
+    "label": "Position",
+    "label_plural": "Positionen",
+    "kind": "Bewegungsdaten",
+    "parent": "HU-Kalkulation"
+  },
+  "stocktaking_receipt_position": {
+    "label": "Position",
+    "label_plural": "Positionen",
+    "kind": "Bewegungsdaten",
+    "parent": "Beleg"
+  },
+  "82d7f4": {
+    "label": "Position",
+    "label_plural": "Positionen",
+    "kind": "Stammdaten",
+    "parent": "Stamm (Prüfplan)"
+  },
+  "task_position": {
+    "label": "Position",
+    "label_plural": "Positionen",
+    "kind": "Bewegungsdaten",
+    "parent": "Vorgang"
+  },
+  "order_position": {
+    "label": "Position",
+    "label_plural": "Positionen",
+    "kind": "Bewegungsdaten",
+    "parent": "Auftrag"
+  },
+  "24174c": {
+    "label": "Produktprobe",
+    "label_plural": "Prüf-Lose (AP)",
+    "kind": "Bewegungsdaten",
+    "parent": ""
+  },
+  "billing_profile": {
+    "label": "Profil (Abrechnung)",
+    "label_plural": "Profile (Abrechnung)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Abrechnung"
+  },
+  "order_closing_profile": {
+    "label": "Profil (Auftragsabschluss)",
+    "label_plural": "Profile (Auftragsabschluss)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "order_calculation_profile": {
+    "label": "Profil (Auftragskalkulation)",
+    "label_plural": "Profile (Auftragskalkulation)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "order_profile_validation": {
+    "label": "Profil (Auftragsvalidierung)",
+    "label_plural": "Profile (Auftragsvalidierung)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "occupancy_validation_profile": {
+    "label": "Profil (Belegungsvaldierung)",
+    "label_plural": "Profile (Belegungsvaldierung)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lagertopologie"
+  },
+  "d4cd31": {
+    "label": "Profil (Benachrichtigung)",
+    "label_plural": "Profile (Benachrichtigung)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "e77ebb": {
+    "label": "Profil (Beschränkungen)",
+    "label_plural": "Profile (Beschränkung)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Disposition"
+  },
+  "stock_qualification_profile": {
+    "label": "Profil (Bestandsarten)",
+    "label_plural": "Profile (Bestandsarten)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Artikelstamm"
+  },
+  "stock_characteristic_profile": {
+    "label": "Profil (Bestandsmerkmal)",
+    "label_plural": "Profile (Bestandsmerkmal)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Artikelstamm"
+  },
+  "stock_restriction": {
+    "label": "Profil (Bestandsrestriktionen)",
+    "label_plural": "Profile (Bestandsrestriktionen)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lagertopologie"
+  },
+  "task_release_profile": {
+    "label": "Profil (Freigabe)",
+    "label_plural": "Profile (Freigabe)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Vorgang"
+  },
+  "e516ec": {
+    "label": "Profil (Gefahrenprüfung)",
+    "label_plural": "Profile (Gefahrenprüfung)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Artikelstamm"
+  },
+  "application_identifier_profile": {
+    "label": "Profil (GS1)",
+    "label_plural": "Profile (GS1)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Adressstamm"
+  },
+  "hu_master_profile": {
+    "label": "Profil (HU-Master)",
+    "label_plural": "Profile (HU-Master)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Handling-Unit"
+  },
+  "picking_profile": {
+    "label": "Profil (Kommissionierung)",
+    "label_plural": "Profile (Kommissionierung)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "profile_conso_location_allocation": {
+    "label": "Profil (Konsoplatzbelegung)",
+    "label_plural": "Profile (Konsoplatzbelegung)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lagertopologie"
+  },
+  "correction_profile": {
+    "label": "Profil (Korrektur)",
+    "label_plural": "Profile (Korrektur)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Vorgang"
+  },
+  "freight_profile": {
+    "label": "Profil (Ladung)",
+    "label_plural": "Profile (Ladung)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Tour/Ladung"
+  },
+  "freight_calculation_profile": {
+    "label": "Profil (Ladungskalkulation)",
+    "label_plural": "Profile (Ladungskalkulation)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Tour/Ladung"
+  },
+  "packing_schema": {
+    "label": "Profil (Packschema)",
+    "label_plural": "Profile (Packschema)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Artikelstamm"
+  },
+  "profile_mandatory_documents_transport_operator": {
+    "label": "Profil Pflichtdokument (Unternehmer)",
+    "label_plural": "Profile Pflichtdokumente (Unternehmer)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Disposition"
+  },
+  "45ddf3": {
+    "label": "Profil (Prioritätsoptimierung)",
+    "label_plural": "Profile (Prioritätsoptimierung)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Vorgang"
+  },
+  "production_profile": {
+    "label": "Profil (Produktion)",
+    "label_plural": "Profile (Produktion)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "stock_quant_grouping": {
+    "label": "Profil (Quant-Gruppierung)",
+    "label_plural": "Profile (Quant-Gruppierung)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "stock_quant_compression": {
+    "label": "Profil (Quant-Verdichtung)",
+    "label_plural": "Profile (Quant-Verdichtung)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lagertopologie"
+  },
+  "converter_profile": {
+    "label": "Profil (REST-API)",
+    "label_plural": "Profile (REST-API)",
+    "kind": "Stammdaten",
+    "parent": "Mandant"
+  },
+  "return_delivery_profile": {
+    "label": "Profil (Retoure)",
+    "label_plural": "Profile (Retoure)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "profile_batch": {
+    "label": "Profil (Sammelliste)",
+    "label_plural": "Profil (Sammellisten)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Vorgang"
+  },
+  "shipment_sub_type": {
+    "label": "Profil (Sendung)",
+    "label_plural": "Profile (Sendung)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "profile_serial_number": {
+    "label": "Profil (Seriennummer)",
+    "label_plural": "Profile (Seriennummer)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Artikelstamm"
+  },
+  "tour_sub_type": {
+    "label": "Profil (Tour)",
+    "label_plural": "Profile (Tour)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "tour_calculation_profile": {
+    "label": "Profil (Tourkalkulation)",
+    "label_plural": "Profile (Tourkalkulation)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Tour/Ladung"
+  },
+  "transport_carts_profile": {
+    "label": "Profil (TransportCart)",
+    "label_plural": "Profil (TransportCarts)",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "transport_carts_allocation_profile": {
+    "label": "Profil (Transportcartbelegung)",
+    "label_plural": "Profile (Transportcartbelegung)",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "repacking_profile": {
+    "label": "Profil (Umpacken)",
+    "label_plural": "Profile (Umpacken)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lagertopologie"
+  },
+  "packaging_profile": {
+    "label": "Profil (Verpackung)",
+    "label_plural": "Profile (Verpackung)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "44b501": {
+    "label": "Profil (Verpackungsstruktur)",
+    "label_plural": "Profile (Verpackungsstruktur)",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "distribution_profile": {
+    "label": "Profil (Verteiler)",
+    "label_plural": "Profile (Verteiler)",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "task_profile": {
+    "label": "Profil (Vorgang)",
+    "label_plural": "Profile (Vorgang)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Vorgang"
+  },
+  "scale_profile": {
+    "label": "Profil (Waage)",
+    "label_plural": "Profile (Waagen)",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "7d86b5": {
+    "label": "Profil (Wareneingang)",
+    "label_plural": "Profile (Wareneingang)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "order_wave_sub_type": {
+    "label": "Profil (Welle)",
+    "label_plural": "Profile (Welle)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftragswelle"
+  },
+  "customs_processing_profile": {
+    "label": "Profil (Zollabwicklung)",
+    "label_plural": "Profile (Zollabwicklung)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Zoll"
+  },
+  "customs_notice_profile": {
+    "label": "Profil (Zollbescheid)",
+    "label_plural": "Profile (Zollbescheid)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Zoll"
+  },
+  "customs_status_profile": {
+    "label": "Profil (Zollstatus)",
+    "label_plural": "Profile (Zollstatus)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Zoll"
+  },
+  "customs_procedure_profile": {
+    "label": "Profil (Zollverfahren)",
+    "label_plural": "Profile (Zollverfahren)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Zoll"
+  },
+  "p_statements": {
+    "label": "P-Satz",
+    "label_plural": "P-Sätze",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "stock_quant": {
+    "label": "Quant",
+    "label_plural": "Quanten",
+    "kind": "Bewegungsdaten",
+    "parent": ""
+  },
+  "tour_frame": {
+    "label": "Rahmentour",
+    "label_plural": "Rahmentouren",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Tour/Ladung"
+  },
+  "stocktaking_receipt_reference": {
+    "label": "Referenz",
+    "label_plural": "Referenzen",
+    "kind": "Bewegungsdaten",
+    "parent": "Beleg"
+  },
+  "handling_unit_reference": {
+    "label": "Referenz",
+    "label_plural": "Referenzen",
+    "kind": "Bewegungsdaten",
+    "parent": "Handling-Unit"
+  },
+  "order_position_reference": {
+    "label": "Referenz",
+    "label_plural": "Referenzen",
+    "kind": "Bewegungsdaten",
+    "parent": "Position"
+  },
+  "freight_reference": {
+    "label": "Referenz",
+    "label_plural": "Referenzen",
+    "kind": "Bewegungsdaten",
+    "parent": "Ladung"
+  },
+  "task_position_reference": {
+    "label": "Referenz",
+    "label_plural": "Referenzen",
+    "kind": "Bewegungsdaten",
+    "parent": "Position"
+  },
+  "task_reference": {
+    "label": "Referenz",
+    "label_plural": "Referenzen",
+    "kind": "Bewegungsdaten",
+    "parent": "Vorgang"
+  },
+  "billing_reference": {
+    "label": "Referenz",
+    "label_plural": "Referenzen",
+    "kind": "Bewegungsdaten",
+    "parent": "Abrechnungsprotokoll"
+  },
+  "order_reference": {
+    "label": "Referenz",
+    "label_plural": "Referenzen",
+    "kind": "Bewegungsdaten",
+    "parent": "Auftrag"
+  },
+  "stocktaking_receipt_position_reference": {
+    "label": "Referenz",
+    "label_plural": "Referenzen",
+    "kind": "Bewegungsdaten",
+    "parent": "Position"
+  },
+  "stocktaking_reference": {
+    "label": "Referenz",
+    "label_plural": "Referenzen",
+    "kind": "Bewegungsdaten",
+    "parent": "Inventur"
+  },
+  "handling_unit_position_reference": {
+    "label": "Referenz",
+    "label_plural": "Referenzen",
+    "kind": "Bewegungsdaten",
+    "parent": "Position"
+  },
+  "allocation_reference": {
+    "label": "Referenz",
+    "label_plural": "Referenzen",
+    "kind": "Bewegungsdaten",
+    "parent": "Zuteilung"
+  },
+  "shelve": {
+    "label": "Regal",
+    "label_plural": "Regale",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "region": {
+    "label": "Region",
+    "label_plural": "Regionen",
+    "kind": "Stammdaten",
+    "parent": "Länderkennzeichen"
+  },
+  "reservation_hu": {
+    "label": "Reservierung",
+    "label_plural": "Reservierungen",
+    "kind": "Bewegungsdaten",
+    "parent": "Position"
+  },
+  "active_ressources": {
+    "label": "Ressource",
+    "label_plural": "Ressourcen",
+    "kind": "Bewegungsdaten",
+    "parent": ""
+  },
+  "resource": {
+    "label": "Ressource",
+    "label_plural": "Ressourcen",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "risk_group": {
+    "label": "Risikogruppe",
+    "label_plural": "Risikogruppen",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "route_section": {
+    "label": "Route",
+    "label_plural": "Routen",
+    "kind": "Bewegungsdaten",
+    "parent": "Position"
+  },
+  "route": {
+    "label": "Route",
+    "label_plural": "Routen",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "routing_point": {
+    "label": "Routing-Punkt",
+    "label_plural": "Routing-Punkte",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "17f479": {
+    "label": "Saldensatz",
+    "label_plural": "Saldensätze",
+    "kind": "Stammdaten",
+    "parent": "Bestandskonto"
+  },
+  "4b52e9": {
+    "label": "Saldensatz",
+    "label_plural": "Saldensätze",
+    "kind": "Stammdaten",
+    "parent": "Partnerkonto"
+  },
+  "billing_key": {
+    "label": "Schlüssel (Abrechnung)",
+    "label_plural": "Schlüssel (Abrechnung)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Abrechnung"
+  },
+  "order_position_serial_number": {
+    "label": "Seriennummer",
+    "label_plural": "Seriennummern",
+    "kind": "Bewegungsdaten",
+    "parent": "Position"
+  },
+  "allocation_serial_number": {
+    "label": "Seriennummer",
+    "label_plural": "Seriennummern",
+    "kind": "Bewegungsdaten",
+    "parent": "Zuteilung"
+  },
+  "2e697a": {
+    "label": "Seriennummer",
+    "label_plural": "Seriennummern",
+    "kind": "Bewegungsdaten",
+    "parent": "Position"
+  },
+  "573e5b": {
+    "label": "Seriennummer",
+    "label_plural": "Seriennummern",
+    "kind": "Bewegungsdaten",
+    "parent": "Bestandsprotokoll"
+  },
+  "hu_position_serial_number": {
+    "label": "Seriennummer",
+    "label_plural": "Seriennummern",
+    "kind": "Bewegungsdaten",
+    "parent": "Position"
+  },
+  "task_serial_number": {
+    "label": "Seriennummer",
+    "label_plural": "Seriennummern",
+    "kind": "Bewegungsdaten",
+    "parent": "Position"
+  },
+  "service_sub_type": {
+    "label": "Serviceart",
+    "label_plural": "Servicearten",
+    "kind": "Stammdaten",
+    "parent": "Art (Versand)"
+  },
+  "signal_word": {
+    "label": "Signalwort",
+    "label_plural": "Signalwörter",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "order_matrix_order_structure": {
+    "label": "Soll-Daten (Auftragsmatrix)",
+    "label_plural": "Soll-Daten (Auftragsmatrix)",
+    "kind": "Stammdaten",
+    "parent": "Matrix (Auftrag)"
+  },
+  "task_evaluation_sorting": {
+    "label": "Sortierung",
+    "label_plural": "Sortierungen",
+    "kind": "Stammdaten",
+    "parent": "Vorgangseinstufung II"
+  },
+  "locating_search_ordering": {
+    "label": "Sortierung",
+    "label_plural": "Sortierungen",
+    "kind": "Stammdaten",
+    "parent": "Sortierung (Lokationssuche)"
+  },
+  "order_pool_sorting": {
+    "label": "Sortierung",
+    "label_plural": "Sortierungen",
+    "kind": "Stammdaten",
+    "parent": "Pool (Auftrag)"
+  },
+  "task_ordering_sorting": {
+    "label": "Sortierung",
+    "label_plural": "Sortierungen",
+    "kind": "Stammdaten",
+    "parent": "Sortierung (Vorgang)"
+  },
+  "task_pool_sorting": {
+    "label": "Sortierung",
+    "label_plural": "Sortierungen",
+    "kind": "Stammdaten",
+    "parent": "Pool (Vorgang)"
+  },
+  "reservation_sorting": {
+    "label": "Sortierung",
+    "label_plural": "Sortierungen",
+    "kind": "Stammdaten",
+    "parent": "Typ (Zuteilung)"
+  },
+  "sorting_order_head_wave": {
+    "label": "Sortierung (Auftrag)",
+    "label_plural": "Sortierungen (Auftrag)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Welle)"
+  },
+  "sorting_order_head_tour": {
+    "label": "Sortierung (Auftrag)",
+    "label_plural": "Sortierungen (Auftrag)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Tour)"
+  },
+  "order_head_sorting": {
+    "label": "Sortierung (Auftrag)",
+    "label_plural": "Sortierungen (Auftrag)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Sendung)"
+  },
+  "stocktaking_sort_limiter": {
+    "label": "Sortierung/ Limitierung",
+    "label_plural": "Sortierungen/ Limitierungen",
+    "kind": "Stammdaten",
+    "parent": "Inventurprofil"
+  },
+  "locating_search_sorting": {
+    "label": "Sortierung (Lokationssuche)",
+    "label_plural": "Sortierungen (Lokationssuche)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lagertopologie"
+  },
+  "shipment_sorting": {
+    "label": "Sortierung (Sendung)",
+    "label_plural": "Sortierungen (Sendung)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Sendung)"
+  },
+  "task_ordering": {
+    "label": "Sortierung (Vorgang)",
+    "label_plural": "Sortierungen (Vorgang)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Vorgang"
+  },
+  "wmx_language": {
+    "label": "Sprache",
+    "label_plural": "Sprachen",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "vehicle_master": {
+    "label": "Stamm (Fahrzeug)",
+    "label_plural": "Stämme (Fahrzeug)",
+    "kind": "Stammdaten",
+    "parent": "Stamm (Unternehmer)"
+  },
+  "hu_message": {
+    "label": "Stamm (HU-Meldung)",
+    "label_plural": "Stämme (Meldung)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Handling-Unit"
+  },
+  "message": {
+    "label": "Stamm (Meldung)",
+    "label_plural": "Stämme (Meldung)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Vorgang"
+  },
+  "a890f0": {
+    "label": "Stamm (Prüfplan)",
+    "label_plural": "Stämme (Prüfplan)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "text_category": {
+    "label": "Stamm (Text)",
+    "label_plural": "Stämme (Text)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "master_transport_operator": {
+    "label": "Stamm (Unternehmer)",
+    "label_plural": "Stämme (Unternehmer)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Disposition"
+  },
+  "vas_master": {
+    "label": "Stamm (VAS)",
+    "label_plural": "Stämme (VAS)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "b8246a": {
+    "label": "Stamm (Zustellgrund)",
+    "label_plural": "Stämme (Zustellgrund)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Disposition"
+  },
+  "site": {
+    "label": "Standort",
+    "label_plural": "Standorte",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "storage_zone_grid": {
+    "label": "Status (Platz)",
+    "label_plural": "Status (Platz)",
+    "kind": "Stammdaten",
+    "parent": "Zone"
+  },
+  "order_control_code": {
+    "label": "Steuercode (Auftrag)",
+    "label_plural": "Steuercodes (Auftrag)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "order_position_control_code": {
+    "label": "Steuercode (Auftragsposition)",
+    "label_plural": "Steuercodes (Auftragsposition)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "task_control_code": {
+    "label": "Steuercode (Vorgang)",
+    "label_plural": "Steuercodes (Vorgang)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Vorgang"
+  },
+  "parts_list": {
+    "label": "Stückliste",
+    "label_plural": "Stücklisten",
+    "kind": "Stammdaten",
+    "parent": "Artikelstamm"
+  },
+  "parts_list_position": {
+    "label": "Stücklistenposition",
+    "label_plural": "Stücklistenpositionen",
+    "kind": "Stammdaten",
+    "parent": "Stückliste"
+  },
+  "system_connection": {
+    "label": "Systemanbindung",
+    "label_plural": "Systemanbindungen",
+    "kind": "Stammdaten",
+    "parent": "Mandant"
+  },
+  "150883": {
+    "label": "Tag (Artikelstammanhang)",
+    "label_plural": "Tags (Artikelstammanhang)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Artikelstamm"
+  },
+  "order_attachment_tag": {
+    "label": "Tag (Auftragsanhang)",
+    "label_plural": "Tags (Auftragsanhang)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "vehicle_attachment_tag": {
+    "label": "Tag (Fahrzeug Anhang)",
+    "label_plural": "Tags (Fahrzeug Anhang)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Disposition"
+  },
+  "handling_unit_attachment_tag": {
+    "label": "Tag (HU-Anhang)",
+    "label_plural": "Tags (HU-Anhang)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Handling-Unit"
+  },
+  "freight_attachment_tag": {
+    "label": "Tag (Ladungsanhang)",
+    "label_plural": "Tags (Ladungsanhang)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Tour/Ladung"
+  },
+  "text_tag": {
+    "label": "Tag (Text)",
+    "label_plural": "Tags (Text)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Auftrag"
+  },
+  "41f52b": {
+    "label": "Tag (Tour)",
+    "label_plural": "Tags (Tour)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Tour/Ladung"
+  },
+  "transport_operator_tags": {
+    "label": "Tag (Unternehmeranhang)",
+    "label_plural": "Tags (Unternehmeranhang)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Disposition"
+  },
+  "task_attachment_tag": {
+    "label": "Tag (Vorgangsanhang)",
+    "label_plural": "Tags (Vorgangsanhang)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Vorgang"
+  },
+  "order_position_text": {
+    "label": "Text",
+    "label_plural": "Texte",
+    "kind": "Bewegungsdaten",
+    "parent": "Position"
+  },
+  "order_text": {
+    "label": "Text",
+    "label_plural": "Texte",
+    "kind": "Bewegungsdaten",
+    "parent": "Auftrag"
+  },
+  "tour_text": {
+    "label": "Text",
+    "label_plural": "Texte",
+    "kind": "Bewegungsdaten",
+    "parent": "Tour"
+  },
+  "tour": {
+    "label": "Tour",
+    "label_plural": "Touren",
+    "kind": "Bewegungsdaten",
+    "parent": ""
+  },
+  "tour_vehicles": {
+    "label": "Tour Fahrzeuge",
+    "label_plural": "Tour Fahrzeuge",
+    "kind": "Bewegungsdaten",
+    "parent": "Tour"
+  },
+  "transport_category": {
+    "label": "Transportkategorie",
+    "label_plural": "Transportkategorien",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "address_type": {
+    "label": "Typ (Adresse)",
+    "label_plural": "Typen (Adresse)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Adressstamm"
+  },
+  "order_type": {
+    "label": "Typ (Auftrag)",
+    "label_plural": "Typen (Auftrag)",
+    "kind": "Schema",
+    "parent": "Auftrag"
+  },
+  "restriction_type": {
+    "label": "Typ (Beschränkungen)",
+    "label_plural": "Typen (Beschränkungen)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Disposition"
+  },
+  "compartment_type": {
+    "label": "Typ (Fach)",
+    "label_plural": "Typen (Fach)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lagertopologie"
+  },
+  "vehicle_type": {
+    "label": "Typ (Fahrzeug)",
+    "label_plural": "Typen (Fahrzeug)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Disposition"
+  },
+  "storage_field_type": {
+    "label": "Typ (Feld)",
+    "label_plural": "Typen (Feld)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lagertopologie"
+  },
+  "handling_unit_type": {
+    "label": "Typ (HU)",
+    "label_plural": "Typen (HU)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Handling-Unit"
+  },
+  "handling_unit_height_type": {
+    "label": "Typ (HU-Höhen)",
+    "label_plural": "Typen (HU-Höhen)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Handling-Unit"
+  },
+  "handling_unit_identification_type": {
+    "label": "Typ (HU-Identifikation)",
+    "label_plural": "Typen (HU-Identifikation)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Handling-Unit"
+  },
+  "handling_unit_segmentation_type": {
+    "label": "Typ (HU-Segmentierung)",
+    "label_plural": "Typen (HU-Segmentierung)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Handling-Unit"
+  },
+  "handling_unit_search_type": {
+    "label": "Typ (HU-Suche)",
+    "label_plural": "Typen (HU-Suche)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Handling-Unit"
+  },
+  "5b97b0": {
+    "label": "Typ (Lademittel)",
+    "label_plural": "Typen (Lademittel)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lademittelkonto"
+  },
+  "17eb88": {
+    "label": "Typ (Lademittelbuchung)",
+    "label_plural": "Typen (Lademittelbuchung)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lademittelkonto"
+  },
+  "35ed8a": {
+    "label": "Typ (Lademittelqualität)",
+    "label_plural": "Typen (Lademittelqualität)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lademittelkonto"
+  },
+  "storage_location_type": {
+    "label": "Typ (Platz)",
+    "label_plural": "Typen (Platz)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lagertopologie"
+  },
+  "storage_location_height_type": {
+    "label": "Typ (Platz-Höhen)",
+    "label_plural": "Typen (Platz-Höhen)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lagertopologie"
+  },
+  "resource_type": {
+    "label": "Typ (Ressource)",
+    "label_plural": "Typen (Ressource)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lagertopologie"
+  },
+  "task_type": {
+    "label": "Typ (Vorgang)",
+    "label_plural": "Typen (Vorgang)",
+    "kind": "Schema",
+    "parent": "Vorgang"
+  },
+  "task_position_type": {
+    "label": "Typ (Vorgangspos.)",
+    "label_plural": "Typen (Vorgangspos.)",
+    "kind": "Schema",
+    "parent": "Position"
+  },
+  "storage_zone_type": {
+    "label": "Typ (Zone)",
+    "label_plural": "Typen (Zone)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Lagertopologie"
+  },
+  "allocation_type": {
+    "label": "Typ (Zuteilung)",
+    "label_plural": "Typen (Zuteilung)",
+    "kind": "Schema",
+    "parent": "Zuteilung"
+  },
+  "un_number": {
+    "label": "UN-Nummer",
+    "label_plural": "UN-Nummern",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "variant_master": {
+    "label": "Variantenstamm",
+    "label_plural": "Variantenstämme",
+    "kind": "Stammdaten",
+    "parent": "Artikelstamm"
+  },
+  "order_position_vas": {
+    "label": "VAS",
+    "label_plural": "VAS",
+    "kind": "Bewegungsdaten",
+    "parent": "Position"
+  },
+  "order_vas": {
+    "label": "VAS",
+    "label_plural": "VAS",
+    "kind": "Bewegungsdaten",
+    "parent": "Auftrag"
+  },
+  "order_position_vas_step": {
+    "label": "VAS-Schritt",
+    "label_plural": "VAS-Schritte",
+    "kind": "Bewegungsdaten",
+    "parent": "VAS"
+  },
+  "order_vas_step": {
+    "label": "VAS-Schritt",
+    "label_plural": "VAS-Schritte",
+    "kind": "Bewegungsdaten",
+    "parent": "VAS"
+  },
+  "vas_step": {
+    "label": "VAS-Schritt",
+    "label_plural": "VAS-Schritte",
+    "kind": "Stammdaten",
+    "parent": "Stamm (VAS)"
+  },
+  "batch_compaction": {
+    "label": "Verdichtung",
+    "label_plural": "Verdichtungen",
+    "kind": "Stammdaten",
+    "parent": "Profil (Sammelliste)"
+  },
+  "return_delivery_procedure": {
+    "label": "Verfahren (Retouren)",
+    "label_plural": "Verfahren (Retouren)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Retoure)"
+  },
+  "modes_of_transport": {
+    "label": "Verkehrsträger",
+    "label_plural": "Verkehrsträger",
+    "kind": "Stammdaten",
+    "parent": "Gefahrrechtliche Grundlage"
+  },
+  "packaging_group": {
+    "label": "Verpackungsgruppe",
+    "label_plural": "Verpackungsgruppen",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "packaging_structure": {
+    "label": "Verpackungsstruktur",
+    "label_plural": "Verpackungsstrukturen",
+    "kind": "Stammdaten",
+    "parent": "Artikelstamm"
+  },
+  "task_evaluation_packaging_structure": {
+    "label": "Verpackungsstruktur",
+    "label_plural": "Verpackungsstrukturen",
+    "kind": "Stammdaten",
+    "parent": "Vorgangseinstufung II"
+  },
+  "packaging_structure_pos": {
+    "label": "Verpackungsstrukturposition",
+    "label_plural": "Verpackungsstrukturpositionen",
+    "kind": "Stammdaten",
+    "parent": "Verpackungsstruktur"
+  },
+  "distributor": {
+    "label": "Verteiler",
+    "label_plural": "Verteiler",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "compatability_group": {
+    "label": "Verträglichkeitsgruppe",
+    "label_plural": "Verträglichkeitsgruppen",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "customs_head": {
+    "label": "Verzollung",
+    "label_plural": "Verzollungen",
+    "kind": "Bewegungsdaten",
+    "parent": ""
+  },
+  "task_head": {
+    "label": "Vorgang",
+    "label_plural": "Vorgänge",
+    "kind": "Bewegungsdaten",
+    "parent": ""
+  },
+  "task_evaluation_step1": {
+    "label": "Vorgangseinstufung I",
+    "label_plural": "Vorgangseinstufungen I",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Vorgang"
+  },
+  "task_evaluation_step2": {
+    "label": "Vorgangseinstufung II",
+    "label_plural": "Vorgangseinstufungen II",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Vorgang"
+  },
+  "task_assignment": {
+    "label": "Vorgangszuordnung",
+    "label_plural": "Vorgangszuordnungen",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "currency": {
+    "label": "Währung",
+    "label_plural": "Währungen",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "water_hazard_class": {
+    "label": "Wassergefährdungsklasse",
+    "label_plural": "Wassergefährdungsklassen",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "economic_zone": {
+    "label": "Wirtschaftszone",
+    "label_plural": "Wirtschaftszonen",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Zoll"
+  },
+  "location_height": {
+    "label": "x-Achse (Höhe)",
+    "label_plural": "x-Achsen (Höhe)",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "stock_restriction_xyz": {
+    "label": "xyz-Achse (Artikelkategorie)",
+    "label_plural": "xyz-Achsen (Artikelkategorie)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Bestandsrestriktionen)"
+  },
+  "location_level": {
+    "label": "y-Achse (Ebene)",
+    "label_plural": "y-Achsen (Ebene)",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "location_depth": {
+    "label": "z-Achse (Tiefe)",
+    "label_plural": "z-Achsen (Tiefe)",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "counter": {
+    "label": "Zähler (Begrenzer)",
+    "label_plural": "Zähler (Begrenzer)",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "stock_qualification_trigger": {
+    "label": "Zeittrigger",
+    "label_plural": "Zeittrigger",
+    "kind": "Stammdaten",
+    "parent": "Profil (Bestandsarten)"
+  },
+  "c71786": {
+    "label": "Zeitzonen",
+    "label_plural": "",
+    "kind": "Stammdaten",
+    "parent": "Basiskonfiguration"
+  },
+  "storage_zone": {
+    "label": "Zone",
+    "label_plural": "Zonen",
+    "kind": "Stammdaten",
+    "parent": "Standort"
+  },
+  "locating_search_grouping": {
+    "label": "Zonierung",
+    "label_plural": "Zonierungen",
+    "kind": "Stammdaten",
+    "parent": "Lokationssuche"
+  },
+  "order_consolidation": {
+    "label": "Zonierung",
+    "label_plural": "Zonierungen",
+    "kind": "Bewegungsdaten",
+    "parent": "Auftrag"
+  },
+  "tour_consolidation": {
+    "label": "Zonierung",
+    "label_plural": "Zonierungen",
+    "kind": "Bewegungsdaten",
+    "parent": "Tour"
+  },
+  "reservation_zoning": {
+    "label": "Zonierung",
+    "label_plural": "Zonierungen",
+    "kind": "Stammdaten",
+    "parent": "Typ (Zuteilung)"
+  },
+  "order_wave_zoning": {
+    "label": "Zonierung",
+    "label_plural": "Zonierungen",
+    "kind": "Bewegungsdaten",
+    "parent": "Auftragswelle"
+  },
+  "permissible_qty_hazardous_substances": {
+    "label": "Zulässige Gefahrstoffmenge",
+    "label_plural": "Zulässige Gefahrstoffmengen",
+    "kind": "Stammdaten",
+    "parent": "Cluster (Zone)"
+  },
+  "billing_assignment": {
+    "label": "Zuordnung (Abrechnungsschlüssel)",
+    "label_plural": "Zuordnungen (Abrechnungsschlüssel)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Abrechnung)"
+  },
+  "billing_key_trigger": {
+    "label": "Zuordnung (Abrechnungstrigger)",
+    "label_plural": "Zuordnungen (Abrechnungstrigger)",
+    "kind": "Stammdaten",
+    "parent": "Schlüssel (Abrechnung)"
+  },
+  "tour_address_assignment": {
+    "label": "Zuordnung (Adresse)",
+    "label_plural": "Zuordnungen (Adresse)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Tour)"
+  },
+  "customs_address_assigment": {
+    "label": "Zuordnung (Adresse)",
+    "label_plural": "Zuordnungen (Adresse)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Zollverfahren)"
+  },
+  "freight_address_assignment": {
+    "label": "Zuordnung (Adresse)",
+    "label_plural": "Zuordnungen (Adresse)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Ladung)"
+  },
+  "order_assignment_address_category": {
+    "label": "Zuordnung (Adresskategorie)",
+    "label_plural": "Zuordnungen (Adresskategorie)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Auftragsvalidierung)"
+  },
+  "route_action_assignment": {
+    "label": "Zuordnung (Aktion)",
+    "label_plural": "Zuordnungen (Aktion)",
+    "kind": "Stammdaten",
+    "parent": "Route"
+  },
+  "storage_location_type_action": {
+    "label": "Zuordnung (Aktion)",
+    "label_plural": "Zuordnungen (Aktion)",
+    "kind": "Stammdaten",
+    "parent": "Typ (Platz)"
+  },
+  "resource_assigned_working_area": {
+    "label": "Zuordnung (Arbeitszone)",
+    "label_plural": "Zuordnungen (Arbeitszone)",
+    "kind": "Stammdaten",
+    "parent": "Ressource"
+  },
+  "replenishment_rule_item": {
+    "label": "Zuordnung (Artikel)",
+    "label_plural": "Zuordnungen (Artikel)",
+    "kind": "Stammdaten",
+    "parent": "Bestandsregel"
+  },
+  "assigment_article_groups": {
+    "label": "Zuordnung (Artikelaktion)",
+    "label_plural": "Zuordnungen (Artikelaktion)",
+    "kind": "Stammdaten",
+    "parent": "Inventurprofil"
+  },
+  "replenishment_rule_action_group": {
+    "label": "Zuordnung (Artikelaktion)",
+    "label_plural": "Zuordnungen (Artikelaktion)",
+    "kind": "Stammdaten",
+    "parent": "Bestandsregel"
+  },
+  "assignement_conditions": {
+    "label": "Zuordnung (Bedingung)",
+    "label_plural": "Zuordnungen (Bedingung)",
+    "kind": "Stammdaten",
+    "parent": "Zusammenlagerungsmatrix"
+  },
+  "assignment_limitations": {
+    "label": "Zuordnung (Beschränkung)",
+    "label_plural": "Zuordnungen (Beschränkung)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Beschränkungen)"
+  },
+  "stock_qualification_assignment": {
+    "label": "Zuordnung (Bestandsarten)",
+    "label_plural": "Zuordnungen (Bestandsarten)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Bestandsarten)"
+  },
+  "replenishment_rule_item_qualification": {
+    "label": "Zuordnung (Bestandsqualifikation)",
+    "label_plural": "Zuordnungen (Bestandsqualifikation)",
+    "kind": "Stammdaten",
+    "parent": "Zuordnung (Artikel)"
+  },
+  "replenishment_rule_action_group_qualification": {
+    "label": "Zuordnung (Bestandsqualifikation)",
+    "label_plural": "Zuordnungen (Bestandsqualifikation)",
+    "kind": "Stammdaten",
+    "parent": "Zuordnung (Artikelaktion)"
+  },
+  "mask_identifiers": {
+    "label": "Zuordnung (Datenbezeichner)",
+    "label_plural": "Zuordnungen (Datenbezeichner)",
+    "kind": "Stammdaten",
+    "parent": "Input (Maske)"
+  },
+  "order_sub_type_print_assignment": {
+    "label": "Zuordnung (Druckausgabe)",
+    "label_plural": "Zuordnungen (Druckausgabe)",
+    "kind": "Stammdaten",
+    "parent": "Art (Auftrag)"
+  },
+  "0305d2": {
+    "label": "Zuordnung (Druckausgabe)",
+    "label_plural": "Zuordnungen (Druckausgabe)",
+    "kind": "Stammdaten",
+    "parent": "VAS-Schritt"
+  },
+  "freight_profile_print_assignment": {
+    "label": "Zuordnung (Druckausgabe)",
+    "label_plural": "Zuordnungen (Druckausgabe)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Ladung)"
+  },
+  "task_sub_type_print_assignment": {
+    "label": "Zuordnung (Druckausgabe)",
+    "label_plural": "Zuordnungen (Druckausgabe)",
+    "kind": "Stammdaten",
+    "parent": "Art (Vorgang)"
+  },
+  "f20266": {
+    "label": "Zuordnung (Druckausgabe)",
+    "label_plural": "Zuordnungen (Druckausgabe)",
+    "kind": "Stammdaten",
+    "parent": "Buchungskreis Disposition"
+  },
+  "shipping_sub_type_print_assignment": {
+    "label": "Zuordnung (Druckausgabe)",
+    "label_plural": "Zuordnungen (Druckausgabe)",
+    "kind": "Stammdaten",
+    "parent": "Art (Versand)"
+  },
+  "8b92ff": {
+    "label": "Zuordnung (Druckausgabe)",
+    "label_plural": "Zuordnungen (Druckausgabe)",
+    "kind": "Stammdaten",
+    "parent": "Inventurprofil"
+  },
+  "location_type_print_assignment": {
+    "label": "Zuordnung (Druckausgabe)",
+    "label_plural": "Zuordnungen (Druckausgabe)",
+    "kind": "Stammdaten",
+    "parent": "Typ (Platz)"
+  },
+  "validation_field_assignment": {
+    "label": "Zuordnung (Feldvalidierung)",
+    "label_plural": "Zuordnungen (Feldvalidierung)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Auftragsvalidierung)"
+  },
+  "task_assignment_release_group": {
+    "label": "Zuordnung (Freigabegruppe)",
+    "label_plural": "Zuordnungen (Freigabegruppe)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Freigabe)"
+  },
+  "container_allocation": {
+    "label": "Zuordnung (Gebinde)",
+    "label_plural": "Zuordnungen (Gebinde)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Auftragskalkulation)"
+  },
+  "height_type_relation": {
+    "label": "Zuordnung (Höhentyp)",
+    "label_plural": "Zuordnungen (Höhentyp)",
+    "kind": "Stammdaten",
+    "parent": "Zonierung"
+  },
+  "task_evaluation_hu_calculation": {
+    "label": "Zuordnung (HU-Kalkulation)",
+    "label_plural": "Zuordnungen (HU-Kalkulation)",
+    "kind": "Stammdaten",
+    "parent": "Vorgangseinstufung II"
+  },
+  "input_template_assignment": {
+    "label": "Zuordnung (Inputschablone)",
+    "label_plural": "Zuordnungen (Inputschablone)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Bestandsmerkmal)"
+  },
+  "category_relation": {
+    "label": "Zuordnung (Kategorie)",
+    "label_plural": "Zuordnungen (Kategorie)",
+    "kind": "Stammdaten",
+    "parent": "Sortierung (Lokationssuche)"
+  },
+  "correction_profile_assignment": {
+    "label": "Zuordnung (Korrekturschritt)",
+    "label_plural": "Zuordnungen (Korrekturschritt)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Korrektur)"
+  },
+  "loading_field_assignment": {
+    "label": "Zuordnung (Lade-Informationen)",
+    "label_plural": "Zuordnungen (Lade-Informationen)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Ladung)"
+  },
+  "loading_target_assignment": {
+    "label": "Zuordnung (Ladeziel)",
+    "label_plural": "Zuordnungen (Ladeziel)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Ladung)"
+  },
+  "template_masks": {
+    "label": "Zuordnung (Maske)",
+    "label_plural": "Zuordnungen (Maske)",
+    "kind": "Stammdaten",
+    "parent": "Input (Schablone)"
+  },
+  "resource_assigned_location": {
+    "label": "Zuordnung (Platz)",
+    "label_plural": "Zuordnungen (Plätze)",
+    "kind": "Stammdaten",
+    "parent": "Ressource"
+  },
+  "assignment_priority_optimisation": {
+    "label": "Zuordnung (Prioritätsoptimierung)",
+    "label_plural": "Zuordnungen (Prioritätsoptimierung)",
+    "kind": "Stammdaten",
+    "parent": "Aktion"
+  },
+  "4cc058": {
+    "label": "Zuordnung (Prozess)",
+    "label_plural": "Zuordnungen (Prozess)",
+    "kind": "Stammdaten",
+    "parent": "Typ (Platz)"
+  },
+  "repacking_source_zone_assignment": {
+    "label": "Zuordnung (Quell-Zone)",
+    "label_plural": "Zuordnungen (Quell-Zone)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Umpacken)"
+  },
+  "assignment_fram_tour_recepient": {
+    "label": "Zuordnung (Rahmentour - Empfänger)",
+    "label_plural": "Zuordnungen (Rahmentour-Empfänger)",
+    "kind": "Stammdaten",
+    "parent": "Rahmentour"
+  },
+  "2a9a8f": {
+    "label": "Zuordnung (Rahmentour - Verlader)",
+    "label_plural": "Zuordnungen (Rahmentour-Verlader)",
+    "kind": "Stammdaten",
+    "parent": "Rahmentour"
+  },
+  "text_tag_resource_assignment": {
+    "label": "Zuordnung (Ressource)",
+    "label_plural": "Zuordnungen (Ressource)",
+    "kind": "Stammdaten",
+    "parent": "Tag (Text)"
+  },
+  "tracking_id_assignment": {
+    "label": "Zuordnung (TrackingId)",
+    "label_plural": "Zuordnungen (TrackingId)",
+    "kind": "Stammdaten",
+    "parent": "Art (Versand)"
+  },
+  "distribution_assignment": {
+    "label": "Zuordnung (Verteilerprofil)",
+    "label_plural": "Zuordnungen (Verteiler)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Verteiler)"
+  },
+  "task_booking_assignments": {
+    "label": "Zuordnung (Vorgangsbuchungsklasse)",
+    "label_plural": "Zuordnungen (Vorgangsbuchungsklasse)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Vorgang)"
+  },
+  "resource_assigned_task_profile": {
+    "label": "Zuordnung (Vorgangsprofil)",
+    "label_plural": "Zuordnungen (Vorgangsprofil)",
+    "kind": "Stammdaten",
+    "parent": "Ressource"
+  },
+  "assignment_outgoing_goods": {
+    "label": "Zuordnung (Warenausgang)",
+    "label_plural": "Zuordnungen (Warenausgang)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Seriennummer)"
+  },
+  "customs_procedure_assigment": {
+    "label": "Zuordnung (Zollabwicklung)",
+    "label_plural": "Zuordnungen (Zollabwicklung)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Zollverfahren)"
+  },
+  "customs_notice_assigment_customs": {
+    "label": "Zuordnung (Zollbescheid - Verzollung)",
+    "label_plural": "Zuordnungen (Zollbescheid - Verzollung)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Zollverfahren)"
+  },
+  "customs_notice_assigment_status": {
+    "label": "Zuordnung (Zollbescheid - Zollstatus)",
+    "label_plural": "Zuordnungen (Zollbescheid - Zollstatus)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Zollverfahren)"
+  },
+  "customs_quantity_unit_assigment": {
+    "label": "Zuordnung (Zolleinheit)",
+    "label_plural": "Zuordnungen (Zolleinheit)",
+    "kind": "Stammdaten",
+    "parent": "Profil (Zollverfahren)"
+  },
+  "assigment_zone": {
+    "label": "Zuordnung (Zonen)",
+    "label_plural": "Zuordnungen (Zonen)",
+    "kind": "Stammdaten",
+    "parent": "Inventurprofil"
+  },
+  "co_location_matrix": {
+    "label": "Zusammenlagerungsmatrix",
+    "label_plural": "Zusammenlagerungsmatrix",
+    "kind": "Stammdaten",
+    "parent": ""
+  },
+  "allocation": {
+    "label": "Zuteilung",
+    "label_plural": "Zuteilungen",
+    "kind": "Bewegungsdaten",
+    "parent": ""
+  },
+  "processevents_printer": {
+    "label": "Druck-Event",
+    "label_plural": "Druck-Events",
+    "kind": "Bewegungsdaten",
+    "parent": "Print-Subscription"
+  }
+}

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Karteikarten — plx.learnSQL{% endblock %}
+{% block content %}
+<header class="page-header">
+  <p class="eyebrow">Aktiver Abruf</p>
+  <h1>Karteikarten</h1>
+  <p class="lede">{{ card_count }} Karten aus Quiz, Glossar und Fallstricken. Umdrehen, bewerten, wiederholen.</p>
+</header>
+
+<section class="card cards-wrap">
+  <div class="cards-toolbar">
+    <label class="muted">Filter
+      <select id="card-filter">
+        <option value="">Alle Lektionen</option>
+        {% for l in lessons %}
+        <option value="{{ l.id }}">Teil {{ l.letter or l.id|upper }} — {{ l.title }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <span class="muted" id="card-progress">0 / 0</span>
+  </div>
+
+  <div class="flashcard" id="flashcard" tabindex="0">
+    <div class="flashcard-inner">
+      <div class="flashcard-face front">
+        <p class="flashcard-kicker" id="card-kicker">Karteikarte</p>
+        <p class="flashcard-text" id="card-front">Lade Karten…</p>
+        <p class="muted">Klicken oder Leertaste zum Umdrehen</p>
+      </div>
+      <div class="flashcard-face back">
+        <p class="flashcard-kicker">Antwort</p>
+        <p class="flashcard-text" id="card-back"></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="cards-actions">
+    <button class="btn" type="button" id="card-again">Nochmal</button>
+    <button class="btn btn-primary" type="button" id="card-got-it">Sitzt</button>
+  </div>
+</section>
+{% endblock %}
