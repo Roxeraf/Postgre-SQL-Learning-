@@ -27,60 +27,23 @@
           "Rechts bei Auftrag siehst du order_number (Auftragsnummer) und task_status (Status). Kein JOIN nötig.",
           "SELECT order_number, task_status FROM instance_1.flowapp_demo_order_head;"
         ],
-        "solution": "SELECT order_number, task_status FROM instance_1.flowapp_demo_order_head;",
-        "pieces": [
-          {
-            "insert": "order_number",
-            "label": "order_number",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "task_status",
-            "label": "task_status",
-            "slot": "SELECT",
-            "into": "select"
-          }
-        ],
-        "trick": "Kein JOIN. Zwei Spalten aus Auftrag nach SELECT."
+        "solution": "SELECT order_number, task_status FROM instance_1.flowapp_demo_order_head;"
       },
       {
         "id": "a-ex2",
         "why": "Dieselbe Liste, aber der Kollege will auch den Mandanten sehen.",
         "task": "Verknüpfe Auftrag mit Mandant und gib Auftragsnummer plus Mandanten-Code aus.",
         "look": [
-          "Baustein SELECT: order_number und code.",
-          "Baustein JOIN: c.id = oh.client_id — die Lücke nach ON."
+          "SELECT: oh.order_number und c.code.",
+          "ON c.id = oh.client_id — der JOIN fehlt noch."
         ],
         "prompt": "Verknüpfe Auftrag mit Mandant und gib Auftragsnummer plus Mandanten-Code aus.",
-        "starter": "-- Lücken mit den Bausteinen füllen (SELECT / JOIN).\n\nSELECT\n  -- Baustein SELECT\nFROM instance_1.flowapp_demo_order_head oh\nLEFT JOIN instance_1.flowapp_demo_client c\n  ON \n",
+        "starter": "-- SELECT-Liste und JOIN-Bedingung ergänzen.\n\nSELECT\n  \nFROM instance_1.flowapp_demo_order_head oh\nLEFT JOIN instance_1.flowapp_demo_client c\n  ON \n",
         "hints": [
           "SELECT oh.order_number, c.code — Alias oh und c stehen schon im FROM.",
           "ON c.id = oh.client_id — nicht client_id mit code verwechseln."
         ],
-        "solution": "SELECT oh.order_number, c.code FROM instance_1.flowapp_demo_order_head oh LEFT JOIN instance_1.flowapp_demo_client c ON c.id = oh.client_id;",
-        "pieces": [
-          {
-            "insert": "oh.order_number",
-            "label": "order_number",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "c.code",
-            "label": "code",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "c.id = oh.client_id",
-            "label": "c.id = oh.client_id",
-            "slot": "JOIN",
-            "into": "after",
-            "after": "ON "
-          }
-        ],
-        "trick": "JOIN-Lücke nach ON: c.id = oh.client_id (beides UUID, nicht code)."
+        "solution": "SELECT oh.order_number, c.code FROM instance_1.flowapp_demo_order_head oh LEFT JOIN instance_1.flowapp_demo_client c ON c.id = oh.client_id;"
       },
       {
         "id": "a-ex3",
@@ -97,35 +60,7 @@
           "Außen dieselben drei Spalten wie in der CTE: handling_unit_position_id, batch_a, updated_date.",
           "WHERE rn = 1 filtert auf die neueste Zeile je Position."
         ],
-        "solution": "WITH ranked AS (SELECT handling_unit_position_id, batch_a, updated_date, ROW_NUMBER() OVER (PARTITION BY handling_unit_position_id ORDER BY updated_date DESC) AS rn FROM instance_1.flowapp_demo_stock_quant) SELECT handling_unit_position_id, batch_a, updated_date FROM ranked WHERE rn = 1;",
-        "pieces": [
-          {
-            "insert": "handling_unit_position_id",
-            "label": "handling_unit_position_id",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "batch_a",
-            "label": "batch_a",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "updated_date",
-            "label": "updated_date",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "rn = 1",
-            "label": "rn = 1",
-            "slot": "WHERE",
-            "into": "after",
-            "after": "WHERE"
-          }
-        ],
-        "trick": "SELECT dieselben drei Spalten wie in der CTE. WHERE-Lücke: rn = 1."
+        "solution": "WITH ranked AS (SELECT handling_unit_position_id, batch_a, updated_date, ROW_NUMBER() OVER (PARTITION BY handling_unit_position_id ORDER BY updated_date DESC) AS rn FROM instance_1.flowapp_demo_stock_quant) SELECT handling_unit_position_id, batch_a, updated_date FROM ranked WHERE rn = 1;"
       }
     ]
   },
@@ -254,72 +189,34 @@
         "why": "Support fragt: Welche Artikel gehören zu welchem Mandanten? Am Artikelstamm gibt es keine client_id.",
         "task": "Gib die deutsche Artikelbezeichnung und den Mandanten-Code aus.",
         "look": [
-          "Baustein 1: deutscher Text — designation_a->>'de' (die Spalte heißt designation_a).",
-          "Baustein 2: Mandanten-Code.",
-          "Der Join ist vorbereitet (parent_id, nicht client_id)."
+          "SELECT: deutscher Text — im.designation_a->>'de' (die Spalte heißt designation_a).",
+          "Dazu: c.code für den Mandanten.",
+          "Der Join steht schon da (parent_id, nicht client_id)."
         ],
         "prompt": "Gib die deutsche Artikelbezeichnung und den Mandanten-Code aus.",
-        "starter": "-- Deutsche Bezeichnung und Mandanten-Code. Join ist schon da.\n\nSELECT\n  -- Baustein SELECT\nFROM instance_1.flowapp_demo_item_master im\nJOIN instance_1.flowapp_demo_client c\n  ON im.parent_id = c.accounting_area_item_master_id;\n",
+        "starter": "-- Deutsche Bezeichnung und Mandanten-Code. Join ist schon da.\n\nSELECT\n  \nFROM instance_1.flowapp_demo_item_master im\nJOIN instance_1.flowapp_demo_client c\n  ON im.parent_id = c.accounting_area_item_master_id;\n",
         "hints": [
           "Bezeichnung: im.designation_a->>'de'. Nicht designation, sondern designation_a.",
           "Mandant: c.code. Join-Spalte am Mandanten: accounting_area_item_master_id."
         ],
-        "solution": "SELECT im.designation_a->>'de' AS bezeichnung, c.code AS mandant FROM instance_1.flowapp_demo_item_master im JOIN instance_1.flowapp_demo_client c ON im.parent_id = c.accounting_area_item_master_id;",
-        "pieces": [
-          {
-            "insert": "im.designation_a->>'de'",
-            "label": "deutscher Text",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "c.code",
-            "label": "code",
-            "slot": "SELECT",
-            "into": "select"
-          }
-        ],
-        "trick": "JSONB: designation_a->>'de' — die Spalte heißt designation_a, nicht designation."
+        "solution": "SELECT im.designation_a->>'de' AS bezeichnung, c.code AS mandant FROM instance_1.flowapp_demo_item_master im JOIN instance_1.flowapp_demo_client c ON im.parent_id = c.accounting_area_item_master_id;"
       },
       {
         "id": "d-ex2",
         "why": "Jemand will wissen, in welchen Zonen Auftrag 100501 geplant ist.",
         "task": "Gib für die lesbare Nummer 100501 alle Zonentypen (consolidation_type) aus der Zonierung aus.",
         "look": [
-          "Baustein SELECT: consolidation_type — nur das soll in der Ergebnisliste stehen.",
-          "Baustein JOIN: id — schließt die Lücke oh. (UUID). Nicht order_id.",
-          "Baustein WHERE: 100501 — ohne Anführungszeichen, das ist ein Integer."
+          "SELECT: oc.consolidation_type — nur das soll in der Ergebnisliste stehen.",
+          "ON oc.parent_id = oh.id — UUID, nicht order_id.",
+          "WHERE oh.order_id = 100501 — ohne Anführungszeichen, das ist ein Integer."
         ],
         "prompt": "Gib für die lesbare Nummer 100501 alle Zonentypen (consolidation_type) aus der Zonierung aus.",
-        "starter": "-- Lücken mit den Bausteinen füllen (SELECT / JOIN / WHERE).\n\nSELECT\n  -- Baustein SELECT\nFROM instance_1.flowapp_demo_order_head oh\nJOIN instance_1.flowapp_demo_order_consolidation oc\n  ON oc.parent_id = oh.\nWHERE oh.order_id =\n",
+        "starter": "-- SELECT, JOIN-Spalte und WHERE-Wert ergänzen.\n\nSELECT\n  \nFROM instance_1.flowapp_demo_order_head oh\nJOIN instance_1.flowapp_demo_order_consolidation oc\n  ON oc.parent_id = oh.\nWHERE oh.order_id =\n",
         "hints": [
           "Ausgeben: oc.consolidation_type. Join auf oh.id (UUID), nicht auf order_id.",
           "WHERE oh.order_id = 100501 — ohne Anführungszeichen, das ist ein Integer."
         ],
-        "solution": "SELECT oc.consolidation_type FROM instance_1.flowapp_demo_order_head oh JOIN instance_1.flowapp_demo_order_consolidation oc ON oc.parent_id = oh.id WHERE oh.order_id = 100501;",
-        "pieces": [
-          {
-            "insert": "oc.consolidation_type",
-            "label": "consolidation_type",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "id",
-            "label": "id",
-            "slot": "JOIN",
-            "into": "after",
-            "after": "oh."
-          },
-          {
-            "insert": "100501",
-            "label": "100501",
-            "slot": "WHERE",
-            "into": "after",
-            "after": "oh.order_id ="
-          }
-        ],
-        "trick": "Drei Lücken: SELECT = consolidation_type, JOIN = oh.id (UUID), WHERE = 100501 ohne Anführungszeichen."
+        "solution": "SELECT oc.consolidation_type FROM instance_1.flowapp_demo_order_head oh JOIN instance_1.flowapp_demo_order_consolidation oc ON oc.parent_id = oh.id WHERE oh.order_id = 100501;"
       },
       {
         "id": "d-ex3",
@@ -336,22 +233,7 @@
           "split_part(order_number, '_', 1) AS order_number_norm",
           "Zweite Spalte: order_id. Kein JOIN nötig."
         ],
-        "solution": "SELECT split_part(order_number, '_', 1) AS order_number_norm, order_id FROM instance_1.flowapp_demo_order_head;",
-        "pieces": [
-          {
-            "insert": "split_part(order_number, '_', 1)",
-            "label": "split_part …",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "order_id",
-            "label": "order_id",
-            "slot": "SELECT",
-            "into": "select"
-          }
-        ],
-        "trick": "split_part(order_number, '_', 1) schneidet das Suffix _A ab."
+        "solution": "SELECT split_part(order_number, '_', 1) AS order_number_norm, order_id FROM instance_1.flowapp_demo_order_head;"
       }
     ],
     "flashcards": [
@@ -412,22 +294,7 @@
         ],
         "forbid": [
           "AT TIME ZONE 'UTC'"
-        ],
-        "pieces": [
-          {
-            "insert": "id",
-            "label": "id",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "updated_date AT TIME ZONE 'Europe/Berlin'",
-            "label": "Zeit nach Berlin",
-            "slot": "SELECT",
-            "into": "select"
-          }
-        ],
-        "trick": "Genau einmal: updated_date AT TIME ZONE 'Europe/Berlin'. Nicht doppelt, nicht UTC."
+        ]
       },
       {
         "id": "e-ex2",
@@ -449,22 +316,7 @@
         ],
         "forbid": [
           "AT TIME ZONE"
-        ],
-        "pieces": [
-          {
-            "insert": "id",
-            "label": "id",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "storage_date::date",
-            "label": "nur Datum",
-            "slot": "SELECT",
-            "into": "select"
-          }
-        ],
-        "trick": "storage_date ist schon lokal. Nur ::date — kein AT TIME ZONE."
+        ]
       }
     ],
     "flashcards": [
@@ -508,23 +360,7 @@
           "Ausgeben: th.id",
           "WHERE tbc.alias = 'goods-receipt-single-hu-movement'"
         ],
-        "solution": "SELECT th.id FROM instance_1.flowapp_demo_task_head th JOIN instance_1.flowapp_demo_task_booking_class tbc ON tbc.id = th.task_booking_class_id WHERE tbc.alias = 'goods-receipt-single-hu-movement';",
-        "pieces": [
-          {
-            "insert": "th.id",
-            "label": "id",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "tbc.alias = 'goods-receipt-single-hu-movement'",
-            "label": "tbc.alias = 'goods-receipt-single-hu-movement'",
-            "slot": "WHERE",
-            "into": "after",
-            "after": "WHERE"
-          }
-        ],
-        "trick": "SELECT th.id. WHERE-Lücke: tbc.alias = 'goods-receipt-single-hu-movement'."
+        "solution": "SELECT th.id FROM instance_1.flowapp_demo_task_head th JOIN instance_1.flowapp_demo_task_booking_class tbc ON tbc.id = th.task_booking_class_id WHERE tbc.alias = 'goods-receipt-single-hu-movement';"
       },
       {
         "id": "f-ex2",
@@ -541,23 +377,7 @@
           "SELECT DISTINCT th.id — sonst verdoppelt der Join über Positionen denselben Vorgang.",
           "WHERE tbc.alias LIKE 'goods-receipt%' AND th.task_state = '90' AND tp.storage_date IS NOT NULL"
         ],
-        "solution": "SELECT DISTINCT th.id FROM instance_1.flowapp_demo_task_head th JOIN instance_1.flowapp_demo_task_position tp ON tp.task_head_id = th.id JOIN instance_1.flowapp_demo_task_booking_class tbc ON tbc.id = th.task_booking_class_id WHERE tbc.alias LIKE 'goods-receipt%' AND th.task_state = '90' AND tp.storage_date IS NOT NULL;",
-        "pieces": [
-          {
-            "insert": "DISTINCT th.id",
-            "label": "DISTINCT th.id",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "tbc.alias LIKE 'goods-receipt%' AND th.task_state = '90' AND tp.storage_date IS NOT NULL",
-            "label": "tbc.alias LIKE 'goods-receipt%' AND th.task_state = '90' AND tp.storage_date IS NOT NULL",
-            "slot": "WHERE",
-            "into": "after",
-            "after": "WHERE"
-          }
-        ],
-        "trick": "SELECT DISTINCT th.id. WHERE: WE-Alias, task_state 90, storage_date vorhanden."
+        "solution": "SELECT DISTINCT th.id FROM instance_1.flowapp_demo_task_head th JOIN instance_1.flowapp_demo_task_position tp ON tp.task_head_id = th.id JOIN instance_1.flowapp_demo_task_booking_class tbc ON tbc.id = th.task_booking_class_id WHERE tbc.alias LIKE 'goods-receipt%' AND th.task_state = '90' AND tp.storage_date IS NOT NULL;"
       }
     ]
   },
@@ -596,22 +416,7 @@
             "order_number": "100507_A",
             "task_status": "80"
           }
-        ],
-        "pieces": [
-          {
-            "insert": "order_number",
-            "label": "order_number",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "task_status",
-            "label": "task_status",
-            "slot": "SELECT",
-            "into": "select"
-          }
-        ],
-        "trick": "Muster: SELECT → BEGIN → UPDATE → dieselbe SELECT → COMMIT."
+        ]
       },
       {
         "id": "g-ex2",
@@ -631,22 +436,7 @@
         "solution": "SELECT id FROM instance_1.flowapp_demo_task_position_reference WHERE task_position_id = 'aaaaaaab-0000-0000-0000-000000000002';\nBEGIN;\nDELETE FROM instance_1.flowapp_demo_task_position_reference WHERE task_position_id = 'aaaaaaab-0000-0000-0000-000000000002';\nDELETE FROM instance_1.flowapp_demo_task_position WHERE id = 'aaaaaaab-0000-0000-0000-000000000002';\nSELECT id FROM instance_1.flowapp_demo_task_position WHERE id = 'aaaaaaab-0000-0000-0000-000000000002';\nCOMMIT;",
         "kind": "write",
         "verify": "SELECT id FROM instance_1.flowapp_demo_task_position WHERE id = 'aaaaaaab-0000-0000-0000-000000000002'",
-        "expected": [],
-        "pieces": [
-          {
-            "insert": "id",
-            "label": "id",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "task_position_id",
-            "label": "task_position_id",
-            "slot": "SELECT",
-            "into": "select"
-          }
-        ],
-        "trick": "Erst die Kind-Tabelle (Referenz) löschen, dann die Position. Dann COMMIT."
+        "expected": []
       }
     ],
     "quiz": [
@@ -799,16 +589,7 @@
           "Eine Spalte reicht: storage_location_id.",
           "LIMIT 1 steht schon am Ende."
         ],
-        "solution": "SELECT storage_location_id FROM instance_1.flowapp_demo_handling_unit LIMIT 1;",
-        "pieces": [
-          {
-            "insert": "storage_location_id",
-            "label": "storage_location_id",
-            "slot": "SELECT",
-            "into": "select"
-          }
-        ],
-        "trick": "Die Spalte heißt storage_location_id — nicht location_id. LIMIT 1 steht schon."
+        "solution": "SELECT storage_location_id FROM instance_1.flowapp_demo_handling_unit LIMIT 1;"
       }
     ]
   },
@@ -950,22 +731,7 @@
           "Zwei Spalten: event_type, payload.",
           "Kein instance_1 und kein flowapp_demo_ vor dem Tabellennamen."
         ],
-        "solution": "SELECT event_type, payload FROM subscription.processevents_printer;",
-        "pieces": [
-          {
-            "insert": "event_type",
-            "label": "event_type",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "payload",
-            "label": "payload",
-            "slot": "SELECT",
-            "into": "select"
-          }
-        ],
-        "trick": "Schema subscription — ohne instance_1 und ohne flowapp_demo_."
+        "solution": "SELECT event_type, payload FROM subscription.processevents_printer;"
       },
       {
         "id": "k-ex2",
@@ -981,35 +747,7 @@
           "SELECT r.handling_unit_position_id, qu_stock.alias AS bestand_einheit, qu_item.alias AS artikel_einheit",
           "AND qu_stock.alias <> qu_item.alias"
         ],
-        "solution": "WITH ranked AS (SELECT sq.*, ROW_NUMBER() OVER (PARTITION BY sq.handling_unit_position_id ORDER BY sq.updated_date DESC) AS rn FROM instance_1.flowapp_demo_stock_quant sq) SELECT r.handling_unit_position_id, qu_stock.alias AS bestand_einheit, qu_item.alias AS artikel_einheit FROM ranked r JOIN instance_1.flowapp_demo_handling_unit_position hup ON hup.id = r.handling_unit_position_id JOIN instance_1.flowapp_demo_item_master im ON im.id = hup.item_master_id JOIN instance_1.flowapp_demo_quantity_unit qu_stock ON qu_stock.id = r.quantity_unit_id JOIN instance_1.flowapp_demo_quantity_unit qu_item ON qu_item.id = im.quantity_unit_id WHERE r.rn = 1 AND qu_stock.alias <> qu_item.alias;",
-        "pieces": [
-          {
-            "insert": "r.handling_unit_position_id",
-            "label": "handling_unit_position_id",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "qu_stock.alias AS bestand_einheit",
-            "label": "bestand_einheit",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "qu_item.alias AS artikel_einheit",
-            "label": "artikel_einheit",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "qu_stock.alias <> qu_item.alias",
-            "label": "qu_stock.alias <> qu_item.alias",
-            "slot": "WHERE",
-            "into": "after",
-            "after": "AND"
-          }
-        ],
-        "trick": "WHERE-Lücke nach AND: qu_stock.alias <> qu_item.alias."
+        "solution": "WITH ranked AS (SELECT sq.*, ROW_NUMBER() OVER (PARTITION BY sq.handling_unit_position_id ORDER BY sq.updated_date DESC) AS rn FROM instance_1.flowapp_demo_stock_quant sq) SELECT r.handling_unit_position_id, qu_stock.alias AS bestand_einheit, qu_item.alias AS artikel_einheit FROM ranked r JOIN instance_1.flowapp_demo_handling_unit_position hup ON hup.id = r.handling_unit_position_id JOIN instance_1.flowapp_demo_item_master im ON im.id = hup.item_master_id JOIN instance_1.flowapp_demo_quantity_unit qu_stock ON qu_stock.id = r.quantity_unit_id JOIN instance_1.flowapp_demo_quantity_unit qu_item ON qu_item.id = im.quantity_unit_id WHERE r.rn = 1 AND qu_stock.alias <> qu_item.alias;"
       },
       {
         "id": "k-ex3",
@@ -1025,22 +763,7 @@
           "Erste Spalte: code",
           "Zweite: MD5(to_jsonb(c)::text) AS fingerprint"
         ],
-        "solution": "SELECT code, MD5(to_jsonb(c)::text) AS fingerprint FROM instance_1.flowapp_demo_client c;",
-        "pieces": [
-          {
-            "insert": "code",
-            "label": "code",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "MD5(to_jsonb(c)::text)",
-            "label": "Fingerprint",
-            "slot": "SELECT",
-            "into": "select"
-          }
-        ],
-        "trick": "code plus MD5(to_jsonb(c)::text) — nie die UUID vergleichen."
+        "solution": "SELECT code, MD5(to_jsonb(c)::text) AS fingerprint FROM instance_1.flowapp_demo_client c;"
       }
     ],
     "quiz": [
@@ -1123,29 +846,7 @@
           "SELECT order_number, task_status",
           "WHERE task_status <> 'X0'"
         ],
-        "solution": "SELECT order_number, task_status FROM instance_1.flowapp_demo_order_head WHERE task_status <> 'X0';",
-        "pieces": [
-          {
-            "insert": "order_number",
-            "label": "order_number",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "task_status",
-            "label": "task_status",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "task_status <> 'X0'",
-            "label": "task_status <> 'X0'",
-            "slot": "WHERE",
-            "into": "after",
-            "after": "WHERE"
-          }
-        ],
-        "trick": "WHERE-Lücke: task_status <> 'X0' — X0 ist storniert."
+        "solution": "SELECT order_number, task_status FROM instance_1.flowapp_demo_order_head WHERE task_status <> 'X0';"
       },
       {
         "id": "l-ex2",
@@ -1161,29 +862,7 @@
           "SELECT order_number, loading_status",
           "Der Vergleich ist = '80'"
         ],
-        "solution": "SELECT order_number, loading_status FROM instance_1.flowapp_demo_order_head WHERE COALESCE(NULLIF(loading_status, '--'), '00') = '80';",
-        "pieces": [
-          {
-            "insert": "order_number",
-            "label": "order_number",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "loading_status",
-            "label": "loading_status",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "'80'",
-            "label": "'80'",
-            "slot": "WHERE",
-            "into": "after",
-            "after": "NULLIF(loading_status, '--'), '00') ="
-          }
-        ],
-        "trick": "Die Normalisierung steht schon. WHERE-Lücke: = '80'."
+        "solution": "SELECT order_number, loading_status FROM instance_1.flowapp_demo_order_head WHERE COALESCE(NULLIF(loading_status, '--'), '00') = '80';"
       },
       {
         "id": "l-ex3",
@@ -1199,29 +878,7 @@
           "SELECT oh.order_number, oh.loading_status",
           "WHERE oh.shipment_number = 'SHP-01' AND oc.alias <> 'sendung'"
         ],
-        "solution": "SELECT oh.order_number, oh.loading_status FROM instance_1.flowapp_demo_order_head oh JOIN instance_1.flowapp_demo_order_class oc ON oc.id = oh.order_class_id WHERE oh.shipment_number = 'SHP-01' AND oc.alias <> 'sendung';",
-        "pieces": [
-          {
-            "insert": "oh.order_number",
-            "label": "order_number",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "oh.loading_status",
-            "label": "loading_status",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "oh.shipment_number = 'SHP-01' AND oc.alias <> 'sendung'",
-            "label": "oh.shipment_number = 'SHP-01' AND oc.alias <> 'sendung'",
-            "slot": "WHERE",
-            "into": "after",
-            "after": "WHERE"
-          }
-        ],
-        "trick": "WHERE-Lücke: shipment_number = 'SHP-01' und alias <> 'sendung'."
+        "solution": "SELECT oh.order_number, oh.loading_status FROM instance_1.flowapp_demo_order_head oh JOIN instance_1.flowapp_demo_order_class oc ON oc.id = oh.order_class_id WHERE oh.shipment_number = 'SHP-01' AND oc.alias <> 'sendung';"
       }
     ],
     "quiz": [
@@ -1304,29 +961,7 @@
           "SELECT oh.order_number, c.alias",
           "WHERE oc.alias = 'warenausgang'"
         ],
-        "solution": "SELECT oh.order_number, c.alias FROM instance_1.flowapp_demo_order_head oh JOIN instance_1.flowapp_demo_order_class oc ON oc.id = oh.order_class_id JOIN instance_1.flowapp_demo_client c ON c.id = oh.client_id WHERE oc.alias = 'warenausgang';",
-        "pieces": [
-          {
-            "insert": "oh.order_number",
-            "label": "order_number",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "c.alias",
-            "label": "alias",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "oc.alias = 'warenausgang'",
-            "label": "oc.alias = 'warenausgang'",
-            "slot": "WHERE",
-            "into": "after",
-            "after": "WHERE"
-          }
-        ],
-        "trick": "WHERE-Lücke: oc.alias = 'warenausgang' — nicht über eine UUID."
+        "solution": "SELECT oh.order_number, c.alias FROM instance_1.flowapp_demo_order_head oh JOIN instance_1.flowapp_demo_order_class oc ON oc.id = oh.order_class_id JOIN instance_1.flowapp_demo_client c ON c.id = oh.client_id WHERE oc.alias = 'warenausgang';"
       },
       {
         "id": "m-ex2",
@@ -1342,22 +977,7 @@
           "Zwei Spalten aus einer Tabelle, kein JOIN.",
           "alias, name->>'de' AS bezeichnung"
         ],
-        "solution": "SELECT alias, name->>'de' AS bezeichnung FROM instance_1.flowapp_demo_address_category;",
-        "pieces": [
-          {
-            "insert": "alias",
-            "label": "alias",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "name->>'de'",
-            "label": "deutscher Name",
-            "slot": "SELECT",
-            "into": "select"
-          }
-        ],
-        "trick": "alias und name->>'de'. Eine Tabelle, kein JOIN."
+        "solution": "SELECT alias, name->>'de' AS bezeichnung FROM instance_1.flowapp_demo_address_category;"
       }
     ],
     "quiz": [
@@ -1424,22 +1044,7 @@
           "Erste Spalte: im.designation_a->>'de' AS bezeichnung",
           "CASE bu.alias WHEN 'palette-typ-a' THEN 'Typ A' WHEN 'palette-typ-b' THEN 'Typ B' ELSE bu.alias END AS hu_typ"
         ],
-        "solution": "SELECT im.designation_a->>'de' AS bezeichnung, CASE bu.alias WHEN 'palette-typ-a' THEN 'Typ A' WHEN 'palette-typ-b' THEN 'Typ B' ELSE bu.alias END AS hu_typ FROM instance_1.flowapp_demo_item_master im JOIN instance_1.flowapp_demo_packaging_structure ps ON ps.parent_id = im.id JOIN instance_1.flowapp_demo_packaging_structure_pos psp ON psp.packaging_structure_id = ps.id JOIN instance_1.flowapp_demo_bundling_unit bu ON bu.id = psp.bundling_unit_id WHERE psp.packaging_level = 3;",
-        "pieces": [
-          {
-            "insert": "im.designation_a->>'de'",
-            "label": "deutscher Text",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "CASE bu.alias WHEN 'palette-typ-a' THEN 'Typ A' WHEN 'palette-typ-b' THEN 'Typ B' ELSE bu.alias END",
-            "label": "CASE Palettentyp",
-            "slot": "SELECT",
-            "into": "select"
-          }
-        ],
-        "trick": "CASE bu.alias: palette-typ-a → Typ A, palette-typ-b → Typ B, sonst den Roh-Alias."
+        "solution": "SELECT im.designation_a->>'de' AS bezeichnung, CASE bu.alias WHEN 'palette-typ-a' THEN 'Typ A' WHEN 'palette-typ-b' THEN 'Typ B' ELSE bu.alias END AS hu_typ FROM instance_1.flowapp_demo_item_master im JOIN instance_1.flowapp_demo_packaging_structure ps ON ps.parent_id = im.id JOIN instance_1.flowapp_demo_packaging_structure_pos psp ON psp.packaging_structure_id = ps.id JOIN instance_1.flowapp_demo_bundling_unit bu ON bu.id = psp.bundling_unit_id WHERE psp.packaging_level = 3;"
       }
     ],
     "quiz": [
@@ -1506,41 +1111,7 @@
           "SELECT im.designation_a->>'de' AS bezeichnung, im.customs_tariff_number_taric AS taric, cc.iso_code AS ursprungsland, csp.alias AS zollstatus",
           "WHERE r.rn = 1"
         ],
-        "solution": "WITH ranked AS (SELECT sq.*, ROW_NUMBER() OVER (PARTITION BY sq.handling_unit_position_id ORDER BY sq.updated_date DESC) AS rn FROM instance_1.flowapp_demo_stock_quant sq) SELECT im.designation_a->>'de' AS bezeichnung, im.customs_tariff_number_taric AS taric, cc.iso_code AS ursprungsland, csp.alias AS zollstatus FROM ranked r JOIN instance_1.flowapp_demo_handling_unit_position hup ON hup.id = r.handling_unit_position_id JOIN instance_1.flowapp_demo_item_master im ON im.id = hup.item_master_id JOIN instance_1.flowapp_demo_country_code cc ON cc.id = r.country_of_origin_id JOIN instance_1.flowapp_demo_customs_status_profile csp ON csp.id = r.customs_status_id WHERE r.rn = 1;",
-        "pieces": [
-          {
-            "insert": "im.designation_a->>'de'",
-            "label": "deutscher Text",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "im.customs_tariff_number_taric",
-            "label": "TARIC",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "cc.iso_code",
-            "label": "iso_code",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "csp.alias",
-            "label": "alias",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "r.rn = 1",
-            "label": "r.rn = 1",
-            "slot": "WHERE",
-            "into": "after",
-            "after": "WHERE"
-          }
-        ],
-        "trick": "WHERE-Lücke: r.rn = 1 — nur die neueste Quant-Zeile."
+        "solution": "WITH ranked AS (SELECT sq.*, ROW_NUMBER() OVER (PARTITION BY sq.handling_unit_position_id ORDER BY sq.updated_date DESC) AS rn FROM instance_1.flowapp_demo_stock_quant sq) SELECT im.designation_a->>'de' AS bezeichnung, im.customs_tariff_number_taric AS taric, cc.iso_code AS ursprungsland, csp.alias AS zollstatus FROM ranked r JOIN instance_1.flowapp_demo_handling_unit_position hup ON hup.id = r.handling_unit_position_id JOIN instance_1.flowapp_demo_item_master im ON im.id = hup.item_master_id JOIN instance_1.flowapp_demo_country_code cc ON cc.id = r.country_of_origin_id JOIN instance_1.flowapp_demo_customs_status_profile csp ON csp.id = r.customs_status_id WHERE r.rn = 1;"
       },
       {
         "id": "o-ex2",
@@ -1556,35 +1127,7 @@
           "SELECT ac.alias AS kategorie, ad.name, cc.iso_code",
           "WHERE oh.order_number = '100504_A' AND ac.alias = 'lieferadresse'"
         ],
-        "solution": "SELECT ac.alias AS kategorie, ad.name, cc.iso_code FROM instance_1.flowapp_demo_order_head oh JOIN instance_1.flowapp_demo_address_data ad ON ad.parent_id = oh.id JOIN instance_1.flowapp_demo_address_category ac ON ac.id = ad.address_category_id JOIN instance_1.flowapp_demo_country_code cc ON cc.id = ad.country_id WHERE oh.order_number = '100504_A' AND ac.alias = 'lieferadresse';",
-        "pieces": [
-          {
-            "insert": "ac.alias",
-            "label": "alias",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "ad.name",
-            "label": "name",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "cc.iso_code",
-            "label": "iso_code",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "oh.order_number = '100504_A' AND ac.alias = 'lieferadresse'",
-            "label": "oh.order_number = '100504_A' AND ac.alias = 'lieferadresse'",
-            "slot": "WHERE",
-            "into": "after",
-            "after": "WHERE"
-          }
-        ],
-        "trick": "WHERE-Lücke: Auftragsnummer 100504_A und alias = lieferadresse."
+        "solution": "SELECT ac.alias AS kategorie, ad.name, cc.iso_code FROM instance_1.flowapp_demo_order_head oh JOIN instance_1.flowapp_demo_address_data ad ON ad.parent_id = oh.id JOIN instance_1.flowapp_demo_address_category ac ON ac.id = ad.address_category_id JOIN instance_1.flowapp_demo_country_code cc ON cc.id = ad.country_id WHERE oh.order_number = '100504_A' AND ac.alias = 'lieferadresse';"
       }
     ],
     "quiz": [
@@ -1667,28 +1210,7 @@
           "hu.handling_unit_id, COUNT(DISTINCT psn.serial_number) AS anzahl_seriennummern",
           "STRING_AGG(DISTINCT psn.serial_number, '; ' ORDER BY psn.serial_number) AS seriennummern_liste"
         ],
-        "solution": "SELECT hu.handling_unit_id, COUNT(DISTINCT psn.serial_number) AS anzahl_seriennummern, STRING_AGG(DISTINCT psn.serial_number, '; ' ORDER BY psn.serial_number) AS seriennummern_liste FROM instance_1.flowapp_demo_handling_unit hu JOIN instance_1.flowapp_demo_handling_unit_position hup ON hu.id = hup.handling_unit_id LEFT JOIN instance_1.flowapp_demo_hu_position_serial_number psn ON hup.id = psn.parent_id GROUP BY hu.handling_unit_id;",
-        "pieces": [
-          {
-            "insert": "hu.handling_unit_id",
-            "label": "handling_unit_id",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "COUNT(DISTINCT psn.serial_number)",
-            "label": "COUNT DISTINCT",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "STRING_AGG(DISTINCT psn.serial_number, '; ' ORDER BY psn.serial_number)",
-            "label": "STRING_AGG",
-            "slot": "SELECT",
-            "into": "select"
-          }
-        ],
-        "trick": "COUNT(DISTINCT …) und STRING_AGG(DISTINCT … ORDER BY …). GROUP BY steht schon."
+        "solution": "SELECT hu.handling_unit_id, COUNT(DISTINCT psn.serial_number) AS anzahl_seriennummern, STRING_AGG(DISTINCT psn.serial_number, '; ' ORDER BY psn.serial_number) AS seriennummern_liste FROM instance_1.flowapp_demo_handling_unit hu JOIN instance_1.flowapp_demo_handling_unit_position hup ON hu.id = hup.handling_unit_id LEFT JOIN instance_1.flowapp_demo_hu_position_serial_number psn ON hup.id = psn.parent_id GROUP BY hu.handling_unit_id;"
       },
       {
         "id": "p-ex2",
@@ -1704,22 +1226,7 @@
           "Erste Spalte: hu.handling_unit_number",
           "CASE WHEN t.alias = 'externe-tracking-nummer' THEN i.handling_unit_identification ELSE hu.handling_unit_number END AS tnr_oder_hu_nummer"
         ],
-        "solution": "SELECT hu.handling_unit_number, CASE WHEN t.alias = 'externe-tracking-nummer' THEN i.handling_unit_identification ELSE hu.handling_unit_number END AS tnr_oder_hu_nummer FROM instance_1.flowapp_demo_handling_unit hu LEFT JOIN instance_1.flowapp_demo_handling_unit_identification i ON i.handling_unit_id = hu.id LEFT JOIN instance_1.flowapp_demo_handling_unit_identification_type t ON t.id = i.identification_type_id;",
-        "pieces": [
-          {
-            "insert": "hu.handling_unit_number",
-            "label": "handling_unit_number",
-            "slot": "SELECT",
-            "into": "select"
-          },
-          {
-            "insert": "CASE WHEN t.alias = 'externe-tracking-nummer' THEN i.handling_unit_identification ELSE hu.handling_unit_number END",
-            "label": "CASE TNR oder HU",
-            "slot": "SELECT",
-            "into": "select"
-          }
-        ],
-        "trick": "CASE WHEN t.alias = 'externe-tracking-nummer' THEN … ELSE interne Nummer."
+        "solution": "SELECT hu.handling_unit_number, CASE WHEN t.alias = 'externe-tracking-nummer' THEN i.handling_unit_identification ELSE hu.handling_unit_number END AS tnr_oder_hu_nummer FROM instance_1.flowapp_demo_handling_unit hu LEFT JOIN instance_1.flowapp_demo_handling_unit_identification i ON i.handling_unit_id = hu.id LEFT JOIN instance_1.flowapp_demo_handling_unit_identification_type t ON t.id = i.identification_type_id;"
       }
     ],
     "quiz": [

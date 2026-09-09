@@ -360,9 +360,9 @@ def friendly_sql_error(err: str, sql: str) -> str:
     low = (err or "").lower()
     hints = []
     if re.search(r"select\s+from\b", strip_sql_line_comments(sql or ""), re.I) or has_empty_select_list(sql or ""):
-                hints.append(
-                    "Die SELECT-Liste ist noch leer. Die Bausteine über dem Editor anklicken — sie landen nach SELECT."
-                )
+        hints.append(
+            "Die SELECT-Liste ist noch leer. Trag die Spalten nach SELECT ein — rechts im Schema-Browser kannst du sie anklicken, das fügt sie an der Cursorposition ein."
+        )
     elif "syntax error at end of input" in low:
         hints.append("Die Abfrage ist unvollständig. Prüfe SELECT-Liste, FROM und schließende Klammern.")
     elif "does not exist" in low:
@@ -403,8 +403,8 @@ def run_sql(sql: str):
         return {
             "ok": False,
             "error": (
-                "Die SELECT-Liste ist noch leer. Die Bausteine über dem Editor anklicken "
-                "— sie landen nach SELECT."
+                "Die SELECT-Liste ist noch leer. Trag die Spalten nach SELECT ein "
+                "— rechts im Schema-Browser kannst du sie anklicken."
             ),
             "columns": None,
             "rows": None,
@@ -685,14 +685,8 @@ def sql_requirement_coach(sql: str, exercise: dict):
 def empty_select_coach(exercise: dict) -> str:
     look = exercise.get("look") or []
     hint = (exercise.get("hints") or [None])[0]
-    parts = [
-        "Die SELECT-Liste ist noch leer. Die Bausteine über dem Editor anklicken — "
-        "sie landen nach SELECT."
-    ]
-    trick = exercise.get("trick")
-    if trick:
-        parts.append(trick)
-    elif look:
+    parts = ["Die SELECT-Liste ist noch leer. Trag die Spalten nach SELECT ein."]
+    if look:
         parts.append(look[0])
     elif hint:
         parts.append(hint)

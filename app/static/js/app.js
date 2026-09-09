@@ -176,308 +176,11 @@ function activeSqlEditor(preferred) {
   );
 }
 
-function isInsideSqlCommentOrString(sql, index) {
-  let i = 0;
-  let inSingle = false;
-  while (i < index) {
-    const ch = sql[i];
-    if (!inSingle && ch === "-" && sql[i + 1] === "-") {
-      const nl = sql.indexOf("\n", i);
-      if (nl < 0 || nl >= index) return true;
-      i = nl + 1;
-      continue;
-    }
-    if (ch === "'") {
-      if (inSingle && sql[i + 1] === "'") {
-        i += 2;
-        continue;
-      }
-      inSingle = !inSingle;
-    }
-    i += 1;
-  }
-  return inSingle;
-}
-
-function sqlKeywordSpans(sql, keyword) {
-  const re = new RegExp(`\\b${keyword}\\b`, "gi");
-  const spans = [];
-  let match;
-  while ((match = re.exec(sql))) {
-    if (isInsideSqlCommentOrString(sql, match.index)) continue;
-    spans.push({ index: match.index, length: match[0].length });
-  }
-  return spans;
-}
-
-function selectListIsEmpty(text) {
-  return !text.replace(/--[^\n]*/g, "").replace(/\s+/g, "");
-}
-
-function selectLists(sql) {
-  const selects = sqlKeywordSpans(sql, "SELECT");
-  const froms = sqlKeywordSpans(sql, "FROM");
-  const lists = [];
-  selects.forEach((sel) => {
-    const from = froms.find((item) => item.index > sel.index);
-    if (!from) return;
-    let start = sel.index + sel.length;
-    const after = sql.slice(start, from.index);
-    const distinct = after.match(/^\s*(DISTINCT|ALL)\b/i);
-    if (distinct) start += distinct[0].length;
-    lists.push({
-      start,
-      end: from.index,
-      text: sql.slice(start, from.index),
-    });
-  });
-  return lists;
-}
-
 function flashEditor(editor) {
   editor.classList.remove("just-inserted");
   void editor.offsetWidth;
   editor.classList.add("just-inserted");
   window.setTimeout(() => editor.classList.remove("just-inserted"), 800);
-}
-
-function insertAfterNeedle(editor, needle, text) {
-  const sql = editor.value;
-  const key = String(needle || "");
-  if (!key) return false;
-  let idx = -1;
-  let from = sql.length;
-  while (from > 0) {
-    const found = sql.lastIndexOf(key, from - 1);
-    if (found < 0) break;
-    const at = found + key.length;
-    const next = sql[at] || "";
-    const danglingDot = key.endsWith(".");
-    if (!danglingDot || !next || /[\s;]/.test(next)) {
-      idx = found;
-      break;
-    }
-    from = found;
-  }
-  if (idx < 0) return false;
-  const at = idx + key.length;
-  const rest = sql.slice(at);
-  let insert = String(text);
-  if (rest.replace(/^\s+/, "").toLowerCase().startsWith(insert.toLowerCase())) {
-    flashEditor(editor);
-    return true;
-  }
-  const needsSpace = /=\s*$/.test(key) || /^(WHERE|AND|ON)\s*$/i.test(key.trim());
-  if (needsSpace && insert && !/^\s/.test(insert)) insert = ` ${insert}`;
-  editor.value = sql.slice(0, at) + insert + sql.slice(at);
-  const pos = at + insert.length;
-  lastEditor = editor;
-  if (!editor.closest(".sql-raw") || editor.closest(".sql-raw").open) {
-    editor.focus();
-    editor.selectionStart = editor.selectionEnd = pos;
-  }
-  flashEditor(editor);
-  announceFill(editor, `${text} eingesetzt`);
-  return true;
-}
-
-function insertPiece(editor, pieceEl) {
-  const text = pieceEl.dataset.insert || "";
-  const into = pieceEl.dataset.into || "select";
-  if (into === "after") {
-    if (insertAfterNeedle(editor, pieceEl.dataset.after || "", text)) {
-      syncSqlFill(editor.closest(".exercise"));
-      return true;
-    }
-  }
-  if (insertColumnIntoSelect(editor, text)) {
-    syncSqlFill(editor.closest(".exercise"));
-    return true;
-  }
-  insertAtCursor(text, editor);
-  syncSqlFill(editor.closest(".exercise"));
-  return true;
-}
-
-function announceFill(editor, message) {
-  const status = editor?.closest(".exercise")?.querySelector(".sql-fill-status");
-  if (!status) return;
-  status.hidden = false;
-  status.textContent = message;
-}
-
-function pieceLabel(pieceEl) {
-  const text = [...pieceEl.childNodes]
-    .filter((n) => n.nodeType === 3)
-    .map((n) => n.textContent)
-    .join("")
-    .trim();
-  return text || pieceEl.dataset.insert || "";
-}
-
-function findDanglingNeedle(sql, key) {
-  if (!key) return -1;
-  let from = sql.length;
-  while (from > 0) {
-    const found = sql.lastIndexOf(key, from - 1);
-    if (found < 0) break;
-    const at = found + key.length;
-    const next = sql[at] || "";
-    if (!key.endsWith(".") || !next || /[\s;]/.test(next)) return found;
-    from = found;
-  }
-  return -1;
-}
-
-function sqlHasInsertAfter(sql, needle, insert) {
-  let from = sql.length;
-  const want = String(insert);
-  while (from > 0) {
-    const found = sql.lastIndexOf(needle, from - 1);
-    if (found < 0) break;
-    const at = found + needle.length;
-    const next = sql[at] || "";
-    if (needle.endsWith(".") && next && !/[\s;]/.test(next) && !next.toLowerCase().startsWith(want.toLowerCase())) {
-      from = found;
-      continue;
-    }
-    return sql.slice(at).replace(/^\s+/, "").toLowerCase().startsWith(want.toLowerCase());
-  }
-  return false;
-}
-
-function pieceIsFilled(sql, pieceEl) {
-  const insert = pieceEl.dataset.insert || "";
-  if (!insert) return false;
-  if ((pieceEl.dataset.into || "select") === "after") {
-    return sqlHasInsertAfter(sql, pieceEl.dataset.after || "", insert);
-  }
-  return selectLists(sql).some((list) =>
-    list.text.replace(/--[^\n]*/g, " ").toLowerCase().includes(insert.toLowerCase())
-  );
-}
-
-function collectGaps(sql, pieces) {
-  const gaps = [];
-  const selectPieces = pieces.filter((p) => (p.dataset.into || "select") !== "after");
-  const afterPieces = pieces.filter((p) => (p.dataset.into || "select") === "after");
-  const unfilledSelect = selectPieces.filter((p) => !pieceIsFilled(sql, p));
-  if (unfilledSelect.length) {
-    const lists = selectLists(sql);
-    const target = lists.find((list) => selectListIsEmpty(list.text)) || lists[lists.length - 1];
-    if (target) {
-      const empty = selectListIsEmpty(target.text);
-      gaps.push({
-        start: empty ? target.start : target.end,
-        end: empty ? target.end : target.end,
-        step: pieces.indexOf(unfilledSelect[0]) + 1,
-        slot: "SELECT",
-        hint: unfilledSelect.map(pieceLabel).join(" · "),
-        piece: unfilledSelect[0],
-        prefix: empty ? "" : ", ",
-      });
-    }
-  }
-  afterPieces.forEach((p) => {
-    if (pieceIsFilled(sql, p)) return;
-    const needle = p.dataset.after || "";
-    const idx = findDanglingNeedle(sql, needle);
-    if (idx < 0) return;
-    gaps.push({
-      start: idx + needle.length,
-      end: idx + needle.length,
-      step: pieces.indexOf(p) + 1,
-      slot: (p.dataset.slot || "JOIN").toUpperCase(),
-      hint: pieceLabel(p),
-      piece: p,
-      prefix: /=\s*$/.test(needle) ? " " : "",
-    });
-  });
-  return gaps.sort((a, b) => a.start - b.start);
-}
-
-function prettyChunk(text) {
-  return esc(text)
-    .replace(/instance_1\.flowapp_demo_/g, '<span class="sql-prefix" title="instance_1.flowapp_demo_">…</span>')
-    .replace(
-      /\b(SELECT|FROM|WHERE|JOIN|LEFT|RIGHT|INNER|OUTER|ON|AND|OR|NOT|NULL|AS|WITH|INSERT|UPDATE|DELETE|BEGIN|COMMIT|ROLLBACK|LIMIT|ORDER|BY|GROUP|HAVING|DISTINCT|CASE|WHEN|THEN|ELSE|END)\b/gi,
-      '<span class="kw">$1</span>'
-    );
-}
-
-function syncSqlFill(exerciseEl) {
-  if (!exerciseEl) return;
-  const editor = exerciseEl.querySelector(".sql-editor");
-  const view = exerciseEl.querySelector(".sql-fill");
-  if (!editor || !view) return;
-  const sql = editor.value;
-  const pieces = [...exerciseEl.querySelectorAll(".piece-chip")];
-  pieces.forEach((p) => p.classList.toggle("is-used", pieceIsFilled(sql, p)));
-  const left = pieces.filter((p) => !p.classList.contains("is-used")).length;
-  const doLine = exerciseEl.querySelector(".sql-do");
-  if (doLine) {
-    doLine.textContent = pieces.length
-      ? left
-        ? `${left} gelbe ${left === 1 ? "Lücke" : "Lücken"} — Baustein mit derselben Nummer klicken.`
-        : "Alle Lücken voll. Jetzt Ausführen, danach Stimmt das?"
-      : "SQL unten anpassen, dann Ausführen.";
-    doLine.classList.toggle("is-done", pieces.length > 0 && !left);
-  }
-  const raw = exerciseEl.querySelector(".sql-raw");
-  if (raw && !pieces.length) raw.open = true;
-  let startAt = 0;
-  const lead = sql.match(/^(?:[ \t]*--[^\n]*\n|[ \t]*\n)+/);
-  if (lead) startAt = lead[0].length;
-  const gaps = collectGaps(sql, pieces).filter((g) => g.end >= startAt);
-  let html = "";
-  let cursor = startAt;
-  gaps.forEach((g) => {
-    if (g.start < cursor) return;
-    html += prettyChunk(sql.slice(cursor, g.start));
-    const idx = pieces.indexOf(g.piece);
-    const emptySelect = g.slot === "SELECT" && g.end > g.start;
-    const gapBtn =
-      `<button type="button" class="sql-gap" data-piece-index="${idx}">` +
-      `<span class="sql-gap-n">${g.step}</span>` +
-      `<span class="sql-gap-h">${esc(g.hint)}</span></button>`;
-    html += emptySelect ? `\n  ${gapBtn}\n` : `${g.prefix || ""}${gapBtn}`;
-    cursor = Math.max(g.end, g.start);
-  });
-  html += prettyChunk(sql.slice(cursor));
-  view.innerHTML = html || prettyChunk(sql.slice(startAt) || sql);
-}
-
-function insertColumnIntoSelect(editor, col) {
-  const sql = editor.value;
-  const lists = selectLists(sql);
-  if (!lists.length) return false;
-  const cursor = editor.selectionStart ?? 0;
-  let target = lists.find((list) => cursor >= list.start && cursor <= list.end);
-  if (!target) target = lists.find((list) => selectListIsEmpty(list.text)) || lists[lists.length - 1];
-  const existing = target.text.replace(/--[^\n]*/g, " ").replace(/\s+/g, " ");
-  const needle = String(col).replace(/\s+/g, " ");
-  if (existing.toLowerCase().includes(needle.toLowerCase())) {
-    flashEditor(editor);
-    return true;
-  }
-  let newList;
-  if (selectListIsEmpty(target.text)) {
-    newList = `\n  ${col}\n`;
-  } else {
-    let body = target.text.replace(/\s+$/, "");
-    if (!/,\s*$/.test(body)) body += ",";
-    newList = `${body}\n  ${col}\n`;
-  }
-  editor.value = sql.slice(0, target.start) + newList + sql.slice(target.end);
-  const pos = target.start + newList.length;
-  lastEditor = editor;
-  if (!editor.closest(".sql-raw") || editor.closest(".sql-raw").open) {
-    editor.focus();
-    editor.selectionStart = editor.selectionEnd = pos;
-  }
-  flashEditor(editor);
-  announceFill(editor, `${col} eingesetzt`);
-  return true;
 }
 
 function insertAtCursor(text, editorEl) {
@@ -487,13 +190,6 @@ function insertAtCursor(text, editorEl) {
     return;
   }
   lastEditor = editor;
-  const ident = /^[A-Za-z_][A-Za-z0-9_]*$/.test(text);
-  const qualified = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$/.test(text);
-  if ((ident || text.includes(" ") || text.includes(">") || text.includes("(")) && insertColumnIntoSelect(editor, text)) return;
-  if (qualified && editor.value.toLowerCase().includes(text.toLowerCase())) {
-    flashEditor(editor);
-    return;
-  }
   const start = editor.selectionStart ?? editor.value.length;
   const end = editor.selectionEnd ?? start;
   editor.value = editor.value.slice(0, start) + text + editor.value.slice(end);
@@ -625,7 +321,7 @@ function initSchema() {
     if (!railList) return;
     const shorts = !railShowAll && railShorts ? new Set(railShorts) : null;
     const filtered = shorts ? tables.filter((t) => shorts.has(t.short)) : tables;
-    railList.innerHTML = filtered.map((t) => tableCard(t, { open: false, insertable: false })).join("") || '<p class="muted">Keine Tabellen zu dieser Übung.</p>';
+    railList.innerHTML = filtered.map((t) => tableCard(t, { open: Boolean(shorts), insertable: true })).join("") || '<p class="muted">Keine Tabellen zu dieser Übung.</p>';
     const need = document.getElementById("schema-rail-need");
     if (need) {
       const needTables = railShorts ? tables.filter((t) => railShorts.includes(t.short)) : [];
@@ -823,7 +519,7 @@ function initLesson() {
 
 const PHASE_HINTS = {
   learn: "Lies den Abschnitt. Unten auf Weiter — nicht die ganze Lektion auf einmal.",
-  practice: "Gelbe Felder im SQL sind Lücken. Baustein mit derselben Nummer klicken, dann Ausführen.",
+  practice: "SQL selbst schreiben. Rechts Tabellen/Spalten zum Reinklicken, dann Ausführen.",
   quiz: "Eine Antwort wählen — danach kommt die Erklärung. Falsch ist ok.",
 };
 
@@ -854,7 +550,6 @@ function showExercise(idx, opts = {}) {
       })
       .join("");
   }
-  syncSqlFill(all[practiceIndex]);
 }
 
 function focusExercise(exerciseEl) {
@@ -985,35 +680,16 @@ function initExercises(lessonId, exerciseCount, quizCount) {
         showExercise(practiceIndex + 1, { focus: true });
         return;
       }
-      const gap = e.target.closest(".sql-gap");
-      if (gap) {
-        e.preventDefault();
-        const piece = exerciseEl.querySelectorAll(".piece-chip")[Number(gap.dataset.pieceIndex)];
-        if (piece) {
-          piece.classList.add("is-flash");
-          window.setTimeout(() => piece.classList.remove("is-flash"), 700);
-          insertPiece(editor, piece);
-        }
-        return;
-      }
-      const piece = e.target.closest(".piece-chip");
-      if (piece) {
-        e.preventDefault();
-        insertPiece(editor, piece);
-        return;
-      }
       if (e.target.closest("[data-ex-prev], [data-ex-next], [data-goto-quiz], .ex-dot")) return;
       focusExercise(exerciseEl);
     });
     exerciseEl.addEventListener("focusin", () => focusExercise(exerciseEl));
-    editor.addEventListener("input", () => syncSqlFill(exerciseEl));
     editor.addEventListener("keydown", (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
         e.preventDefault();
         runAction("run");
       }
     });
-    syncSqlFill(exerciseEl);
   });
 
   document.getElementById("ex-stepper")?.addEventListener("click", (e) => {

@@ -25,19 +25,6 @@ def EX(id, why, task, look, starter, hints, solution, **extra):
     return data
 
 
-def P(insert, slot="SELECT", **kw):
-    """Klickbarer Baustein: slot sagt, welche Lücke gefüllt wird."""
-    into = kw.pop("into", "select" if slot == "SELECT" else "after")
-    data = {
-        "insert": insert,
-        "label": kw.pop("label", insert),
-        "slot": slot,
-        "into": into,
-    }
-    data.update(kw)
-    return data
-
-
 # ---------------------------------------------------------------------------
 L(
     id="a",
@@ -159,10 +146,10 @@ Eine View ist eine gespeicherte SELECT-Abfrage. Views übernehmen **nicht automa
             why="Dieselbe Liste, aber der Kollege will auch den Mandanten sehen.",
             task="Verknüpfe Auftrag mit Mandant und gib Auftragsnummer plus Mandanten-Code aus.",
             look=[
-                "Baustein SELECT: order_number und code.",
-                "Baustein JOIN: c.id = oh.client_id — die Lücke nach ON.",
+                "SELECT: oh.order_number und c.code.",
+                "ON c.id = oh.client_id — der JOIN fehlt noch.",
             ],
-            starter="-- Lücken mit den Bausteinen füllen (SELECT / JOIN).\n\nSELECT\n  -- Baustein SELECT\nFROM instance_1.flowapp_demo_order_head oh\nLEFT JOIN instance_1.flowapp_demo_client c\n  ON \n",
+            starter="-- SELECT-Liste und JOIN-Bedingung ergänzen.\n\nSELECT\n  \nFROM instance_1.flowapp_demo_order_head oh\nLEFT JOIN instance_1.flowapp_demo_client c\n  ON \n",
             hints=[
                 "SELECT oh.order_number, c.code — Alias oh und c stehen schon im FROM.",
                 "ON c.id = oh.client_id — nicht client_id mit code verwechseln.",
@@ -391,11 +378,11 @@ FROM instance_1.flowapp_demo_order_head;
             why="Support fragt: Welche Artikel gehören zu welchem Mandanten? Am Artikelstamm gibt es keine client_id.",
             task="Gib die deutsche Artikelbezeichnung und den Mandanten-Code aus.",
             look=[
-                "Baustein 1: deutscher Text — designation_a->>'de' (die Spalte heißt designation_a).",
-                "Baustein 2: Mandanten-Code.",
-                "Der Join ist vorbereitet (parent_id, nicht client_id).",
+                "SELECT: deutscher Text — im.designation_a->>'de' (die Spalte heißt designation_a).",
+                "Dazu: c.code für den Mandanten.",
+                "Der Join steht schon da (parent_id, nicht client_id).",
             ],
-            starter="-- Deutsche Bezeichnung und Mandanten-Code. Join ist schon da.\n\nSELECT\n  -- Baustein SELECT\nFROM instance_1.flowapp_demo_item_master im\nJOIN instance_1.flowapp_demo_client c\n  ON im.parent_id = c.accounting_area_item_master_id;\n",
+            starter="-- Deutsche Bezeichnung und Mandanten-Code. Join ist schon da.\n\nSELECT\n  \nFROM instance_1.flowapp_demo_item_master im\nJOIN instance_1.flowapp_demo_client c\n  ON im.parent_id = c.accounting_area_item_master_id;\n",
             hints=[
                 "Bezeichnung: im.designation_a->>'de'. Nicht designation, sondern designation_a.",
                 "Mandant: c.code. Join-Spalte am Mandanten: accounting_area_item_master_id.",
@@ -407,11 +394,11 @@ FROM instance_1.flowapp_demo_order_head;
             why="Jemand will wissen, in welchen Zonen Auftrag 100501 geplant ist.",
             task="Gib für die lesbare Nummer 100501 alle Zonentypen (consolidation_type) aus der Zonierung aus.",
             look=[
-                "Baustein SELECT: consolidation_type — nur das soll in der Ergebnisliste stehen.",
-                "Baustein JOIN: id — schließt die Lücke oh. (UUID). Nicht order_id.",
-                "Baustein WHERE: 100501 — ohne Anführungszeichen, das ist ein Integer.",
+                "SELECT: oc.consolidation_type — nur das soll in der Ergebnisliste stehen.",
+                "ON oc.parent_id = oh.id — UUID, nicht order_id.",
+                "WHERE oh.order_id = 100501 — ohne Anführungszeichen, das ist ein Integer.",
             ],
-            starter="-- Lücken mit den Bausteinen füllen (SELECT / JOIN / WHERE).\n\nSELECT\n  -- Baustein SELECT\nFROM instance_1.flowapp_demo_order_head oh\nJOIN instance_1.flowapp_demo_order_consolidation oc\n  ON oc.parent_id = oh.\nWHERE oh.order_id =\n",
+            starter="-- SELECT, JOIN-Spalte und WHERE-Wert ergänzen.\n\nSELECT\n  \nFROM instance_1.flowapp_demo_order_head oh\nJOIN instance_1.flowapp_demo_order_consolidation oc\n  ON oc.parent_id = oh.\nWHERE oh.order_id =\n",
             hints=[
                 "Ausgeben: oc.consolidation_type. Join auf oh.id (UUID), nicht auf order_id.",
                 "WHERE oh.order_id = 100501 — ohne Anführungszeichen, das ist ein Integer.",
@@ -1395,200 +1382,8 @@ END AS "TNR_oder_HU_Nummer"
     ],
 )
 
-# Kurze Drehpunkte + klickbare Bausteine für die mittlere Übungsspalte.
-GUIDE = {
-    "a-ex1": {
-        "pieces": [P("order_number"), P("task_status")],
-        "trick": "Kein JOIN. Zwei Spalten aus Auftrag nach SELECT.",
-    },
-    "a-ex2": {
-        "pieces": [
-            P("oh.order_number", label="order_number"),
-            P("c.code", label="code"),
-            P("c.id = oh.client_id", slot="JOIN", after="ON "),
-        ],
-        "trick": "JOIN-Lücke nach ON: c.id = oh.client_id (beides UUID, nicht code).",
-    },
-    "a-ex3": {
-        "pieces": [
-            P("handling_unit_position_id"),
-            P("batch_a"),
-            P("updated_date"),
-            P("rn = 1", slot="WHERE", after="WHERE"),
-        ],
-        "trick": "SELECT dieselben drei Spalten wie in der CTE. WHERE-Lücke: rn = 1.",
-    },
-    "d-ex1": {
-        "pieces": [
-            P("im.designation_a->>'de'", label="deutscher Text"),
-            P("c.code", label="code"),
-        ],
-        "trick": "JSONB: designation_a->>'de' — die Spalte heißt designation_a, nicht designation.",
-    },
-    "d-ex2": {
-        "pieces": [
-            P("oc.consolidation_type", label="consolidation_type"),
-            P("id", slot="JOIN", after="oh."),
-            P("100501", slot="WHERE", after="oh.order_id ="),
-        ],
-        "trick": "Drei Lücken: SELECT = consolidation_type, JOIN = oh.id (UUID), WHERE = 100501 ohne Anführungszeichen.",
-    },
-    "d-ex3": {
-        "pieces": [
-            P("split_part(order_number, '_', 1)", label="split_part …"),
-            P("order_id"),
-        ],
-        "trick": "split_part(order_number, '_', 1) schneidet das Suffix _A ab.",
-    },
-    "e-ex1": {
-        "pieces": [
-            P("id"),
-            P("updated_date AT TIME ZONE 'Europe/Berlin'", label="Zeit nach Berlin"),
-        ],
-        "trick": "Genau einmal: updated_date AT TIME ZONE 'Europe/Berlin'. Nicht doppelt, nicht UTC.",
-    },
-    "e-ex2": {
-        "pieces": [
-            P("id"),
-            P("storage_date::date", label="nur Datum"),
-        ],
-        "trick": "storage_date ist schon lokal. Nur ::date — kein AT TIME ZONE.",
-    },
-    "f-ex1": {
-        "pieces": [
-            P("th.id", label="id"),
-            P("tbc.alias = 'goods-receipt-single-hu-movement'", slot="WHERE", after="WHERE"),
-        ],
-        "trick": "SELECT th.id. WHERE-Lücke: tbc.alias = 'goods-receipt-single-hu-movement'.",
-    },
-    "f-ex2": {
-        "pieces": [
-            P("DISTINCT th.id", label="DISTINCT th.id"),
-            P("tbc.alias LIKE 'goods-receipt%' AND th.task_state = '90' AND tp.storage_date IS NOT NULL", slot="WHERE", after="WHERE"),
-        ],
-        "trick": "SELECT DISTINCT th.id. WHERE: WE-Alias, task_state 90, storage_date vorhanden.",
-    },
-    "g-ex1": {
-        "pieces": [P("order_number"), P("task_status")],
-        "trick": "Muster: SELECT → BEGIN → UPDATE → dieselbe SELECT → COMMIT.",
-    },
-    "g-ex2": {
-        "pieces": [P("id"), P("task_position_id")],
-        "trick": "Erst die Kind-Tabelle (Referenz) löschen, dann die Position. Dann COMMIT.",
-    },
-    "i-ex1": {
-        "pieces": [P("storage_location_id")],
-        "trick": "Die Spalte heißt storage_location_id — nicht location_id. LIMIT 1 steht schon.",
-    },
-    "k-ex1": {
-        "pieces": [P("event_type"), P("payload")],
-        "trick": "Schema subscription — ohne instance_1 und ohne flowapp_demo_.",
-    },
-    "k-ex2": {
-        "pieces": [
-            P("r.handling_unit_position_id", label="handling_unit_position_id"),
-            P("qu_stock.alias AS bestand_einheit", label="bestand_einheit"),
-            P("qu_item.alias AS artikel_einheit", label="artikel_einheit"),
-            P("qu_stock.alias <> qu_item.alias", slot="WHERE", after="AND"),
-        ],
-        "trick": "WHERE-Lücke nach AND: qu_stock.alias <> qu_item.alias.",
-    },
-    "k-ex3": {
-        "pieces": [
-            P("code"),
-            P("MD5(to_jsonb(c)::text)", label="Fingerprint"),
-        ],
-        "trick": "code plus MD5(to_jsonb(c)::text) — nie die UUID vergleichen.",
-    },
-    "l-ex1": {
-        "pieces": [
-            P("order_number"),
-            P("task_status"),
-            P("task_status <> 'X0'", slot="WHERE", after="WHERE"),
-        ],
-        "trick": "WHERE-Lücke: task_status <> 'X0' — X0 ist storniert.",
-    },
-    "l-ex2": {
-        "pieces": [
-            P("order_number"),
-            P("loading_status"),
-            P("'80'", slot="WHERE", after="NULLIF(loading_status, '--'), '00') ="),
-        ],
-        "trick": "Die Normalisierung steht schon. WHERE-Lücke: = '80'.",
-    },
-    "l-ex3": {
-        "pieces": [
-            P("oh.order_number", label="order_number"),
-            P("oh.loading_status", label="loading_status"),
-            P("oh.shipment_number = 'SHP-01' AND oc.alias <> 'sendung'", slot="WHERE", after="WHERE"),
-        ],
-        "trick": "WHERE-Lücke: shipment_number = 'SHP-01' und alias <> 'sendung'.",
-    },
-    "m-ex1": {
-        "pieces": [
-            P("oh.order_number", label="order_number"),
-            P("c.alias", label="alias"),
-            P("oc.alias = 'warenausgang'", slot="WHERE", after="WHERE"),
-        ],
-        "trick": "WHERE-Lücke: oc.alias = 'warenausgang' — nicht über eine UUID.",
-    },
-    "m-ex2": {
-        "pieces": [
-            P("alias"),
-            P("name->>'de'", label="deutscher Name"),
-        ],
-        "trick": "alias und name->>'de'. Eine Tabelle, kein JOIN.",
-    },
-    "n-ex1": {
-        "pieces": [
-            P("im.designation_a->>'de'", label="deutscher Text"),
-            P("CASE bu.alias WHEN 'palette-typ-a' THEN 'Typ A' WHEN 'palette-typ-b' THEN 'Typ B' ELSE bu.alias END", label="CASE Palettentyp"),
-        ],
-        "trick": "CASE bu.alias: palette-typ-a → Typ A, palette-typ-b → Typ B, sonst den Roh-Alias.",
-    },
-    "o-ex1": {
-        "pieces": [
-            P("im.designation_a->>'de'", label="deutscher Text"),
-            P("im.customs_tariff_number_taric", label="TARIC"),
-            P("cc.iso_code", label="iso_code"),
-            P("csp.alias", label="alias"),
-            P("r.rn = 1", slot="WHERE", after="WHERE"),
-        ],
-        "trick": "WHERE-Lücke: r.rn = 1 — nur die neueste Quant-Zeile.",
-    },
-    "o-ex2": {
-        "pieces": [
-            P("ac.alias", label="alias"),
-            P("ad.name", label="name"),
-            P("cc.iso_code", label="iso_code"),
-            P("oh.order_number = '100504_A' AND ac.alias = 'lieferadresse'", slot="WHERE", after="WHERE"),
-        ],
-        "trick": "WHERE-Lücke: Auftragsnummer 100504_A und alias = lieferadresse.",
-    },
-    "p-ex1": {
-        "pieces": [
-            P("hu.handling_unit_id", label="handling_unit_id"),
-            P("COUNT(DISTINCT psn.serial_number)", label="COUNT DISTINCT"),
-            P("STRING_AGG(DISTINCT psn.serial_number, '; ' ORDER BY psn.serial_number)", label="STRING_AGG"),
-        ],
-        "trick": "COUNT(DISTINCT …) und STRING_AGG(DISTINCT … ORDER BY …). GROUP BY steht schon.",
-    },
-    "p-ex2": {
-        "pieces": [
-            P("hu.handling_unit_number", label="handling_unit_number"),
-            P("CASE WHEN t.alias = 'externe-tracking-nummer' THEN i.handling_unit_identification ELSE hu.handling_unit_number END", label="CASE TNR oder HU"),
-        ],
-        "trick": "CASE WHEN t.alias = 'externe-tracking-nummer' THEN … ELSE interne Nummer.",
-    },
-}
-
 
 def main():
-    for lesson in LESSONS:
-        for ex in lesson.get("exercises") or []:
-            extra = GUIDE.get(ex["id"])
-            if extra:
-                ex.update(extra)
     out = Path(__file__).with_name("lessons.json")
     out.write_text(json.dumps(LESSONS, ensure_ascii=False, indent=2), encoding="utf-8")
     ex = sum(len(l.get("exercises") or []) for l in LESSONS)
