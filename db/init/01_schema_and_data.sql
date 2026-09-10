@@ -359,7 +359,12 @@ INSERT INTO instance_1.flowapp_demo_order_head (
   '11111111-0000-0000-0000-000000000005', '12121212-0000-0000-0000-000000000001',
   '10', '00', '--', '--', NULL,
   TIMESTAMP '2026-09-09 06:00:00', NULL, TIMESTAMPTZ '2026-09-09 15:30:00+02',
-  NULL, '1a1a1a1a-0000-0000-0000-000000000002');
+  NULL, '1a1a1a1a-0000-0000-0000-000000000002'),
+ ('55555555-0000-0000-0000-000000000008', 100508, '100508_A',
+  NULL, '12121212-0000-0000-0000-000000000001',
+  '10', '00', '00', '00', NULL,
+  TIMESTAMP '2026-09-10 06:00:00', NULL, TIMESTAMPTZ '2026-09-10 09:00:00+02',
+  NULL, NULL);
 
 INSERT INTO instance_1.flowapp_demo_order_position (id, order_head_id, item_master_id, quantity) VALUES
  ('66666666-0000-0000-0000-000000000001','55555555-0000-0000-0000-000000000001','33333333-0000-0000-0000-000000000001', 20),
@@ -463,48 +468,69 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA subscription GRANT SELECT, INSERT, UPDATE, DE
 DROP SCHEMA IF EXISTS learn CASCADE;
 CREATE SCHEMA learn;
 
-CREATE TABLE learn.orders (
-    id            integer PRIMARY KEY,
-    order_number  integer NOT NULL,
-    client        text NOT NULL,
-    status        text NOT NULL,
-    quantity      integer NOT NULL,
-    created_at    date NOT NULL
-);
-
 CREATE TABLE learn.clients (
     id       integer PRIMARY KEY,
     name     text NOT NULL,
     country  text NOT NULL
 );
 
+CREATE TABLE learn.orders (
+    id            integer PRIMARY KEY,
+    order_number  integer NOT NULL,
+    client_id     integer REFERENCES learn.clients(id),
+    client        text,
+    status        text NOT NULL,
+    quantity      integer,
+    created_at    date NOT NULL
+);
+
 CREATE TABLE learn.stock (
     id        integer PRIMARY KEY,
     item      text NOT NULL,
-    quantity  integer NOT NULL,
-    weight    integer NOT NULL
+    quantity  integer,
+    weight    integer
 );
 
-INSERT INTO learn.orders (id, order_number, client, status, quantity, created_at) VALUES
-    (1, 4711, 'Red Bull',  'open',      12, '2026-09-08'),
-    (2, 4712, 'ETE',       'finished',   4, '2026-09-07'),
-    (3, 4713, 'Red Bull',  'open',      25, '2026-09-09'),
-    (4, 4714, 'ETE',       'open',       8, '2026-09-06'),
-    (5, 4715, 'Red Bull',  'finished',  30, '2026-09-05'),
-    (6, 4716, 'Nordlog',   'open',      15, '2026-09-10'),
-    (7, 4717, 'ETE',       'cancelled',  2, '2026-09-04'),
-    (8, 4718, 'Red Bull',  'open',      50, '2026-09-10');
-
 INSERT INTO learn.clients (id, name, country) VALUES
-    (10, 'Red Bull', 'AT'),
-    (20, 'ETE',      'DE'),
-    (30, 'Nordlog',  'CH');
+    (10, 'Helio',    'AT'),
+    (20, 'Alpin',    'DE'),
+    (30, 'Nordkai',  'CH'),
+    (40, 'Westfeld', 'DE');
+
+INSERT INTO learn.orders (id, order_number, client_id, client, status, quantity, created_at) VALUES
+    (1,  4711, 10,   'Helio',   'offen',     12,   '2026-09-08'),
+    (2,  4712, 20,   'Alpin',   'fertig',     4,   '2026-09-07'),
+    (3,  4713, 10,   'Helio',   'offen',     25,   '2026-09-09'),
+    (4,  4714, 20,   'Alpin',   'offen',      8,   '2026-09-06'),
+    (5,  4715, 10,   'Helio',   'fertig',    30,   '2026-09-05'),
+    (6,  4716, 30,   'Nordkai', 'offen',     15,   '2026-09-10'),
+    (7,  4717, 20,   'Alpin',   'storniert',  2,   '2026-09-04'),
+    (8,  4718, 10,   'Helio',   'offen',     50,   '2026-09-10'),
+    (9,  4719, 10,   'Helio',   'offen',     18,   '2026-09-11'),
+    (10, 4720, 20,   'Alpin',   'fertig',    22,   '2026-09-03'),
+    (11, 4721, 30,   'Nordkai', 'fertig',     9,   '2026-09-02'),
+    (12, 4722, 30,   'Nordkai', 'offen',      6,   '2026-09-12'),
+    (13, 4723, 10,   'Helio',   'storniert', 11,   '2026-09-01'),
+    (14, 4724, 20,   'Alpin',   'offen',     40,   '2026-09-13'),
+    (15, 4725, 30,   'Nordkai', 'offen',      3,   '2026-09-08'),
+    (16, 4726, 10,   'Helio',   'fertig',     7,   '2026-09-14'),
+    (17, 4727, 20,   'Alpin',   'offen',     16,   '2026-09-15'),
+    (18, 4728, 30,   'Nordkai', 'storniert',  5,   '2026-09-06'),
+    (19, 4729, 10,   'Helio',   'offen',    100,   '2026-09-16'),
+    (20, 4730, NULL, NULL,      'offen',     14,   '2026-09-09'),
+    (21, 4731, 20,   'Alpin',   'offen',    NULL,  '2026-09-11'),
+    (22, 4732, 10,   'Helio',   'fertig',   NULL,  '2026-09-07'),
+    (23, 4733, 30,   'Nordkai', 'offen',      1,   '2026-09-17'),
+    (24, 4734, 10,   'Helio',   'offen',     13,   '2026-09-18');
 
 INSERT INTO learn.stock (id, item, quantity, weight) VALUES
-    (1, 'Palette A', 40, 120),
-    (2, 'Palette B',  8,  80),
-    (3, 'Karton C',  15,  25),
-    (4, 'Palette D',  3, 100);
+    (1, 'Palette A', 40,   120),
+    (2, 'Palette B',  8,    80),
+    (3, 'Karton C',  15,    25),
+    (4, 'Palette D',  3,   100),
+    (5, 'Karton E',  NULL,  40),
+    (6, 'Folie F',   12,  NULL),
+    (7, 'Palette G',  0,    50);
 
 GRANT USAGE ON SCHEMA learn TO lernuser;
 GRANT SELECT ON ALL TABLES IN SCHEMA learn TO lernuser;

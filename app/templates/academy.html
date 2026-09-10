@@ -4,23 +4,59 @@
 <article class="academy" id="academy-root"
   data-lesson-id="{{ lesson.id }}"
   data-next-id="{{ next_id or '' }}"
-  data-prev-id="{{ prev_id or '' }}">
+  data-prev-id="{{ prev_id or '' }}"
+  data-quiz-count="{{ lesson.quiz|length if lesson.quiz else 0 }}">
   <header class="lesson-hero academy-hero">
     <p class="eyebrow">Kapitel {{ lesson.chapter }}{% if lesson.challenge %} · Challenge{% endif %} · ca. {{ lesson.minutes }} Min</p>
     <h1>{{ lesson.title }}</h1>
-    <p class="lesson-path-copy">{{ lesson.goal }}</p>
+    <p class="lesson-path-copy">{% if lesson.quiz %}Verstehen → schreiben → Kurzcheck. {{ lesson.goal }}
+    {% else %}{{ lesson.goal }}{% endif %}</p>
   </header>
 
-  <div class="academy-layout">
-    <div class="academy-main">
-      <div class="step-meter" id="step-meter"></div>
-      <div class="card academy-card" id="step-card">
-        <div id="step-root"></div>
-      </div>
-      <div class="academy-footer" id="step-footer"></div>
-    </div>
-    <aside class="model-rail" id="model-rail"></aside>
+  <div class="tabs phase-tabs" role="tablist">
+    <button class="tab active" type="button" data-tab="steps">
+      <span class="phase-num">1</span>
+      <span class="phase-label">Üben <span class="tab-count">{{ lesson.steps|length }}</span></span>
+    </button>
+    {% if lesson.quiz %}
+    <button class="tab" type="button" data-tab="quiz">
+      <span class="phase-num">2</span>
+      <span class="phase-label">Kurzcheck <span class="tab-count">{{ lesson.quiz|length }}</span></span>
+    </button>
+    {% endif %}
   </div>
+  <p class="phase-hint" id="phase-hint">Kurze Schritte: anschauen, vorhersagen, selbst schreiben.</p>
+
+  <section class="tab-panel active" data-panel="steps">
+    <div class="academy-layout">
+      <div class="academy-main">
+        <div class="step-meter" id="step-meter"></div>
+        <div class="card academy-card" id="step-card">
+          <div id="step-root"></div>
+        </div>
+        <div class="academy-footer" id="step-footer"></div>
+      </div>
+      <aside class="model-rail" id="model-rail"></aside>
+    </div>
+  </section>
+
+  {% if lesson.quiz %}
+  <section class="tab-panel" data-panel="quiz">
+    <p class="phase-hint">Eine Antwort tippen — danach kommt die Erklärung. Falsch ist ok.</p>
+    <div class="quiz-score muted" id="quiz-score"></div>
+    {% for q in lesson.quiz %}
+    <div class="quiz-question" data-correct="{{ q.correct }}" data-explain='{{ (q.explain or "")|tojson }}'>
+      <p class="quiz-q">{{ loop.index }}. {{ q.q }}</p>
+      <div class="quiz-options">
+        {% for opt in q.options %}
+        <button class="quiz-option" type="button" data-index="{{ loop.index0 }}">{{ opt }}</button>
+        {% endfor %}
+      </div>
+      <div class="quiz-feedback"></div>
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
 
   <nav class="lesson-nav">
     {% if prev_id %}<a class="btn" href="/learn/{{ prev_id }}">← Vorheriges Kapitel</a>{% else %}<a class="btn" href="/">Zur Übersicht</a>{% endif %}
@@ -31,5 +67,5 @@
 {% endblock %}
 {% block page_scripts %}
 <script id="academy-data" type="application/json">{{ lesson | tojson }}</script>
-<script src="/static/js/academy.js?v=15"></script>
+<script src="/static/js/academy.js?v=16"></script>
 {% endblock %}
