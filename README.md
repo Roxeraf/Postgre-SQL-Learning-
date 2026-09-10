@@ -1,9 +1,9 @@
 # PostgreSQL & FlowApp/WMX — Interaktive Einarbeitung
 
 Lern-App aus der Einarbeitungs-Dokumentation `PostgreSQL_FlowApp_Einarbeitung.docx`.
-Die Datei ist die **Wissensbasis** für alle Inhalte (Teile A–P plus Glossar).
+Die Datei ist die **Wissensbasis** für alle Inhalte (SQL-Grundlagen, Teile A–P plus Glossar).
 
-- **16 Lektionen:** Einstieg A–J, Vertiefung K–P (Eigenheiten, Status/Sendung, Alias-Filter, Verpackung, Zoll, Tracking)
+- **17 Lektionen:** SQL-Grundlagen (SELECT, JOINs), Einstieg A–J, Vertiefung K–P (Eigenheiten, Status/Sendung, Alias-Filter, Verpackung, Zoll, Tracking)
 - **SQL-Übungen im Browser** (SELECT, UPDATE, DELETE) mit Prüfung gegen eine Musterlösung
 - **Kurz-Quiz und Karteikarten**
 - **Durchsuchbare Wissensbasis** (`/wissen`) über alle Abschnitte, Tabellen und Begriffe

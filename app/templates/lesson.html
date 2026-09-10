@@ -62,9 +62,9 @@
       <div class="practice-toolbar">
         <div class="ex-stepper" id="ex-stepper" role="tablist" aria-label="Übungen"></div>
         <ol class="do-steps">
-          <li>Aufgabe lesen</li>
-          <li>SQL schreiben — Tabellen/Spalten rechts zum Reinklicken</li>
-          <li><strong>Ausführen</strong>, dann <strong>Stimmt das?</strong></li>
+          <li><span>Nächsten Schritt lesen</span></li>
+          <li><span>Rechts Tabelle aufklappen → Spalte klicken (füllt die Lücke)</span></li>
+          <li><span><strong>Ausführen</strong>, dann <strong>Stimmt das?</strong></span></li>
         </ol>
       </div>
       <div class="practice-layout">
@@ -86,13 +86,9 @@
             {% if ex.kind == 'write' %}
             <p class="exercise-write-note muted">Schreibübung: Wenn der Datenstand schon verändert ist, zuerst <button type="button" class="text-btn js-reset-db">Datenbank zurücksetzen</button>.</p>
             {% endif %}
-            <div class="sql-worksheet">
-              <label class="sql-editor-label" for="sql-{{ ex.id }}">Dein SQL</label>
-              <textarea class="sql-editor" id="sql-{{ ex.id }}" spellcheck="false">{{ ex.starter }}</textarea>
-            </div>
             {% if ex.look %}
-            <details class="exercise-guide">
-              <summary>Wenn du feststeckst</summary>
+            <details class="exercise-guide" open>
+              <summary>Nächster Schritt</summary>
               <ol class="exercise-look">
                 {% for step in ex.look %}
                 <li>{{ step }}</li>
@@ -100,6 +96,10 @@
               </ol>
             </details>
             {% endif %}
+            <div class="sql-worksheet">
+              <label class="sql-editor-label" for="sql-{{ ex.id }}">Dein SQL — Spalte rechts klicken füllt die Lücke</label>
+              <textarea class="sql-editor" id="sql-{{ ex.id }}" spellcheck="false">{{ ex.starter }}</textarea>
+            </div>
             <div class="exercise-actions">
               <button class="btn btn-primary" data-action="run">Ausführen</button>
               <button class="btn btn-check" data-action="check">Stimmt das?</button>
@@ -119,8 +119,8 @@
         </div>
         <aside class="schema-rail" id="schema-rail">
           <div class="schema-rail-head">
-            <h2>Nachschauen</h2>
-            <p class="muted">Auf eine Spalte klicken fügt sie im SQL-Feld links an der Cursorposition ein.</p>
+            <h2>Tabellen &amp; Spalten</h2>
+            <p class="muted">Tabelle aufklappen, Spalte klicken — sie landet in der Lücke nach SELECT. Bei mehreren Tabellen setzt die App den Kurznamen davor (<code>oh.order_number</code>).</p>
           </div>
           <p class="schema-need-label">In dieser Aufgabe</p>
           <ul class="schema-need" id="schema-rail-need"></ul>
