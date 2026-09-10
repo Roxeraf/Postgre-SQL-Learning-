@@ -71,6 +71,32 @@ CONCEPTS = [
     {"id": "NULL", "label": "NULL"},
     {"id": "GROUP BY", "label": "GROUP BY"},
     {"id": "JOIN", "label": "JOIN"},
+    {"id": "HAVING", "label": "HAVING"},
+    {"id": "DML", "label": "Ändern"},
+    {"id": "TX", "label": "Transaktionen"},
+]
+
+PATH_IDS = [
+    "ch0",
+    "ch1",
+    "ch2",
+    "ch3",
+    "ch4",
+    "ch5",
+    "ch6",
+    "ch7",
+    "ch-alias",
+    "ch8",
+    "ch-having",
+    "ch-keys",
+    "ch9",
+    "ch10",
+    "challenge-1",
+    "challenge-2",
+    "ch-dml",
+    "ch-tx",
+    "ch-pg",
+    "challenge-3",
 ]
 
 
@@ -135,8 +161,8 @@ HINT_WHERE = [
 
 ACADEMY = {
     "id": "sql",
-    "label": "SQL Grundlagen",
-    "blurb": "Vom ersten Blick in eine Tabelle bis zu JOIN und Zählen.",
+    "label": "PostgreSQL Grundlagen",
+    "blurb": "Vom ersten Blick in eine Tabelle bis zu JOIN, Gruppen, Änderungen und dem Postgres-Modell.",
     "concepts": CONCEPTS,
     "lessons": [
         {
@@ -1083,7 +1109,10 @@ ACADEMY = {
                     "type": "look",
                     "title": "Zwei Tabellen, eine Frage",
                     "text": "In `orders` steht der Kundenname zur Übung noch einmal. Die Stammdaten liegen in `clients` (Name, Land).\n\nZusammengehören tun sie über **`orders.client_id = clients.id`**.",
-                    "table": clients_table(),
+                    "tables": [
+                        clients_table(),
+                        orders_table("id", "order_number", "client_id", "client"),
+                    ],
                     "note": "Westfeld hat in clients eine Zeile — aber keinen Auftrag. Beim INNER JOIN siehst du Westfeld deshalb nicht.",
                     "cta": "JOIN ansehen",
                 },
@@ -1109,6 +1138,7 @@ ACADEMY = {
                     "expected_ids": HAS_CLIENT,
                     "id_field": "id",
                     "execute": True,
+                    "visualize": "inner",
                     "concepts": ["JOIN"],
                     "feedback_ok": "Auftrag 4730 hat keine client_id — INNER JOIN lässt ihn weg. Westfeld erscheint hier sowieso nicht, der steht nur in clients.",
                     "feedback_bad": "Schau, bei welchem Auftrag die Kundenspalte leer ist. Der hat keinen Partner in clients.",
@@ -1405,3 +1435,23 @@ def lesson_by_id(lesson_id: str):
         if lesson["id"] == lesson_id:
             return lesson
     return None
+
+
+def _finalize_academy():
+    from lessons.academy_more import GLOSSARY, extra_lessons, flashcards
+
+    by_id = {lesson["id"]: lesson for lesson in ACADEMY["lessons"]}
+    for lesson in extra_lessons():
+        by_id[lesson["id"]] = lesson
+    missing = [lid for lid in PATH_IDS if lid not in by_id]
+    if missing:
+        raise RuntimeError("Unbekannte Kapitel in PATH_IDS: " + ", ".join(missing))
+    ACADEMY["lessons"] = [by_id[lid] for lid in PATH_IDS]
+    for index, lesson in enumerate(ACADEMY["lessons"]):
+        lesson["chapter"] = index
+    ACADEMY["glossary"] = GLOSSARY
+    ACADEMY["concepts"] = CONCEPTS
+    ACADEMY["flashcards"] = flashcards()
+
+
+_finalize_academy()

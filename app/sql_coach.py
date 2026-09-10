@@ -242,6 +242,36 @@ def diagnose_structure(user_sql: str, solution_sql: str, step: dict | None = Non
             "Mit `JOIN` nimmst du die zweite Tabelle hinzu, mit `ON` sagst du, wie sie zusammenhängen."
         )
 
+    if has_clause(sol, "JOIN") and has_clause(user, "JOIN") and has_clause(sol, "ON") and not has_clause(user, "ON"):
+        return (
+            "`JOIN` allein reicht nicht. `ON` sagt, über welche Spalten die Zeilen zusammengehören. "
+            "Ohne `ON` entsteht ein Kreuzprodukt."
+        )
+
+    if has_clause(sol, "LEFT JOIN") and has_clause(user, "JOIN") and not has_clause(user, "LEFT"):
+        return (
+            "`JOIN` ohne `LEFT` ist ein INNER JOIN: Zeilen ohne Treffer fallen weg. "
+            "Hier sollen sie bleiben — das ist `LEFT JOIN`."
+        )
+
+    if has_clause(sol, "HAVING") and not has_clause(user, "HAVING"):
+        return (
+            "`WHERE` filtert Zeilen **vor** dem Gruppieren. "
+            "Wenn die Bedingung die Gruppe betrifft (`COUNT(*) > …`), brauchst du `HAVING`."
+        )
+
+    if re.search(r"\bUPDATE\b", sol, re.I) and re.search(r"\bUPDATE\b", user, re.I) and not has_clause(user, "WHERE"):
+        return (
+            "`UPDATE` ohne `WHERE` ändert **jede** Zeile der Tabelle. "
+            "Sag mit `WHERE`, welche Datensätze gemeint sind."
+        )
+
+    if re.search(r"\bDELETE\b", sol, re.I) and re.search(r"\bDELETE\b", user, re.I) and not has_clause(user, "WHERE"):
+        return (
+            "`DELETE` ohne `WHERE` leert die ganze Tabelle. "
+            "Mit `WHERE` löschst du nur die gemeinten Zeilen."
+        )
+
     if has_clause(sol, "ORDER BY") and not has_clause(user, "ORDER BY") and step.get("ordered"):
         return "Das Ergebnis soll in einer bestimmten Reihenfolge kommen. Dafür ist `ORDER BY` zuständig."
 
@@ -263,7 +293,7 @@ def diagnose_structure(user_sql: str, solution_sql: str, step: dict | None = Non
     return None
 
 
-def friendly_sql_error(err: str, sql: str, sandbox: str = "wmx") -> str:
+def friendly_sql_error(err: str, sql: str, sandbox: str = "learn") -> str:
     low = (err or "").lower()
     structural = diagnose_structure(sql, sql)
     if has_clause(sql, "SELECT") and not has_clause(sql, "FROM"):
@@ -287,34 +317,26 @@ def friendly_sql_error(err: str, sql: str, sandbox: str = "wmx") -> str:
         near = re.search(r'syntax error at or near "([^"]+)"', err or "", re.I)
         token = near.group(1) if near else ""
         hint = f" Postgres stolpert bei `{token}`." if token else ""
-        if token.lower() in {"orders", "clients", "stock"} and not has_clause(sql, "FROM"):
+        if token.lower() in {"orders", "clients", "stock", "order_items"} and not has_clause(sql, "FROM"):
             return diagnose_structure(sql, "SELECT * FROM orders")
         return "Die Abfrage hat einen Syntaxfehler." + hint + " Lies die Query wie eine Frage: Was? Woher? Welche?"
     if "does not exist" in low and "column" in low:
-        extra = (
-            " Zwischen zwei Spalten gehört ein Komma (`order_number, task_status`)."
-            if sandbox != "learn"
-            else ""
-        )
         return (
             "Eine Spalte in deiner Abfrage gibt es in dieser Tabelle nicht. "
             "Schau in der Tabelle nach den genauen Namen — Groß/Kleinschreibung und Tippfehler zählen."
-            + extra
         )
     if "does not exist" in low:
-        if sandbox == "learn":
-            return (
-                "Diese Tabelle gibt es im Übungsbereich nicht. "
-                "Im Anfänger-Pfad heißen die Tabellen `orders`, `clients` und `stock`."
-            )
         return (
-            "Tabellen immer voll qualifiziert: instance_1.flowapp_demo_<name>. "
-            "Im Schema den deutschen Namen suchen und die Tabelle anklicken."
+            "Diese Tabelle gibt es im Übungsbereich nicht. "
+            "Die Trainings-Tabellen heißen `orders`, `clients`, `stock` und `order_items`."
         )
     if "statement timeout" in low or "canceling statement" in low:
         return "Die Abfrage lief zu lange und wurde abgebrochen. Prüfe JOINs ohne `ON`-Bedingung."
     if "permission denied" in low:
-        return "Im Übungsbereich darfst du Daten nur lesen (`SELECT`). Änderungen an Tabellen sind gesperrt."
+        return (
+            "Diese Aktion ist für den Übungs-User nicht erlaubt. "
+            "Lesen, Einfügen, Ändern und Löschen in den Trainingstabellen gehen — Schema ändern nicht."
+        )
     if structural and "syntax" in low:
         return structural
     return err or "Die Abfrage konnte nicht ausgeführt werden."

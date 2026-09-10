@@ -4,23 +4,40 @@
 <header class="page-header">
   <p class="eyebrow">Nachschlagen</p>
   <h1>Wissensbasis</h1>
-  <p class="lede">{{ index_count }} Einträge aus SQL-Grundlagen und der Einarbeitung (Teile A–P, Glossar, Übungen, Karteikarten). Tippe einen Begriff wie <em>INNER JOIN</em>, <em>TARIC</em> oder <em>shipment_number</em>.</p>
+  <p class="lede">{{ index_count }} Einträge aus dem Lernpfad: Kapitel, Schritte, Kurzchecks und Konzepte. Tippe einen Begriff wie <em>LEFT JOIN</em>, <em>NULL</em> oder <em>HAVING</em>.</p>
 </header>
 
 <section class="card">
   <label class="sr-only" for="wissen-q">Suche</label>
-  <input class="search-input wissen-input" id="wissen-q" type="search" placeholder="Begriff, Tabelle, Statuscode, Alias…" autocomplete="off">
-  <p class="muted" id="wissen-meta">Mindestens zwei Zeichen — Suche läuft über alle Lektionen.</p>
+  <input class="search-input wissen-input" id="wissen-q" type="search" placeholder="Begriff, Klausel, Konzept…" autocomplete="off">
+  <p class="muted" id="wissen-meta">Mindestens zwei Zeichen — Suche läuft über alle Kapitel.</p>
   <div class="chip-row" id="wissen-chips">
-    <button type="button" class="section-chip" data-q="alias">alias statt UUID</button>
-    <button type="button" class="section-chip" data-q="timestamptz">Zeitzone</button>
-    <button type="button" class="section-chip" data-q="order_consolidation">Zonen</button>
-    <button type="button" class="section-chip" data-q="X0">Storno X0</button>
-    <button type="button" class="section-chip" data-q="TARIC">TARIC</button>
-    <button type="button" class="section-chip" data-q="TNR">TNR</button>
-    <button type="button" class="section-chip" data-q="ProcessModelFactory">ProcessModelFactory</button>
-    <button type="button" class="section-chip" data-q="subscription">Print-Schema</button>
+    <button type="button" class="section-chip" data-q="SELECT">SELECT</button>
+    <button type="button" class="section-chip" data-q="WHERE">WHERE</button>
+    <button type="button" class="section-chip" data-q="NULL">NULL</button>
+    <button type="button" class="section-chip" data-q="JOIN">JOIN</button>
+    <button type="button" class="section-chip" data-q="GROUP BY">GROUP BY</button>
+    <button type="button" class="section-chip" data-q="HAVING">HAVING</button>
+    <button type="button" class="section-chip" data-q="Transaktion">Transaktion</button>
+    <button type="button" class="section-chip" data-q="Index">Index</button>
   </div>
   <div id="wissen-results"></div>
 </section>
+
+{% if glossary %}
+<section class="card" style="margin-top:20px">
+  <h2>Konzepte</h2>
+  <p class="muted">Kurz erklärt — Details stehen in den Kapiteln.</p>
+  <div class="glossary-grid">
+    {% for g in glossary %}
+    <article class="gloss-card">
+      <h3>{{ g.label }}</h3>
+      <p>{{ g.text }}</p>
+      {% if g.sql %}<pre class="sql-pre">{{ g.sql }}</pre>{% endif %}
+      {% if g.lesson_id %}<a class="btn" href="/learn/{{ g.lesson_id }}">Zum Kapitel</a>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
 {% endblock %}

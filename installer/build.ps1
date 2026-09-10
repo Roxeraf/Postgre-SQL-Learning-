@@ -109,12 +109,14 @@ Write-Step "App-Dateien kopieren"
 $stagingApp = Join-Path $StagingDir "app"
 New-Item -ItemType Directory -Force -Path $stagingApp | Out-Null
 Copy-Item (Join-Path $ProjectRoot "app\app.py") $stagingApp
+Copy-Item (Join-Path $ProjectRoot "app\sql_coach.py") $stagingApp
 Copy-Item (Join-Path $ProjectRoot "app\requirements.txt") $stagingApp
 Copy-Item (Join-Path $ProjectRoot "app\templates") (Join-Path $stagingApp "templates") -Recurse
 Copy-Item (Join-Path $ProjectRoot "app\static") (Join-Path $stagingApp "static") -Recurse
 New-Item -ItemType Directory -Force -Path (Join-Path $stagingApp "lessons") | Out-Null
-Copy-Item (Join-Path $ProjectRoot "app\lessons\lessons.json") (Join-Path $stagingApp "lessons\")
-Copy-Item (Join-Path $ProjectRoot "app\lessons\table_catalog.json") (Join-Path $stagingApp "lessons\")
+Copy-Item (Join-Path $ProjectRoot "app\lessons\__init__.py") (Join-Path $stagingApp "lessons\")
+Copy-Item (Join-Path $ProjectRoot "app\lessons\academy_data.py") (Join-Path $stagingApp "lessons\")
+Copy-Item (Join-Path $ProjectRoot "app\lessons\academy_more.py") (Join-Path $stagingApp "lessons\")
 
 $stagingDb = Join-Path $StagingDir "db\init"
 New-Item -ItemType Directory -Force -Path $stagingDb | Out-Null

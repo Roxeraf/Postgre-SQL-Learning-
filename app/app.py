@@ -1,4 +1,3 @@
-import json
 import os
 import re
 from collections import Counter
@@ -19,83 +18,12 @@ from sql_coach import (
 
 app = Flask(__name__)
 
-LESSONS_PATH = Path(__file__).parent / "lessons" / "lessons.json"
-with open(LESSONS_PATH, encoding="utf-8") as f:
-    LESSONS = json.load(f)
-
-CATALOG_PATH = Path(__file__).parent / "lessons" / "table_catalog.json"
-if CATALOG_PATH.exists():
-    with open(CATALOG_PATH, encoding="utf-8") as f:
-        TABLE_CATALOG = json.load(f)
-else:
-    TABLE_CATALOG = {}
-
-LESSONS_BY_ID = {l["id"]: l for l in LESSONS}
-TABLE_NAME_RE = re.compile(r"\b((?:instance_1|subscription)\.[a-zA-Z0-9_]+)", re.I)
-
-
-def catalog_info(short: str) -> dict:
-    return TABLE_CATALOG.get(short) or {}
-
-
-def tables_used(*sql_parts):
-    found, seen = [], set()
-    blob = " ".join(part or "" for part in sql_parts)
-    for match in TABLE_NAME_RE.findall(blob):
-        key = match.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        short = match.split(".")[-1]
-        for prefix in ("flowapp_demo_",):
-            if short.lower().startswith(prefix):
-                short = short[len(prefix):]
-                break
-        info = catalog_info(short)
-        found.append({
-            "qualified": match,
-            "short": short,
-            "label": info.get("label") or short,
-            "parent": info.get("parent") or "",
-            "kind": info.get("kind") or "",
-        })
-    return found
-
-
-EXERCISES_BY_ID = {}
-for lesson in LESSONS:
-    for ex in lesson.get("exercises", []):
-        ex["tables"] = tables_used(ex.get("solution"), ex.get("verify"), ex.get("starter"))
-        EXERCISES_BY_ID[ex["id"]] = ex
-
-FLASHCARDS = []
-for lesson in LESSONS:
-    for card in lesson.get("flashcards", []):
-        FLASHCARDS.append({**card, "lesson_id": lesson["id"], "lesson": lesson["title"]})
-    for i, q in enumerate(lesson.get("quiz", []), start=1):
-        correct = q["options"][q["correct"]]
-        FLASHCARDS.append({
-            "id": f"{lesson['id']}-quiz-{i}",
-            "front": q["q"],
-            "back": correct + ((" — " + q["explain"]) if q.get("explain") else ""),
-            "lesson_id": lesson["id"],
-            "lesson": lesson["title"],
-        })
-
-TRACKS = [
-    {
-        "id": "einstieg",
-        "label": "Einstieg · WMX, A–J",
-        "blurb": "SQL sitzt aus der Akademie. Hier dieselben Befehle auf den Lager-Tabellen, dann Umgebung, Datenmodell und Arbeitsregeln.",
-        "lessons": [l for l in LESSONS if l.get("track") == "einstieg"],
-    },
-    {
-        "id": "vertiefung",
-        "label": "Vertiefung K–P",
-        "blurb": "Installations-Eigenheiten, Statuslogik, Alias-Filter, Verpackung, Zoll und Tracking.",
-        "lessons": [l for l in LESSONS if l.get("track") == "vertiefung"],
-    },
-]
+TABLE_LABELS = {
+    "orders": "Aufträge",
+    "clients": "Kunden",
+    "stock": "Bestand",
+    "order_items": "Positionen",
+}
 
 
 def _plain(text: str) -> str:
@@ -120,71 +48,85 @@ def _snippet(text: str, query: str, width: int = 180) -> str:
     return chunk
 
 
+def _step_text(step: dict) -> str:
+    parts = [
+        step.get("title") or "",
+        step.get("text") or "",
+        step.get("prompt") or "",
+        step.get("question") or "",
+        step.get("plain") or "",
+        step.get("note") or "",
+        " ".join(step.get("hints") or []),
+    ]
+    return " ".join(parts)
+
+
+FLASHCARDS = list(ACADEMY.get("flashcards") or [])
+for lesson in ACADEMY["lessons"]:
+    for i, q in enumerate(lesson.get("quiz") or [], start=1):
+        options = q.get("options") or []
+        correct = options[q["correct"]] if options else ""
+        FLASHCARDS.append({
+            "id": f"{lesson['id']}-quiz-{i}",
+            "front": q["q"],
+            "back": correct + ((" — " + q["explain"]) if q.get("explain") else ""),
+            "lesson_id": lesson["id"],
+            "lesson": lesson["title"],
+        })
+
 SEARCH_INDEX = []
-for lesson in LESSONS:
-    letter = lesson.get("letter") or lesson["id"].upper()
-    url = f"/lesson/{lesson['id']}"
+for lesson in ACADEMY["lessons"]:
+    letter = str(lesson.get("chapter", ""))
+    url = f"/learn/{lesson['id']}"
     SEARCH_INDEX.append({
         "type": "lektion",
         "lesson_id": lesson["id"],
         "letter": letter,
-        "title": f"Teil {letter} — {lesson['title']}",
+        "title": f"Kapitel {letter} — {lesson['title']}",
         "url": url,
         "text": _plain(" ".join([
             lesson["title"],
-            " ".join(lesson.get("goals") or []),
-            lesson.get("content") or "",
+            lesson.get("goal") or "",
+            " ".join(_step_text(s) for s in lesson.get("steps") or []),
         ])),
-        "preview": " ".join(lesson.get("goals") or []),
+        "preview": lesson.get("goal") or "",
     })
-    for block in re.split(r"\n##\s+", lesson.get("content") or ""):
-        block = block.strip()
-        if not block:
-            continue
-        title, _, body = block.partition("\n")
-        if not title.strip():
-            continue
+    for step in lesson.get("steps") or []:
         SEARCH_INDEX.append({
-            "type": "abschnitt",
+            "type": "schritt",
             "lesson_id": lesson["id"],
             "letter": letter,
-            "title": title.strip(),
+            "title": step.get("title") or lesson["title"],
             "url": url,
-            "text": _plain(title + " " + body),
-            "preview": body[:280],
+            "text": _plain(_step_text(step)),
+            "preview": (step.get("text") or step.get("prompt") or "")[:280],
         })
-    for card in lesson.get("flashcards") or []:
+    for q in lesson.get("quiz") or []:
         SEARCH_INDEX.append({
-            "type": "karte",
+            "type": "check",
             "lesson_id": lesson["id"],
             "letter": letter,
-            "title": card["front"],
-            "url": "/cards",
-            "text": _plain(card["front"] + " " + card["back"]),
-            "preview": card["back"],
-        })
-    for ex in lesson.get("exercises") or []:
-        SEARCH_INDEX.append({
-            "type": "übung",
-            "lesson_id": lesson["id"],
-            "letter": letter,
-            "title": ex["prompt"][:90],
+            "title": q["q"],
             "url": url,
-            "text": _plain(
-                " ".join([
-                    ex.get("why") or "",
-                    ex.get("task") or ex.get("prompt") or "",
-                    " ".join(ex.get("look") or []),
-                    " ".join(ex.get("hints") or []),
-                ])
-            ),
-            "preview": ex["prompt"],
+            "text": _plain(q["q"] + " " + " ".join(q.get("options") or []) + " " + (q.get("explain") or "")),
+            "preview": q.get("explain") or "",
         })
+
+for item in ACADEMY.get("glossary") or []:
+    SEARCH_INDEX.append({
+        "type": "konzept",
+        "lesson_id": item.get("lesson_id") or "",
+        "letter": "SQL",
+        "title": item["label"],
+        "url": f"/learn/{item['lesson_id']}" if item.get("lesson_id") else "/wissen",
+        "text": _plain(item["label"] + " " + item.get("text") + " " + (item.get("sql") or "")),
+        "preview": item.get("text") or "",
+    })
 
 DB_CONFIG = dict(
     host=os.environ.get("DB_HOST", "db"),
     port=os.environ.get("DB_PORT", "5432"),
-    dbname=os.environ.get("DB_NAME", "flowapp_learn"),
+    dbname=os.environ.get("DB_NAME", "learnsql"),
     user=os.environ.get("DB_USER", "lernuser"),
     password=os.environ.get("DB_PASSWORD", "lernuser"),
     connect_timeout=5,
@@ -193,7 +135,7 @@ DB_CONFIG = dict(
 
 MAX_ROWS = 200
 SAFE_IDENT = re.compile(r"^[a-zA-Z0-9_]+$")
-ALLOWED_SCHEMAS = ("instance_1", "subscription", "learn")
+ALLOWED_SCHEMAS = ("learn",)
 ADMIN_CONFIG = dict(
     DB_CONFIG,
     user=os.environ.get("DB_ADMIN_USER", "postgres"),
@@ -229,13 +171,12 @@ def _init_sql_path():
     return None
 
 
-def get_connection(admin=False, search_path=None):
+def get_connection(admin=False):
     cfg = dict(ADMIN_CONFIG if admin else DB_CONFIG)
     conn = psycopg2.connect(**cfg)
     conn.autocommit = True
-    if search_path == "learn":
-        with conn.cursor() as cur:
-            cur.execute("SET search_path TO learn, public")
+    with conn.cursor() as cur:
+        cur.execute("SET search_path TO learn, public")
     return conn
 
 
@@ -335,23 +276,20 @@ def jsonable_rows(columns, rows):
     return out
 
 
-def run_sql(sql: str, sandbox: str = "wmx"):
-    """Führt SQL aus. sandbox=learn: nur lesen, search_path=learn. sandbox=wmx: bestehende Übungs-DB."""
+def run_sql(sql: str, allow_write: bool = False):
+    """Führt SQL gegen Schema learn aus. DDL bleibt gesperrt."""
     raw = (sql or "").strip()
-    sandbox = "learn" if sandbox == "learn" else "wmx"
     if not raw:
         return {"ok": False, "error": "Bitte gib eine SQL-Abfrage ein.", "columns": None, "rows": None, "pg_error": None}
 
     if FORBIDDEN_KEYWORDS.search(strip_sql_line_comments(raw)):
-        msg = (
-            "Im Übungsbereich darfst du das Datenbank-Schema nicht ändern (kein DROP/ALTER/CREATE)."
-            if sandbox == "learn"
-            else (
-                "DROP, ALTER, CREATE und ähnliche Schema-Befehle sind in der Lern-App gesperrt. "
-                "SELECT, INSERT, UPDATE, DELETE sowie BEGIN/COMMIT sind erlaubt."
-            )
-        )
-        return {"ok": False, "error": msg, "columns": None, "rows": None, "pg_error": None}
+        return {
+            "ok": False,
+            "error": "Im Übungsbereich darfst du das Datenbank-Schema nicht ändern (kein DROP/ALTER/CREATE).",
+            "columns": None,
+            "rows": None,
+            "pg_error": None,
+        }
 
     statements = split_statements(raw)
     if not statements:
@@ -359,16 +297,9 @@ def run_sql(sql: str, sandbox: str = "wmx"):
 
     incomplete = next((s for s in statements if has_empty_select_list(s)), None)
     if incomplete:
-        empty_msg = (
-            "Nach SELECT fehlt noch, **was** du sehen möchtest — zum Beispiel `*` oder Spaltennamen."
-            if sandbox == "learn"
-            else (
-                "Die SELECT-Liste ist noch leer. Rechts eine Spalte anklicken — sie landet in der Lücke nach SELECT."
-            )
-        )
         return {
             "ok": False,
-            "error": empty_msg,
+            "error": "Nach SELECT fehlt noch, **was** du sehen möchtest — zum Beispiel `*` oder Spaltennamen.",
             "columns": None,
             "rows": None,
             "empty_select": True,
@@ -378,18 +309,18 @@ def run_sql(sql: str, sandbox: str = "wmx"):
     columns, rows, note = [], [], None
     messages = []
     try:
-        with get_connection(search_path="learn" if sandbox == "learn" else None) as conn:
+        with get_connection() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 for stmt in statements:
                     kind = classify_statement(stmt)
                     if kind == "empty":
                         continue
-                    if sandbox == "learn" and kind in {"write", "begin", "commit", "rollback"}:
+                    if not allow_write and kind in {"write", "begin", "commit", "rollback"}:
                         return {
                             "ok": False,
                             "error": (
-                                "Im Anfänger-Bereich sind nur lesende Abfragen erlaubt: "
-                                "`SELECT`, `WITH` und `EXPLAIN`."
+                                "Hier sind nur lesende Abfragen erlaubt: `SELECT`, `WITH` und `EXPLAIN`. "
+                                "Schreiben übst du in den späteren Kapiteln — oder im Playground."
                             ),
                             "columns": None,
                             "rows": None,
@@ -397,26 +328,13 @@ def run_sql(sql: str, sandbox: str = "wmx"):
                         }
                     if kind == "unknown":
                         allowed = (
-                            "Erlaubt sind SELECT und EXPLAIN."
-                            if sandbox == "learn"
-                            else "Erlaubt sind SELECT, INSERT, UPDATE, DELETE und BEGIN/COMMIT/ROLLBACK."
+                            "Erlaubt sind SELECT, EXPLAIN, INSERT, UPDATE, DELETE und BEGIN/COMMIT/ROLLBACK."
+                            if allow_write
+                            else "Erlaubt sind SELECT, WITH und EXPLAIN."
                         )
                         return {
                             "ok": False,
                             "error": "Dieser Befehl ist hier nicht erlaubt. " + allowed,
-                            "columns": None,
-                            "rows": None,
-                            "pg_error": None,
-                        }
-                    if kind == "write" and not re.search(
-                        r"\b(instance_1|subscription)\.", stmt, re.IGNORECASE
-                    ):
-                        return {
-                            "ok": False,
-                            "error": (
-                                "Schreibzugriffe bitte vollqualifiziert auf instance_1 oder subscription "
-                                "(z. B. UPDATE instance_1.flowapp_demo_order_head ...)."
-                            ),
                             "columns": None,
                             "rows": None,
                             "pg_error": None,
@@ -442,11 +360,11 @@ def run_sql(sql: str, sandbox: str = "wmx"):
                             messages.append("Änderung übernommen (COMMIT).")
                         elif kind == "rollback":
                             messages.append("Änderung verworfen (ROLLBACK).")
-    except Exception as e:  # noqa: BLE001 - want to surface DB errors to the learner
+    except Exception as e:  # noqa: BLE001
         pg_error = str(e)
         return {
             "ok": False,
-            "error": friendly_sql_error(pg_error, raw, sandbox=sandbox),
+            "error": friendly_sql_error(pg_error, raw),
             "pg_error": pg_error,
             "columns": None,
             "rows": None,
@@ -463,12 +381,7 @@ def run_sql(sql: str, sandbox: str = "wmx"):
     }
 
 
-def _learn_sql_fragment(script: str) -> str | None:
-    start = script.find("DROP SCHEMA IF EXISTS learn")
-    return script[start:] if start >= 0 else None
-
-
-def reset_learning_db():
+def restore_learn_schema():
     sql_path = _init_sql_path()
     if not sql_path:
         return False, "Init-SQL nicht gefunden. Bitte die App neu installieren bzw. den Container mit db/init starten."
@@ -476,67 +389,51 @@ def reset_learning_db():
     try:
         with get_connection(admin=True) as conn:
             with conn.cursor() as cur:
-                cur.execute("DROP SCHEMA IF EXISTS instance_1 CASCADE")
-                cur.execute("DROP SCHEMA IF EXISTS subscription CASCADE")
-                cur.execute("DROP SCHEMA IF EXISTS learn CASCADE")
                 cur.execute(script)
     except Exception as e:  # noqa: BLE001
         return False, str(e)
     return True, "Lern-Datenbank ist wieder im Ausgangszustand."
 
 
+def _restore_error():
+    ok, message = restore_learn_schema()
+    if ok:
+        return None
+    return {
+        "ok": False,
+        "error": "Die Übungsdatenbank konnte nicht zurückgesetzt werden: " + (message or ""),
+    }
+
+
+def reset_learning_db():
+    return restore_learn_schema()
+
+
 def ensure_learn_schema():
-    """Alte Volumes ohne learn-Schema nachziehen."""
-    sql_path = _init_sql_path()
-    if not sql_path:
-        return
-    try:
-        with get_connection(admin=True) as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT 1 FROM information_schema.schemata WHERE schema_name = 'learn'")
-                if cur.fetchone():
-                    return
-        fragment = _learn_sql_fragment(sql_path.read_text(encoding="utf-8"))
-        if not fragment:
-            return
-        with get_connection(admin=True) as conn:
-            with conn.cursor() as cur:
-                cur.execute(fragment)
-    except Exception:  # noqa: BLE001
-        pass
-
-
-def ensure_write_privileges():
-    """Damit bestehende Docker-Volumes ohne Neuaufsetzen schreiben dürfen."""
     try:
         with get_connection(admin=True) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    GRANT INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA instance_1 TO lernuser;
-                    GRANT INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA subscription TO lernuser;
-                    GRANT USAGE ON SCHEMA learn TO lernuser;
-                    GRANT SELECT ON ALL TABLES IN SCHEMA learn TO lernuser;
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = 'learn' AND table_name = 'order_items'
                     """
                 )
+                if cur.fetchone():
+                    cur.execute(
+                        """
+                        GRANT USAGE ON SCHEMA learn TO lernuser;
+                        GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA learn TO lernuser;
+                        """
+                    )
+                    return
+        restore_learn_schema()
     except Exception:  # noqa: BLE001
-        pass
-
-
-def normalize_rows(rows):
-    """Erzeugt eine ordnungs- und typunabhaengige Repraesentation zum Vergleich."""
-    normalized = []
-    for row in rows:
-        values = tuple(sorted(row.items(), key=lambda kv: kv[0]))
-        normalized.append(tuple(str(v) for _, v in values))
-    return sorted(normalized)
-
-
-def project_rows(rows, wanted_cols, col_map):
-    keys = []
-    for row in rows or []:
-        keys.append(tuple(str(row.get(col_map[c])) for c in wanted_cols))
-    return sorted(set(keys))
+        try:
+            restore_learn_schema()
+        except Exception:
+            pass
 
 
 def _cell_str(value):
@@ -566,7 +463,6 @@ def unique_rows(rows):
 
 
 def compare_by_values(user_rows, sol_rows):
-    """Alias-unabhängig: Lösungswerte müssen in den Nutzerzeilen vorkommen."""
     users = unique_rows(user_rows)
     sols = unique_rows(sol_rows)
     if not sols and not users:
@@ -578,6 +474,13 @@ def compare_by_values(user_rows, sol_rows):
     return True, len(users), len(sols)
 
 
+def project_rows(rows, wanted_cols, col_map):
+    keys = []
+    for row in rows or []:
+        keys.append(tuple(str(row.get(col_map[c])) for c in wanted_cols))
+    return sorted(set(keys))
+
+
 def project_row_seq(rows, wanted_cols, col_map):
     seq = []
     for row in rows or []:
@@ -586,7 +489,6 @@ def project_row_seq(rows, wanted_cols, col_map):
 
 
 def compare_query_result(user_cols, user_rows, sol_cols, sol_rows, ordered=False, strict_columns=False):
-    """Vergleicht Ergebnisse. Extra-Spalten und andere Aliase sind ok, außer strict_columns."""
     user_map = {c.lower(): c for c in (user_cols or [])}
     sol_map = {c.lower(): c for c in (sol_cols or [])}
     sol_names = [c.lower() for c in (sol_cols or [])]
@@ -611,15 +513,6 @@ def compare_query_result(user_cols, user_rows, sol_cols, sol_rows, ordered=False
     return False, missing, extra, user_n, sol_n
 
 
-def lesson_nav(lesson_id):
-    ids = list(LESSONS_BY_ID.keys())
-    idx = ids.index(lesson_id)
-    return (
-        ids[idx - 1] if idx > 0 else None,
-        ids[idx + 1] if idx < len(ids) - 1 else None,
-    )
-
-
 def academy_nav(lesson_id):
     ids = [l["id"] for l in ACADEMY["lessons"]]
     if lesson_id not in ids:
@@ -634,7 +527,6 @@ def academy_nav(lesson_id):
 @app.context_processor
 def inject_nav():
     return {
-        "tracks": TRACKS,
         "academy": ACADEMY,
         "academy_lessons": ACADEMY["lessons"],
     }
@@ -644,14 +536,8 @@ def inject_nav():
 def index():
     return render_template(
         "index.html",
-        lessons=LESSONS,
         academy_lessons=ACADEMY["lessons"],
         academy_concepts=ACADEMY["concepts"],
-        current_lesson_id=None,
-        exercise_count=sum(len(l.get("exercises") or []) for l in LESSONS),
-        quiz_count=sum(len(l.get("quiz") or []) for l in LESSONS)
-        + sum(len(l.get("quiz") or []) for l in ACADEMY["lessons"]),
-        card_count=len(FLASHCARDS),
         academy_step_count=sum(len(l.get("steps") or []) for l in ACADEMY["lessons"]),
     )
 
@@ -665,48 +551,24 @@ def academy_lesson(lesson_id):
     return render_template(
         "academy.html",
         lesson=lesson_obj,
-        lessons=LESSONS,
         prev_id=prev_id,
         next_id=next_id,
-        current_lesson_id=None,
         current_academy_id=lesson_id,
-    )
-
-
-@app.route("/lesson/<lesson_id>")
-def lesson(lesson_id):
-    lesson_obj = LESSONS_BY_ID.get(lesson_id)
-    if not lesson_obj:
-        return "Lektion nicht gefunden", 404
-    prev_id, next_id = lesson_nav(lesson_id)
-    return render_template(
-        "lesson.html",
-        lesson=lesson_obj,
-        lessons=LESSONS,
-        prev_id=prev_id,
-        next_id=next_id,
-        current_lesson_id=lesson_id,
     )
 
 
 @app.route("/playground")
 def playground():
-    return render_template(
-        "playground.html",
-        lessons=LESSONS,
-        current_lesson_id=None,
-        active_tool="playground",
-    )
+    return render_template("playground.html", active_tool="playground")
 
 
 @app.route("/cards")
 def cards():
     return render_template(
         "cards.html",
-        lessons=LESSONS,
-        current_lesson_id=None,
         active_tool="cards",
         card_count=len(FLASHCARDS),
+        academy_lessons=ACADEMY["lessons"],
     )
 
 
@@ -714,18 +576,17 @@ def cards():
 def wissen():
     return render_template(
         "wissen.html",
-        lessons=LESSONS,
-        current_lesson_id=None,
         active_tool="wissen",
         index_count=len(SEARCH_INDEX),
+        glossary=ACADEMY.get("glossary") or [],
     )
 
 
 @app.route("/api/run", methods=["POST"])
 def api_run():
-    data = request.get_json(force=True)
-    sandbox = data.get("sandbox") or "wmx"
-    result = run_sql(data.get("sql", ""), sandbox=sandbox)
+    data = request.get_json(force=True) or {}
+    allow_write = bool(data.get("allow_write"))
+    result = run_sql(data.get("sql", ""), allow_write=allow_write)
     if not result["ok"]:
         return jsonify({
             "ok": False,
@@ -752,154 +613,6 @@ def sql_requirement_coach(sql: str, exercise: dict):
         if needle.lower() in low:
             return f"Bitte {needle} nicht verwenden — siehe Aufgabe."
     return None
-
-
-def empty_select_coach(exercise: dict) -> str:
-    look = exercise.get("look") or []
-    hint = (exercise.get("hints") or [None])[0]
-    parts = ["Die SELECT-Liste ist noch leer. Rechts eine Spalte anklicken — sie landet in der Lücke nach SELECT."]
-    if look:
-        parts.append(look[0])
-    elif hint:
-        parts.append(hint)
-    return " ".join(parts)
-
-
-@app.route("/api/check", methods=["POST"])
-def api_check():
-    data = request.get_json(force=True)
-    ex_id = data.get("exercise_id")
-    sql = data.get("sql", "")
-    exercise = EXERCISES_BY_ID.get(ex_id)
-    if not exercise:
-        return jsonify({"ok": False, "error": "Unbekannte Übung."})
-
-    if exercise.get("kind") == "write":
-        applied = run_sql(sql)
-        if not applied["ok"]:
-            return jsonify({"ok": False, "error": applied["error"]})
-        verified = run_sql(exercise["verify"])
-        if not verified["ok"]:
-            return jsonify({"ok": False, "error": "Prüfung fehlgeschlagen: " + verified["error"]})
-        expected = exercise.get("expected") or []
-        correct = normalize_rows(verified["rows"]) == normalize_rows(expected)
-        coach = None
-        if not correct:
-            if re.search(r"\bbegin\b", sql, re.I) and not re.search(r"\bcommit\b", sql, re.I):
-                coach = "Du hast BEGIN ohne COMMIT — die Änderung wurde beim Schließen der Verbindung verworfen."
-            else:
-                coach = (
-                    "Der Datenstand nach deinem Skript stimmt noch nicht. "
-                    "Prüfe WHERE, die Zielwerte und das Sicherheitsmuster (BEGIN → Änderung → SELECT → COMMIT)."
-                )
-        return jsonify({
-            "ok": True,
-            "correct": correct,
-            "columns": verified["columns"],
-            "rows": verified["rows"],
-            "messages": applied.get("messages") or [],
-            "note": applied.get("note"),
-            "row_count": len(verified["rows"] or []),
-            "coach": coach,
-        })
-
-    user = run_sql(sql)
-    if user.get("empty_select"):
-        return jsonify({
-            "ok": True,
-            "correct": False,
-            "columns": [],
-            "rows": [],
-            "row_count": 0,
-            "coach": empty_select_coach(exercise),
-        })
-    if not user["ok"]:
-        return jsonify({"ok": False, "error": user["error"]})
-
-    req_coach = sql_requirement_coach(sql, exercise)
-
-    solution = run_sql(exercise["solution"])
-    if not solution["ok"]:
-        return jsonify({"ok": False, "error": "Interner Fehler in der Musterlösung: " + solution["error"]})
-
-    user_cols, user_rows = user["columns"] or [], user["rows"] or []
-    sol_cols, sol_rows = solution["columns"] or [], solution["rows"] or []
-    correct, missing, extra, user_n, sol_n = compare_query_result(
-        user_cols, user_rows, sol_cols, sol_rows
-    )
-    if req_coach:
-        correct = False
-    coach = None
-    if not correct:
-        if req_coach:
-            coach = req_coach
-        elif missing and extra:
-            coach = (
-                "Ein Alias in der SELECT-Liste ist nicht nötig. "
-                "Die Werte weichen aber noch ab — prüfe Konvertierung, Filter und Joins."
-            )
-        elif missing:
-            coach = (
-                "Es fehlen noch Daten in der SELECT-Liste. "
-                "Schau in der Aufgabe, welche Felder ausgegeben werden sollen."
-            )
-        elif user_n != sol_n:
-            coach = (
-                f"Zeilenanzahl stimmt nicht: du hast {user_n} eindeutige Treffer, "
-                f"erwartet werden {sol_n}. Prüfe JOIN, WHERE und Deduplizierung."
-            )
-        else:
-            coach = (
-                "Spaltenanzahl passt, der Inhalt weicht aber noch ab. "
-                "Prüfe Filter, JSON-Zugriff (->) und ob du den neuesten Datensatz nimmst."
-            )
-
-    return jsonify({
-        "ok": True,
-        "correct": correct,
-        "columns": user_cols,
-        "rows": user_rows,
-        "row_count": len(user_rows),
-        "expected_row_count": sol_n,
-        "coach": coach,
-    })
-
-
-@app.route("/api/hint/<exercise_id>")
-def api_hint(exercise_id):
-    exercise = EXERCISES_BY_ID.get(exercise_id)
-    if not exercise:
-        return jsonify({"ok": False, "error": "Unbekannte Übung."})
-    try:
-        level = int(request.args.get("level", "1"))
-    except ValueError:
-        level = 1
-    hints = exercise.get("hints") or []
-    if level > len(hints) + 1:
-        return jsonify({"ok": False, "error": "Keine weiteren Hinweise."})
-    if level <= len(hints):
-        return jsonify({
-            "ok": True,
-            "kind": "hint",
-            "level": level,
-            "total": len(hints) + 1,
-            "text": hints[level - 1],
-        })
-    return jsonify({
-        "ok": True,
-        "kind": "solution",
-        "level": level,
-        "total": len(hints) + 1,
-        "solution": exercise["solution"],
-    })
-
-
-@app.route("/api/solution/<exercise_id>")
-def api_solution(exercise_id):
-    exercise = EXERCISES_BY_ID.get(exercise_id)
-    if not exercise:
-        return jsonify({"ok": False, "error": "Unbekannte Übung."})
-    return jsonify({"ok": True, "solution": exercise["solution"]})
 
 
 def academy_sql_feedback(user_sql, step, user, solution):
@@ -933,7 +646,7 @@ def academy_sql_feedback(user_sql, step, user, solution):
         elif user_n != sol_n:
             coach = (
                 f"Zeilenanzahl stimmt nicht: du hast {user_n}, erwartet werden {sol_n}. "
-                "Prüfe `WHERE`, `AND`/`OR` und `LIMIT`."
+                "Prüfe `WHERE`, `AND`/`OR`, `JOIN` und `LIMIT`."
             )
         else:
             coach = "Das Ergebnis weicht noch ab. Vergleiche Filter, Spalten und Werte mit der Aufgabenstellung."
@@ -950,7 +663,51 @@ def academy_sql_feedback(user_sql, step, user, solution):
         "expected_row_count": sol_n,
         "coach": coach,
         "explain": explain_sql_query(user_sql) if correct else None,
+        "messages": user.get("messages") or [],
     }
+
+
+def _fail_payload(user_sql, step, user):
+    coach = diagnose_structure(user_sql, step.get("solution") or "", step) or user.get("error")
+    return {
+        "ok": True,
+        "correct": False,
+        "columns": user.get("columns") or [],
+        "rows": user.get("rows") or [],
+        "row_count": len(user.get("rows") or []),
+        "coach": coach,
+        "error": user.get("error"),
+        "pg_error": user.get("pg_error"),
+        "messages": user.get("messages") or [],
+    }
+
+
+def academy_write_check(user_sql, step):
+    err = _restore_error()
+    if err:
+        return err
+    try:
+        sol = run_sql(step["solution"], allow_write=True)
+        if not sol["ok"]:
+            return {"ok": False, "error": "Interner Fehler in der Musterlösung: " + (sol.get("error") or "")}
+        expected = run_sql(step["verify"], allow_write=False)
+        if not expected["ok"]:
+            return {"ok": False, "error": "Interner Fehler in der Prüfung: " + (expected.get("error") or "")}
+
+        err = _restore_error()
+        if err:
+            return err
+        user = run_sql(user_sql, allow_write=True)
+        if user.get("empty_select") or not user["ok"]:
+            return _fail_payload(user_sql, step, user)
+        verified = run_sql(step["verify"], allow_write=False)
+        if not verified["ok"]:
+            return _fail_payload(user_sql, step, verified)
+        payload = academy_sql_feedback(user_sql, step, verified, expected)
+        payload["messages"] = user.get("messages") or []
+        return payload
+    finally:
+        restore_learn_schema()
 
 
 @app.route("/api/academy/check", methods=["POST"])
@@ -970,25 +727,52 @@ def api_academy_check():
         return jsonify({"ok": False, "error": "Dieser Schritt wird in der App geprüft."})
 
     sql = data.get("sql") or ""
-    user = run_sql(sql, sandbox="learn")
-    if user.get("empty_select") or not user["ok"]:
-        coach = diagnose_structure(sql, step.get("solution") or "", step) or user.get("error")
+    allow_write = bool(step.get("allow_write") or step.get("verify"))
+
+    err = _restore_error()
+    if err:
+        return jsonify(err)
+
+    if step.get("check") == "explain":
+        user = run_sql(sql, allow_write=False)
+        req = sql_requirement_coach(sql, step)
+        if req:
+            return jsonify({
+                "ok": True,
+                "correct": False,
+                "columns": user.get("columns") or [],
+                "rows": user.get("rows") or [],
+                "coach": req,
+            })
+        cols = [c.lower() for c in (user.get("columns") or [])]
+        ok = bool(user.get("ok")) and "query plan" in cols
+        coach = None if ok else (
+            diagnose_structure(sql, step.get("solution") or "", step)
+            or "Vor die Abfrage gehört `EXPLAIN` — du willst den Plan, nicht die Datenzeilen."
+        )
         return jsonify({
             "ok": True,
-            "correct": False,
-            "columns": [],
-            "rows": [],
-            "row_count": 0,
+            "correct": ok,
+            "columns": user.get("columns") or [],
+            "rows": user.get("rows") or [],
+            "row_count": len(user.get("rows") or []),
             "coach": coach,
             "error": user.get("error"),
             "pg_error": user.get("pg_error"),
         })
 
-    solution = run_sql(step["solution"], sandbox="learn")
+    if step.get("verify"):
+        payload = academy_write_check(sql, step)
+        return jsonify(payload)
+
+    user = run_sql(sql, allow_write=allow_write)
+    if user.get("empty_select") or not user["ok"]:
+        return jsonify(_fail_payload(sql, step, user))
+
+    solution = run_sql(step["solution"], allow_write=allow_write)
     if not solution["ok"]:
         return jsonify({"ok": False, "error": "Interner Fehler in der Musterlösung: " + solution["error"]})
-    payload = academy_sql_feedback(sql, step, user, solution)
-    return jsonify(payload)
+    return jsonify(academy_sql_feedback(sql, step, user, solution))
 
 
 @app.route("/api/explain", methods=["POST"])
@@ -1011,8 +795,8 @@ def api_schema():
                     SELECT c.table_schema, c.table_name, c.column_name, c.data_type,
                            c.ordinal_position
                     FROM information_schema.columns c
-                    WHERE c.table_schema IN ('instance_1', 'subscription', 'learn')
-                    ORDER BY c.table_schema, c.table_name, c.ordinal_position
+                    WHERE c.table_schema = 'learn'
+                    ORDER BY c.table_name, c.ordinal_position
                     """
                 )
                 rows = cur.fetchall()
@@ -1021,23 +805,17 @@ def api_schema():
 
     tables = {}
     for row in rows:
-        key = f"{row['table_schema']}.{row['table_name']}"
+        key = row["table_name"]
         if key not in tables:
-            short = row["table_name"]
-            for prefix in ("flowapp_demo_",):
-                if short.lower().startswith(prefix):
-                    short = short[len(prefix):]
-                    break
-            info = catalog_info(short)
             tables[key] = {
                 "schema": row["table_schema"],
                 "name": row["table_name"],
-                "short": short,
-                "qualified": key,
-                "sandbox": "learn" if row["table_schema"] == "learn" else "wmx",
-                "label": info.get("label") or {"orders": "Aufträge", "clients": "Kunden", "stock": "Bestand"}.get(short, short),
-                "parent": info.get("parent") or "",
-                "kind": info.get("kind") or ("Training" if row["table_schema"] == "learn" else ""),
+                "short": row["table_name"],
+                "qualified": f"learn.{row['table_name']}",
+                "sandbox": "learn",
+                "label": TABLE_LABELS.get(row["table_name"], row["table_name"]),
+                "parent": "",
+                "kind": "Training",
                 "columns": [],
             }
         tables[key]["columns"].append({
@@ -1050,12 +828,12 @@ def api_schema():
 @app.route("/api/preview", methods=["POST"])
 def api_preview():
     data = request.get_json(force=True) or {}
-    schema = data.get("schema", "")
+    schema = data.get("schema", "learn")
     table = data.get("table", "")
     if schema not in ALLOWED_SCHEMAS or not SAFE_IDENT.match(table):
         return jsonify({"ok": False, "error": "Ungültige Tabelle."})
-    sql = f'SELECT * FROM {schema}.{table} LIMIT 8'
-    result = run_sql(sql, sandbox="learn" if schema == "learn" else "wmx")
+    sql = f"SELECT * FROM {schema}.{table} LIMIT 8"
+    result = run_sql(sql)
     if not result["ok"]:
         return jsonify({"ok": False, "error": result["error"]})
     return jsonify({
@@ -1097,7 +875,7 @@ def api_search():
             if t in title_l:
                 score += 8
             score += hay.count(t)
-        if item["type"] == "lektion":
+        if item["type"] in {"lektion", "konzept"}:
             score += 3
         scored.append((score, item))
     scored.sort(key=lambda x: (-x[0], x[1]["letter"], x[1]["title"]))
@@ -1122,7 +900,6 @@ def api_search():
 
 
 if __name__ == "__main__":
-    ensure_write_privileges()
     ensure_learn_schema()
     debug = os.environ.get("FLASK_DEBUG", "0") == "1"
     host = os.environ.get("APP_HOST", "0.0.0.0")

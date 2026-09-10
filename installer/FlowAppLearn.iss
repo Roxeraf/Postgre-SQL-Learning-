@@ -1,6 +1,6 @@
 #define MyAppName "plx.learnSQL"
 #define MyAppVersion "1.0.0"
-#define MyAppPublisher "FlowApp Einarbeitung"
+#define MyAppPublisher "plx.learnSQL"
 
 [Setup]
 AppId={{8F3C1A2B-9D4E-4B71-A6C8-E1F2A3B4C5D6}

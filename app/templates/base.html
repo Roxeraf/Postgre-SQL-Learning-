@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{% block title %}plx.learnSQL — SQL lernen{% endblock %}</title>
+<title>{% block title %}plx.learnSQL — PostgreSQL lernen{% endblock %}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/css/style.css?v=16">
+<link rel="stylesheet" href="/static/css/style.css?v=17">
 <script src="/static/js/vendor/marked.min.js?v=1"></script>
 </head>
 <body>
@@ -27,16 +27,15 @@
     <div class="progress-card" id="global-progress">
       <div class="progress-ring" style="--p:0"><span>0%</span></div>
       <div>
-        <div class="progress-label">SQL Kenntnisse</div>
+        <div class="progress-label">PostgreSQL</div>
         <div class="progress-meta muted" id="progress-meta">Noch nicht gestartet</div>
       </div>
     </div>
     <div class="skill-pair" id="skill-pair">
-      <div class="skill-row"><span>SQL</span><span class="skill-bar"><i id="bar-sql" style="width:0%"></i></span><span id="pct-sql">0%</span></div>
-      <div class="skill-row"><span>WMX</span><span class="skill-bar"><i id="bar-wmx" style="width:0%"></i></span><span id="pct-wmx">0%</span></div>
+      <div class="skill-row"><span>Pfad</span><span class="skill-bar"><i id="bar-sql" style="width:0%"></i></span><span id="pct-sql">0%</span></div>
     </div>
 
-    <p class="nav-label">SQL Grundlagen</p>
+    <p class="nav-label">Lernpfad</p>
     <ol class="lesson-list">
       {% for l in academy_lessons %}
       <li class="{{ 'active' if current_academy_id is defined and current_academy_id == l.id else '' }}" data-academy-id="{{ l.id }}">
@@ -48,21 +47,6 @@
       </li>
       {% endfor %}
     </ol>
-
-    {% for track in tracks %}
-    <p class="nav-label">{{ track.label }}</p>
-    <ol class="lesson-list">
-      {% for l in track.lessons %}
-      <li class="{{ 'active' if current_lesson_id is defined and current_lesson_id == l.id else '' }}" data-lesson-id="{{ l.id }}">
-        <a href="/lesson/{{ l.id }}">
-          <span class="lesson-status" aria-hidden="true"></span>
-          <span class="lesson-letter">{{ l.letter or l.id|upper }}</span>
-          <span class="lesson-name">{{ l.title }}</span>
-        </a>
-      </li>
-      {% endfor %}
-    </ol>
-    {% endfor %}
 
     <p class="nav-label">Werkzeuge</p>
     <div class="tool-links">
@@ -91,7 +75,7 @@
   <div class="schema-list" id="schema-list"></div>
 </aside>
 
-<script src="/static/js/app.js?v=16"></script>
+<script src="/static/js/app.js?v=17"></script>
 {% block page_scripts %}{% endblock %}
 </body>
 </html>

@@ -1,4 +1,4 @@
-"""Create flowapp_learn and import the learning schema via psycopg2 (no psql required)."""
+"""Create learnsql and import the learning schema via psycopg2 (no psql required)."""
 from __future__ import annotations
 
 import os
@@ -38,19 +38,20 @@ def main() -> None:
     sql_path = Path(sys.argv[1])
     port = int(os.environ.get("DB_PORT", "5432"))
     password = os.environ.get("PGPASSWORD", "postgres")
+    dbname = os.environ.get("DB_NAME", "learnsql")
 
     wait_for_server(port, password)
 
     conn = connect("postgres", port, password)
     conn.autocommit = True
     with conn.cursor() as cur:
-        cur.execute("SELECT 1 FROM pg_database WHERE datname = 'flowapp_learn'")
+        cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (dbname,))
         if cur.fetchone() is None:
-            cur.execute("CREATE DATABASE flowapp_learn")
+            cur.execute(f'CREATE DATABASE "{dbname}"')
     conn.close()
 
     sql = sql_path.read_text(encoding="utf-8")
-    conn = connect("flowapp_learn", port, password)
+    conn = connect(dbname, port, password)
     conn.autocommit = True
     with conn.cursor() as cur:
         cur.execute(sql)

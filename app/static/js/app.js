@@ -1,5 +1,6 @@
-const STORE_KEY = "flowapp-learn-v2";
+const STORE_KEY = "learnsql-v3";
 const STORE_KEY_V1 = "flowapp-learn-v1";
+const STORE_KEY_V2 = "flowapp-learn-v2";
 
 const ACADEMY_CONCEPTS = [
   ["TABLE", "Tabellen"],
@@ -13,11 +14,14 @@ const ACADEMY_CONCEPTS = [
   ["NULL", "NULL"],
   ["GROUP BY", "GROUP BY"],
   ["JOIN", "JOIN"],
+  ["HAVING", "HAVING"],
+  ["DML", "Ändern"],
+  ["TX", "Transaktionen"],
 ];
 
 function emptyStore() {
   return {
-    version: 2,
+    version: 3,
     onboarded: false,
     lessons: {},
     lastLesson: null,
@@ -38,6 +42,14 @@ function loadStore() {
     }
   } catch {
     /* fall through */
+  }
+  try {
+    const v2 = JSON.parse(localStorage.getItem(STORE_KEY_V2) || "null");
+    if (v2) {
+      return { ...emptyStore(), ...v2, version: 3 };
+    }
+  } catch {
+    /* ignore */
   }
   try {
     const v1 = JSON.parse(localStorage.getItem(STORE_KEY_V1) || "null");
@@ -107,23 +119,6 @@ function refreshChrome() {
   });
   const sqlPct = academyIds.length ? Math.round((sqlDone / academyIds.length) * 100) : 0;
 
-  const items = [...document.querySelectorAll(".lesson-list li[data-lesson-id], .path-card[data-lesson-id]")];
-  const ids = [...document.querySelectorAll(".lesson-list li[data-lesson-id]")].map((el) => el.dataset.lessonId);
-  let done = 0;
-  ids.forEach((id) => {
-    const state = store.lessons[id];
-    const complete = state?.complete;
-    const started = lessonStarted(state);
-    if (complete) done += 1;
-    document.querySelectorAll(`[data-lesson-id="${id}"]`).forEach((el) => {
-      el.classList.toggle("done", Boolean(complete));
-      el.classList.toggle("started", started && !complete);
-      const badge = el.querySelector(".path-state");
-      if (badge) badge.textContent = complete ? "Fertig" : started ? "Begonnen" : "Offen";
-    });
-  });
-  const wmxPct = ids.length ? Math.round((done / ids.length) * 100) : 0;
-
   const ring = document.querySelector(".progress-ring");
   if (ring) {
     ring.style.setProperty("--p", String(sqlPct));
@@ -138,16 +133,10 @@ function refreshChrome() {
         : "Noch nicht gestartet";
   }
   const barSql = document.getElementById("bar-sql");
-  const barWmx = document.getElementById("bar-wmx");
   const pctSql = document.getElementById("pct-sql");
-  const pctWmx = document.getElementById("pct-wmx");
   if (barSql) barSql.style.width = `${sqlPct}%`;
-  if (barWmx) barWmx.style.width = `${wmxPct}%`;
   if (pctSql) pctSql.textContent = `${sqlPct}%`;
-  if (pctWmx) pctWmx.textContent = `${wmxPct}%`;
 
-  const stat = document.getElementById("stat-done");
-  if (stat) stat.textContent = `${done}/${ids.length}`;
   const statSql = document.getElementById("stat-sql");
   if (statSql) statSql.textContent = `${sqlDone}/${academyIds.length || document.querySelectorAll(".path-academy [data-academy-id]").length}`;
   const statXp = document.getElementById("stat-xp");
@@ -220,7 +209,11 @@ function initDashboard() {
     .sort((a, b) => a.v - b.v)[0];
   if (weak && started) {
     recWhy = `${weak.label} liegt bei ${Math.round(weak.v)}%. Kurz wiederholen, dann fühlt sich das nächste Kapitel leichter an.`;
-    const map = { TABLE: "ch0", SELECT: "ch2", FROM: "ch1", WHERE: "ch3", COMPARE: "ch4", AND: "ch5", "ORDER BY": "ch6", LIMIT: "ch6", NULL: "ch7", "GROUP BY": "ch8", JOIN: "ch9" };
+    const map = {
+      TABLE: "ch0", SELECT: "ch2", FROM: "ch1", WHERE: "ch3", COMPARE: "ch4",
+      AND: "ch5", "ORDER BY": "ch6", LIMIT: "ch6", NULL: "ch7", "GROUP BY": "ch8",
+      JOIN: "ch9", HAVING: "ch-having", DML: "ch-dml", TX: "ch-tx",
+    };
     recId = map[weak.id] || next;
   }
   const recCard = document.querySelector(`.path-card[data-academy-id="${recId}"]`);
@@ -419,14 +412,7 @@ function selectListHasColumn(text, col) {
 const SQL_ALIAS_STOP = /^(on|where|left|right|inner|outer|full|cross|join|select|group|order|limit|having|union|except|intersect|set|and|or|natural|using|returning|window|fetch|offset|for|when|then|else|end|distinct|all|as|with|from)$/i;
 
 function tableShortFromQualified(name) {
-  let short = String(name || "").split(".").pop().toLowerCase();
-  for (const prefix of ["flowapp_demo_"]) {
-    if (short.startsWith(prefix)) {
-      short = short.slice(prefix.length);
-      break;
-    }
-  }
-  return short;
+  return String(name || "").split(".").pop().toLowerCase();
 }
 
 function fromSegmentForSelectList(sql, list) {
@@ -1145,19 +1131,16 @@ function initPlayground() {
   const runBtn = document.getElementById("pg-run");
   if (!editor || !runBtn) return;
   lastEditor = editor;
-  let sandbox = "learn";
   let tables = [];
   const LEARN_SQL = "SELECT *\nFROM orders;";
-  const WMX_SQL = "SELECT order_number, task_status\nFROM instance_1.flowapp_demo_order_head;";
 
   const renderTables = () => {
     const host = document.getElementById("pg-tables");
     if (!host) return;
-    const filtered = tables.filter((t) => (t.sandbox || "wmx") === sandbox);
-    host.innerHTML = filtered.map((t) => `
+    host.innerHTML = tables.map((t) => `
       <details class="schema-table" data-short="${esc(t.short)}">
         <summary>
-          <span class="insert-name" data-insert="${sandbox === "learn" ? esc(t.name) : esc(t.qualified)}">${esc(t.label || t.short)}</span>
+          <span class="insert-name" data-insert="${esc(t.name)}">${esc(t.label || t.short)}</span>
           <span class="schema-type">${esc(t.short)}</span>
         </summary>
         <div class="schema-cols">
@@ -1171,27 +1154,6 @@ function initPlayground() {
     renderTables();
   }).catch(() => {});
 
-  const setSandbox = (next) => {
-    sandbox = next;
-    document.querySelectorAll(".pg-tab").forEach((t) => t.classList.toggle("active", t.dataset.sandbox === sandbox));
-    const lede = document.getElementById("pg-lede");
-    const mode = document.getElementById("pg-mode-label");
-    if (sandbox === "learn") {
-      if (lede) lede.textContent = "Trainingsdaten: orders, clients, stock. Nur lesen.";
-      if (mode) mode.textContent = "SELECT · EXPLAIN · max. 200 Zeilen";
-      if (!editor.value.trim() || editor.value.includes("flowapp_demo")) editor.value = LEARN_SQL;
-    } else {
-      if (lede) lede.textContent = "WMX-Übungsdatenbank. SELECT, UPDATE, DELETE — DROP/ALTER gesperrt.";
-      if (mode) mode.textContent = "SELECT · UPDATE · DELETE · BEGIN/COMMIT · max. 200 Zeilen";
-      if (!editor.value.trim() || editor.value.includes("FROM orders")) editor.value = WMX_SQL;
-    }
-    renderTables();
-  };
-
-  document.querySelector(".pg-tabs")?.addEventListener("click", (e) => {
-    const tab = e.target.closest("[data-sandbox]");
-    if (tab) setSandbox(tab.dataset.sandbox);
-  });
   document.getElementById("pg-tables")?.addEventListener("click", (e) => {
     const insert = e.target.closest("[data-insert]");
     if (!insert) return;
@@ -1203,7 +1165,7 @@ function initPlayground() {
     resultEl.innerHTML = '<p class="muted">Führe Abfrage aus…</p>';
     runBtn.disabled = true;
     try {
-      const data = await postJson("/api/run", { sql: editor.value, sandbox });
+      const data = await postJson("/api/run", { sql: editor.value, allow_write: true });
       if (!data.ok) {
         const pg = data.pg_error && data.pg_error !== data.error
           ? `<details class="pg-error"><summary>PostgreSQL-Meldung anzeigen</summary><pre>${esc(data.pg_error)}</pre></details>`
@@ -1317,29 +1279,30 @@ function initWissen() {
   if (!input || !resultsEl) return;
 
   const typeLabel = {
-    lektion: "Lektion",
-    abschnitt: "Abschnitt",
+    lektion: "Kapitel",
+    schritt: "Schritt",
     karte: "Karte",
-    übung: "Übung",
+    check: "Kurzcheck",
+    konzept: "Konzept",
   };
 
   const render = (data, query) => {
     if (!query || query.length < 2) {
       resultsEl.innerHTML = "";
-      if (meta) meta.textContent = "Mindestens zwei Zeichen — Suche läuft über alle Lektionen.";
+      if (meta) meta.textContent = "Mindestens zwei Zeichen — Suche läuft über alle Kapitel.";
       return;
     }
     const rows = data.results || [];
     if (meta) {
       meta.textContent = rows.length
-        ? `${rows.length} Treffer in der Einarbeitung`
-        : "Kein Treffer — anderen Begriff versuchen (Tabellenname, Statuscode, Alias).";
+        ? `${rows.length} Treffer im Lernpfad`
+        : "Kein Treffer — anderen Begriff versuchen (SELECT, JOIN, NULL, Transaktion).";
     }
     resultsEl.innerHTML = rows
       .map(
         (r) => `
       <a class="wissen-hit" href="${r.url}">
-        <span class="wissen-kicker">Teil ${esc(r.letter)} · ${esc(typeLabel[r.type] || r.type)}</span>
+        <span class="wissen-kicker">${esc(r.letter)} · ${esc(typeLabel[r.type] || r.type)}</span>
         <strong>${esc(r.title)}</strong>
         <span class="muted">${esc(r.snippet || "")}</span>
       </a>`
@@ -1382,7 +1345,6 @@ function initWissen() {
 
 initNav();
 initSchema();
-initLesson();
 initPlayground();
 initCards();
 initWissen();

@@ -12,7 +12,7 @@ $SqlFile = Join-Path $Root "db\init\01_schema_and_data.sql"
 $InitDbPy = Join-Path $Root "init-db.py"
 $env:PATH = "$PgBin;" + $env:PATH
 $RuntimeFile = Join-Path $Root "runtime.json"
-$MarkerFile = Join-Path $DataDir ".flowapp_initialized"
+$MarkerFile = Join-Path $DataDir ".learnsql_initialized"
 $IconFile = Join-Path $Root "flowapp.ico"
 $MutexName = "Local\FlowAppLearnSingleton"
 
@@ -170,6 +170,7 @@ function Import-Schema {
     Write-Log "Schema importieren mit init-db.py"
     $env:PGPASSWORD = $Password
     $env:DB_PORT = "$DbPort"
+    $env:DB_NAME = "learnsql"
     $output = & $Python $InitDbPy $SqlFile 2>&1 | Out-String
     if ($LASTEXITCODE -ne 0) {
         throw "SQL-Import fehlgeschlagen. $output"
@@ -182,7 +183,7 @@ function Start-Flask {
 
     $env:DB_HOST = "127.0.0.1"
     $env:DB_PORT = "$DbPort"
-    $env:DB_NAME = "flowapp_learn"
+    $env:DB_NAME = "learnsql"
     $env:DB_USER = "lernuser"
     $env:DB_PASSWORD = "lernuser"
     $env:DB_ADMIN_USER = "postgres"

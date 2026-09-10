@@ -1,18 +1,18 @@
 """Unit tests for learner feedback and academy metadata (no database)."""
 from __future__ import annotations
 
-import json
 import re
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 REPO = ROOT.parent
 sys.path.insert(0, str(ROOT))
 
-from lessons.academy_data import ACADEMY, CLIENTS, ORDERS, lesson_by_id  # noqa: E402
-from lessons.generate import LESSONS as GENERATED_LESSONS  # noqa: E402
+from lessons.academy_data import ACADEMY, CLIENTS, ORDERS, PATH_IDS, lesson_by_id  # noqa: E402
+from lessons.academy_more import ORDER_ITEMS  # noqa: E402
 from sql_coach import (  # noqa: E402
     diagnose_structure,
     explain_sql,
@@ -26,6 +26,10 @@ FORBIDDEN_SNIPPETS = (
     "Nordlog",
     "13d663",
     "flowapp_13d663",
+    "instance_1",
+    "flowapp_demo_",
+    "WMX",
+    "FlowApp",
 )
 FORBIDDEN_CLIENT_TOKENS = (
     re.compile(r"['\"]ETE['\"]"),
@@ -33,6 +37,7 @@ FORBIDDEN_CLIENT_TOKENS = (
 )
 
 SKIP_NAME = {"test_learning.py"}
+SKIP_PARTS = {"vendor", ".git"}
 
 
 class SqlCoachTests(unittest.TestCase):
@@ -51,7 +56,7 @@ class SqlCoachTests(unittest.TestCase):
 
     def test_equals_null(self):
         self.assertTrue(uses_equals_null("SELECT * FROM orders WHERE status = NULL"))
-        msg = friendly_sql_error("syntax error", "SELECT * FROM stock WHERE weight = NULL", sandbox="learn")
+        msg = friendly_sql_error("syntax error", "SELECT * FROM stock WHERE weight = NULL")
         self.assertIn("IS NULL", msg)
 
     def test_empty_select(self):
@@ -74,10 +79,45 @@ class SqlCoachTests(unittest.TestCase):
         self.assertIsNotNone(msg)
         self.assertIn("JOIN", msg)
 
+    def test_having_hint(self):
+        msg = diagnose_structure(
+            "SELECT client, COUNT(*) FROM orders GROUP BY client",
+            "SELECT client, COUNT(*) FROM orders GROUP BY client HAVING COUNT(*) > 4",
+        )
+        self.assertIn("HAVING", msg)
+
+    def test_left_join_hint(self):
+        msg = diagnose_structure(
+            "SELECT o.order_number FROM orders o JOIN clients c ON c.id = o.client_id",
+            "SELECT o.order_number FROM orders o LEFT JOIN clients c ON c.id = o.client_id",
+        )
+        self.assertIn("LEFT", msg)
+
+    def test_update_without_where(self):
+        msg = diagnose_structure(
+            "UPDATE orders SET status = 'fertig'",
+            "UPDATE orders SET status = 'fertig' WHERE order_number = 4714",
+        )
+        self.assertIn("WHERE", msg)
+
+    def test_unknown_table_message_lists_learn_tables(self):
+        msg = friendly_sql_error('relation "foo" does not exist', "SELECT * FROM foo")
+        self.assertIn("order_items", msg)
+        self.assertNotIn("instance_1", msg)
+
 
 class AcademyContentTests(unittest.TestCase):
+    def test_path_covers_fundamentals(self):
+        ids = [l["id"] for l in ACADEMY["lessons"]]
+        self.assertEqual(ids, PATH_IDS)
+        for needed in (
+            "ch0", "ch7", "ch-alias", "ch8", "ch-having", "ch-keys",
+            "ch9", "ch10", "ch-dml", "ch-tx", "ch-pg", "challenge-3",
+        ):
+            self.assertIn(needed, ids)
+
     def test_every_lesson_has_goal_interaction_and_quiz(self):
-        self.assertGreaterEqual(len(ACADEMY["lessons"]), 12)
+        self.assertGreaterEqual(len(ACADEMY["lessons"]), 18)
         for lesson in ACADEMY["lessons"]:
             self.assertTrue(lesson["goal"], lesson["id"])
             self.assertTrue(lesson["steps"], lesson["id"])
@@ -107,6 +147,7 @@ class AcademyContentTests(unittest.TestCase):
     def test_lookup(self):
         self.assertEqual(lesson_by_id("ch3")["title"], "WHERE")
         self.assertEqual(lesson_by_id("ch7")["title"], "NULL — fehlende Werte")
+        self.assertEqual(lesson_by_id("ch-keys")["title"], "Schlüssel und Relationen")
         self.assertIsNone(lesson_by_id("missing"))
 
     def test_anonymized_clients(self):
@@ -115,15 +156,88 @@ class AcademyContentTests(unittest.TestCase):
         self.assertTrue(any(r["client_id"] is None for r in ORDERS))
         self.assertTrue(any(r["quantity"] is None for r in ORDERS))
         self.assertGreaterEqual(len(ORDERS), 20)
+        self.assertTrue(any(r["id"] not in {i["order_id"] for i in ORDER_ITEMS} for r in ORDERS))
 
-    def test_join_and_null_chapters_exist(self):
-        ids = [l["id"] for l in ACADEMY["lessons"]]
-        for needed in ("ch7", "ch8", "ch9", "ch10", "challenge-1", "challenge-2"):
-            self.assertIn(needed, ids)
+    def test_glossary_and_flashcards(self):
+        glossary = ACADEMY.get("glossary") or []
+        self.assertGreaterEqual(len(glossary), 12)
+        self.assertTrue(ACADEMY.get("flashcards"))
+        labels = {g["id"] for g in glossary}
+        for needed in ("NULL", "JOIN", "HAVING", "TX", "INDEX"):
+            self.assertIn(needed, labels)
+
+    def test_dml_steps_are_verified(self):
+        dml = lesson_by_id("ch-dml")
+        writes = [s for s in dml["steps"] if s.get("allow_write")]
+        self.assertGreaterEqual(len(writes), 3)
+        for step in writes:
+            self.assertTrue(step.get("verify"), step["title"])
+
+
+class AcademyCheckRestoreTests(unittest.TestCase):
+    def test_failed_restore_blocks_write_check(self):
+        import app as flask_app
+
+        with patch.object(flask_app, "restore_learn_schema", return_value=(False, "kein Init-SQL")):
+            result = flask_app.academy_write_check(
+                "INSERT INTO stock (id, item, quantity, weight) VALUES (8, 'Karton H', 4, 18);",
+                {
+                    "solution": "INSERT INTO stock (id, item, quantity, weight) VALUES (8, 'Karton H', 4, 18);",
+                    "verify": "SELECT * FROM stock WHERE id = 8",
+                },
+            )
+        self.assertFalse(result["ok"])
+        self.assertIn("kein Init-SQL", result["error"])
+
+    def test_select_check_resets_schema_first(self):
+        import app as flask_app
+
+        client = flask_app.app.test_client()
+        ok_result = {
+            "ok": True,
+            "columns": ["*"],
+            "rows": [{"id": 1, "order_number": 4711, "client": "Helio", "status": "offen"}],
+            "empty_select": False,
+            "error": None,
+            "messages": [],
+        }
+        calls = []
+
+        def restore():
+            calls.append("restore")
+            return True, "ok"
+
+        def run_sql(*_a, **_k):
+            calls.append("run")
+            return ok_result
+
+        with patch.object(flask_app, "restore_learn_schema", side_effect=restore):
+            with patch.object(flask_app, "run_sql", side_effect=run_sql):
+                resp = client.post(
+                    "/api/academy/check",
+                    json={"lesson_id": "ch1", "step": 3, "sql": "SELECT * FROM orders"},
+                )
+        data = resp.get_json()
+        self.assertTrue(data["ok"])
+        self.assertIn("restore", calls)
+        self.assertEqual(calls[0], "restore")
+
+    def test_select_check_surfaces_restore_failure(self):
+        import app as flask_app
+
+        client = flask_app.app.test_client()
+        with patch.object(flask_app, "restore_learn_schema", return_value=(False, "boom")):
+            resp = client.post(
+                "/api/academy/check",
+                json={"lesson_id": "ch1", "step": 3, "sql": "SELECT order_number FROM orders"},
+            )
+        data = resp.get_json()
+        self.assertFalse(data["ok"])
+        self.assertIn("boom", data["error"])
 
 
 class NoCustomerNamesTests(unittest.TestCase):
-    def test_repo_has_no_customer_names(self):
+    def test_repo_has_no_wmx_or_customer_names(self):
         roots = [
             REPO / "app",
             REPO / "db",
@@ -137,7 +251,7 @@ class NoCustomerNamesTests(unittest.TestCase):
                     continue
                 if path.name in SKIP_NAME or path.suffix in {".pyc", ".png", ".min.js"}:
                     continue
-                if "vendor" in path.parts:
+                if any(part in SKIP_PARTS for part in path.parts):
                     continue
                 try:
                     text = path.read_text(encoding="utf-8")
@@ -149,50 +263,7 @@ class NoCustomerNamesTests(unittest.TestCase):
                 for rx in FORBIDDEN_CLIENT_TOKENS:
                     if rx.search(text):
                         hits.append(f"{path}:{rx.pattern}")
-        self.assertEqual(hits, [], msg="Echte Kundennamen/Hashes im Repo:\n" + "\n".join(hits))
-
-
-class WmxLessonsTests(unittest.TestCase):
-    def test_generate_matches_lessons_json(self):
-        path = ROOT / "lessons" / "lessons.json"
-        on_disk = json.loads(path.read_text(encoding="utf-8"))
-        self.assertEqual(
-            on_disk,
-            GENERATED_LESSONS,
-            msg="lessons.json weicht von generate.py ab — generate.py ausführen.",
-        )
-
-    def test_required_quizzes_and_transfer_exercises(self):
-        by_id = {lesson["id"]: lesson for lesson in GENERATED_LESSONS}
-        for needed in ("sql", "a", "d", "e", "f", "i"):
-            quiz = by_id[needed].get("quiz") or []
-            self.assertGreaterEqual(len(quiz), 4, msg=f"{needed} needs a Kurzcheck")
-        self.assertTrue(by_id["b"].get("exercises"), msg="B braucht eine Mini-Übung")
-        self.assertGreaterEqual(len(by_id["sql"].get("exercises") or []), 4)
-        self.assertGreaterEqual(len(by_id["i"].get("exercises") or []), 2)
-        self.assertGreaterEqual(len(by_id["n"].get("exercises") or []), 2)
-
-    def test_cte_exercises_are_written_not_filled(self):
-        by_id = {lesson["id"]: lesson for lesson in GENERATED_LESSONS}
-        exercises = {
-            ex["id"]: ex
-            for lesson in by_id.values()
-            for ex in (lesson.get("exercises") or [])
-        }
-        for ex_id in ("a-ex3", "k-ex2", "o-ex1"):
-            starter = exercises[ex_id].get("starter") or ""
-            self.assertNotIn("WHERE rn", starter)
-            self.assertNotIn("ROW_NUMBER", starter)
-            self.assertIn("ROW_NUMBER", exercises[ex_id]["solution"])
-
-    def test_wmx_last_hint_is_not_the_solution(self):
-        for lesson in GENERATED_LESSONS:
-            for ex in lesson.get("exercises") or []:
-                hints = ex.get("hints") or []
-                self.assertTrue(hints, msg=f"{ex['id']} needs hints")
-                last = re.sub(r"\s+", " ", hints[-1].replace(";", "")).strip().lower()
-                sol = re.sub(r"\s+", " ", (ex["solution"] or "").replace(";", "")).strip().lower()
-                self.assertNotEqual(last, sol, msg=f"{ex['id']} last hint is the full solution")
+        self.assertEqual(hits, [], msg="WMX/Kundennamen im Repo:\n" + "\n".join(hits))
 
 
 if __name__ == "__main__":
