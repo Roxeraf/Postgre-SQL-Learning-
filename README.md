@@ -1,15 +1,22 @@
 # PostgreSQL & FlowApp/WMX — Interaktive Einarbeitung
 
-Lern-App aus der Einarbeitungs-Dokumentation `PostgreSQL_FlowApp_Einarbeitung.docx`.
-Die Datei ist die **Wissensbasis** für alle Inhalte (SQL-Grundlagen, Teile A–P plus Glossar).
+Zwei Lernpfade in einer App:
 
-- **17 Lektionen:** SQL-Grundlagen (SELECT, JOINs), Einstieg A–J, Vertiefung K–P (Eigenheiten, Status/Sendung, Alias-Filter, Verpackung, Zoll, Tracking)
-- **SQL-Übungen im Browser** (SELECT, UPDATE, DELETE) mit Prüfung gegen eine Musterlösung
-- **Kurz-Quiz und Karteikarten**
-- **Durchsuchbare Wissensbasis** (`/wissen`) über alle Abschnitte, Tabellen und Begriffe
-- **Übungs-PostgreSQL**, die die FlowApp/WMX-Struktur nachbildet (Schema `instance_1`, Präfix `flowapp_demo_`, Schema `subscription`)
+1. **SQL Grundlagen** — interaktiver Trainer für komplette Anfänger
+   (verstehen → vorhersagen → bauen → schreiben → anwenden)
+2. **WMX Datenmodell** — Einarbeitung gegen das FlowApp-Übungsschema:
+   SQL-Grundlagen (SELECT, JOINs) auf WMX-Tabellen, danach Teile A–P plus Glossar
 
-Alles läuft in der App. Die Beispieldaten setzt du bei Bedarf über **Datenbank zurücksetzen** zurück.
+Die Datei `PostgreSQL_FlowApp_Einarbeitung.docx` bleibt die Wissensbasis für den WMX-Pfad.
+
+- **SQL-Akademie:** Kapitel 0–6 plus Challenge, mit Explain / Predict / Build / Write
+- **WMX-Lektionen:** 17 Einheiten (SELECT/JOINs auf dem Demo-Schema, Einstieg A–J, Vertiefung K–P)
+- **SQL-Übungen im Browser** gegen isoliertes Schema `learn` (nur SELECT) und gegen `instance_1` (WMX)
+- **Kurz-Quiz und Karteikarten** (WMX)
+- **Durchsuchbare Wissensbasis** (`/wissen`)
+- **Playground** mit Training- und WMX-Tabellen, plus „Erkläre diese Query“
+
+Trainingsdaten setzt du bei Bedarf über **Datenbank zurücksetzen** zurück.
 
 ## Windows-Installer (für Kollegen)
 
@@ -36,6 +43,7 @@ docker compose up --build
 Danach:
 
 - **Lern-App:** http://localhost:8080
+- **SQL-Pfad:** http://localhost:8080/learn/ch0
 - **Wissensbasis:** http://localhost:8080/wissen
 
 Zum Stoppen: `Ctrl+C`, danach `docker compose down` (mit `-v` werden auch die DB-Daten gelöscht,
@@ -54,22 +62,18 @@ docker compose up --build
 flowapp-learn/
 ├── docker-compose.yml
 ├── db/
-│   └── init/01_schema_and_data.sql   # Schema + Beispieldaten + Lern-User "lernuser"
+│   └── init/01_schema_and_data.sql   # WMX-Schema + Anfänger-Schema learn
 └── app/
-    ├── Dockerfile
-    ├── requirements.txt
-    ├── app.py                        # Flask-Backend (Lektionen, SQL-Sandbox, Suche)
-    ├── lessons/lessons.json          # Wissensbasis: Lerninhalte, Übungen, Quiz
-    ├── lessons/generate.py           # regeneriert lessons.json aus der Doku-Struktur
-    ├── templates/
-    └── static/
+    ├── app.py                        # Flask-Backend
+    ├── sql_coach.py                  # Lernfeedback statt Roh-Postgres-Fehler
+    ├── lessons/academy_data.py       # SQL-Grundlagen (interaktive Schritte)
+    ├── lessons/lessons.json          # WMX-Einarbeitung A–P
+    └── templates/
 ```
 
 ## Hinweise
 
-- Die SQL-Sandbox erlaubt SELECT, INSERT, UPDATE und DELETE (plus BEGIN/COMMIT).
-  Schema-Änderungen (DROP/ALTER/CREATE) sind gesperrt.
-- Diese Datenbank ist eine **didaktisch vereinfachte Nachbildung** der echten Struktur.
-- Inhalte kommen aus der Einarbeitungs-Dokumentation. Anpassungen an den Texten
-  in `app/lessons/generate.py` vornehmen und das Skript ausführen, oder direkt
-  `lessons.json` editieren.
+- Anfänger-Sandbox (`learn`): nur `SELECT` / `WITH` / `EXPLAIN`. Tabellen: `orders`, `clients`, `stock`.
+- WMX-Sandbox: SELECT, INSERT, UPDATE und DELETE (plus BEGIN/COMMIT). Schema-Änderungen sind gesperrt.
+- SQL-Aufgaben werden über das **Abfrageergebnis** bewertet, nicht über einen exakten Musterstring.
+- WMX-Inhalte kommen aus der Einarbeitungs-Dokumentation. Anfänger-Tabellen sind isolierte Trainingsdaten und **kein** Abbild des echten WMX-Schemas.

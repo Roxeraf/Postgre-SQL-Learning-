@@ -8,6 +8,15 @@ import psycopg2
 import psycopg2.extras
 from flask import Flask, jsonify, render_template, request
 
+from lessons.academy_data import ACADEMY, lesson_by_id as academy_lesson_by_id
+from sql_coach import (
+    diagnose_structure,
+    explain_sql as explain_sql_query,
+    friendly_sql_error,
+    has_empty_select_list,
+    strip_sql_line_comments,
+)
+
 app = Flask(__name__)
 
 LESSONS_PATH = Path(__file__).parent / "lessons" / "lessons.json"
@@ -184,7 +193,7 @@ DB_CONFIG = dict(
 
 MAX_ROWS = 200
 SAFE_IDENT = re.compile(r"^[a-zA-Z0-9_]+$")
-ALLOWED_SCHEMAS = ("instance_1", "subscription")
+ALLOWED_SCHEMAS = ("instance_1", "subscription", "learn")
 ADMIN_CONFIG = dict(
     DB_CONFIG,
     user=os.environ.get("DB_ADMIN_USER", "postgres"),
@@ -197,7 +206,7 @@ FORBIDDEN_KEYWORDS = re.compile(
     re.IGNORECASE,
 )
 WRITE_KEYWORDS = re.compile(r"\b(insert|update|delete)\b", re.IGNORECASE)
-QUERY_HEADS = {"select", "with"}
+QUERY_HEADS = {"select", "with", "explain"}
 WRITE_HEADS = {"insert", "update", "delete"}
 BEGIN_HEADS = {"begin", "start"}
 COMMIT_HEADS = {"commit"}
@@ -220,10 +229,13 @@ def _init_sql_path():
     return None
 
 
-def get_connection(admin=False):
+def get_connection(admin=False, search_path=None):
     cfg = dict(ADMIN_CONFIG if admin else DB_CONFIG)
     conn = psycopg2.connect(**cfg)
     conn.autocommit = True
+    if search_path == "learn":
+        with conn.cursor() as cur:
+            cur.execute("SET search_path TO learn, public")
     return conn
 
 
@@ -323,117 +335,78 @@ def jsonable_rows(columns, rows):
     return out
 
 
-def strip_sql_line_comments(sql: str) -> str:
-    lines = []
-    for line in (sql or "").splitlines():
-        i = 0
-        in_single = False
-        cut = len(line)
-        while i < len(line):
-            ch = line[i]
-            if in_single:
-                if ch == "'" and i + 1 < len(line) and line[i + 1] == "'":
-                    i += 2
-                    continue
-                if ch == "'":
-                    in_single = False
-                i += 1
-                continue
-            if ch == "'":
-                in_single = True
-                i += 1
-                continue
-            if ch == "-" and i + 1 < len(line) and line[i + 1] == "-":
-                cut = i
-                break
-            i += 1
-        lines.append(line[:cut])
-    return "\n".join(lines)
-
-
-def has_empty_select_list(sql: str) -> bool:
-    compact = re.sub(r"\s+", " ", strip_sql_line_comments(sql))
-    return bool(re.search(r"\bselect(\s+(distinct|all))?\s+from\b", compact, re.I))
-
-
-def friendly_sql_error(err: str, sql: str) -> str:
-    low = (err or "").lower()
-    hints = []
-    if re.search(r"select\s+from\b", strip_sql_line_comments(sql or ""), re.I) or has_empty_select_list(sql or ""):
-        hints.append(
-                "Die SELECT-Liste ist noch leer. Rechts eine Spalte anklicken — sie landet in der Lücke nach SELECT."
-        )
-    elif "syntax error at end of input" in low:
-        hints.append("Die Abfrage ist unvollständig. Prüfe SELECT-Liste, FROM und schließende Klammern.")
-    elif "does not exist" in low:
-        if "column" in low:
-            hints.append(
-                "Diese Spalte gibt es so nicht. Namen rechts im Schema prüfen — "
-                "zwischen zwei Spalten gehört ein Komma (order_number, task_status)."
-            )
-        else:
-            hints.append(
-                "Tabellen immer voll qualifiziert: instance_1.flowapp_demo_<name>. "
-                "Rechts im Schema den deutschen Namen suchen und die Tabelle anklicken."
-            )
-    elif "statement timeout" in low or "canceling statement" in low:
-        hints.append("Die Abfrage lief zu lange und wurde abgebrochen. Prüfe JOINs ohne ON-Bedingung.")
-    if hints:
-        return err + "\n\nHinweis: " + " ".join(hints)
-    return err
-
-
-def run_sql(sql: str):
-    """Fuehrt SELECT/WITH und DML (INSERT/UPDATE/DELETE) plus BEGIN/COMMIT aus."""
+def run_sql(sql: str, sandbox: str = "wmx"):
+    """Führt SQL aus. sandbox=learn: nur lesen, search_path=learn. sandbox=wmx: bestehende Übungs-DB."""
     raw = (sql or "").strip()
+    sandbox = "learn" if sandbox == "learn" else "wmx"
     if not raw:
-        return {"ok": False, "error": "Bitte gib eine SQL-Abfrage ein.", "columns": None, "rows": None}
+        return {"ok": False, "error": "Bitte gib eine SQL-Abfrage ein.", "columns": None, "rows": None, "pg_error": None}
 
     if FORBIDDEN_KEYWORDS.search(strip_sql_line_comments(raw)):
-        return {
-            "ok": False,
-            "error": (
+        msg = (
+            "Im Übungsbereich darfst du das Datenbank-Schema nicht ändern (kein DROP/ALTER/CREATE)."
+            if sandbox == "learn"
+            else (
                 "DROP, ALTER, CREATE und ähnliche Schema-Befehle sind in der Lern-App gesperrt. "
                 "SELECT, INSERT, UPDATE, DELETE sowie BEGIN/COMMIT sind erlaubt."
-            ),
-            "columns": None,
-            "rows": None,
-        }
+            )
+        )
+        return {"ok": False, "error": msg, "columns": None, "rows": None, "pg_error": None}
 
     statements = split_statements(raw)
     if not statements:
-        return {"ok": False, "error": "Bitte gib eine SQL-Abfrage ein.", "columns": None, "rows": None}
+        return {"ok": False, "error": "Bitte gib eine SQL-Abfrage ein.", "columns": None, "rows": None, "pg_error": None}
 
     incomplete = next((s for s in statements if has_empty_select_list(s)), None)
     if incomplete:
+        empty_msg = (
+            "Nach SELECT fehlt noch, **was** du sehen möchtest — zum Beispiel `*` oder Spaltennamen."
+            if sandbox == "learn"
+            else (
+                "Die SELECT-Liste ist noch leer. Rechts eine Spalte anklicken — sie landet in der Lücke nach SELECT."
+            )
+        )
         return {
             "ok": False,
-            "error": (
-                "Die SELECT-Liste ist noch leer. Rechts eine Spalte anklicken — sie landet in der Lücke nach SELECT."
-            ),
+            "error": empty_msg,
             "columns": None,
             "rows": None,
             "empty_select": True,
+            "pg_error": None,
         }
 
     columns, rows, note = [], [], None
     messages = []
     try:
-        with get_connection() as conn:
+        with get_connection(search_path="learn" if sandbox == "learn" else None) as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 for stmt in statements:
                     kind = classify_statement(stmt)
                     if kind == "empty":
                         continue
-                    if kind == "unknown":
+                    if sandbox == "learn" and kind in {"write", "begin", "commit", "rollback"}:
                         return {
                             "ok": False,
                             "error": (
-                                "Dieser Befehl ist hier nicht erlaubt. "
-                                "Erlaubt sind SELECT, INSERT, UPDATE, DELETE und BEGIN/COMMIT/ROLLBACK."
+                                "Im Anfänger-Bereich sind nur lesende Abfragen erlaubt: "
+                                "`SELECT`, `WITH` und `EXPLAIN`."
                             ),
                             "columns": None,
                             "rows": None,
+                            "pg_error": None,
+                        }
+                    if kind == "unknown":
+                        allowed = (
+                            "Erlaubt sind SELECT und EXPLAIN."
+                            if sandbox == "learn"
+                            else "Erlaubt sind SELECT, INSERT, UPDATE, DELETE und BEGIN/COMMIT/ROLLBACK."
+                        )
+                        return {
+                            "ok": False,
+                            "error": "Dieser Befehl ist hier nicht erlaubt. " + allowed,
+                            "columns": None,
+                            "rows": None,
+                            "pg_error": None,
                         }
                     if kind == "write" and not re.search(
                         r"\b(instance_1|subscription)\.", stmt, re.IGNORECASE
@@ -446,13 +419,17 @@ def run_sql(sql: str):
                             ),
                             "columns": None,
                             "rows": None,
+                            "pg_error": None,
                         }
                     if kind == "query":
-                        cur.execute(f"SELECT * FROM ({stmt.rstrip(';')}) AS sub LIMIT {MAX_ROWS + 1}")
-                        fetched = cur.fetchall()
+                        cur.execute(stmt)
+                        if not cur.description:
+                            messages.append("Ausgeführt.")
+                            continue
+                        fetched = cur.fetchmany(MAX_ROWS + 1)
                         truncated = len(fetched) > MAX_ROWS
                         fetched = fetched[:MAX_ROWS]
-                        columns = [d.name for d in cur.description] if cur.description else []
+                        columns = [d.name for d in cur.description]
                         rows = jsonable_rows(columns, fetched)
                         note = f"(Ergebnis auf {MAX_ROWS} Zeilen begrenzt.)" if truncated else None
                     else:
@@ -466,7 +443,14 @@ def run_sql(sql: str):
                         elif kind == "rollback":
                             messages.append("Änderung verworfen (ROLLBACK).")
     except Exception as e:  # noqa: BLE001 - want to surface DB errors to the learner
-        return {"ok": False, "error": friendly_sql_error(str(e), raw), "columns": None, "rows": None}
+        pg_error = str(e)
+        return {
+            "ok": False,
+            "error": friendly_sql_error(pg_error, raw, sandbox=sandbox),
+            "pg_error": pg_error,
+            "columns": None,
+            "rows": None,
+        }
 
     return {
         "ok": True,
@@ -475,7 +459,13 @@ def run_sql(sql: str):
         "note": note,
         "messages": messages,
         "error": None,
+        "pg_error": None,
     }
+
+
+def _learn_sql_fragment(script: str) -> str | None:
+    start = script.find("DROP SCHEMA IF EXISTS learn")
+    return script[start:] if start >= 0 else None
 
 
 def reset_learning_db():
@@ -488,10 +478,32 @@ def reset_learning_db():
             with conn.cursor() as cur:
                 cur.execute("DROP SCHEMA IF EXISTS instance_1 CASCADE")
                 cur.execute("DROP SCHEMA IF EXISTS subscription CASCADE")
+                cur.execute("DROP SCHEMA IF EXISTS learn CASCADE")
                 cur.execute(script)
     except Exception as e:  # noqa: BLE001
         return False, str(e)
     return True, "Lern-Datenbank ist wieder im Ausgangszustand."
+
+
+def ensure_learn_schema():
+    """Alte Volumes ohne learn-Schema nachziehen."""
+    sql_path = _init_sql_path()
+    if not sql_path:
+        return
+    try:
+        with get_connection(admin=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1 FROM information_schema.schemata WHERE schema_name = 'learn'")
+                if cur.fetchone():
+                    return
+        fragment = _learn_sql_fragment(sql_path.read_text(encoding="utf-8"))
+        if not fragment:
+            return
+        with get_connection(admin=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute(fragment)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def ensure_write_privileges():
@@ -503,6 +515,8 @@ def ensure_write_privileges():
                     """
                     GRANT INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA instance_1 TO lernuser;
                     GRANT INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA subscription TO lernuser;
+                    GRANT USAGE ON SCHEMA learn TO lernuser;
+                    GRANT SELECT ON ALL TABLES IN SCHEMA learn TO lernuser;
                     """
                 )
     except Exception:  # noqa: BLE001
@@ -564,20 +578,35 @@ def compare_by_values(user_rows, sol_rows):
     return True, len(users), len(sols)
 
 
-def compare_query_result(user_cols, user_rows, sol_cols, sol_rows):
-    """Vergleicht Ergebnisse. Extra-Spalten und andere Aliase (timezone vs. updated_berlin) sind ok."""
+def project_row_seq(rows, wanted_cols, col_map):
+    seq = []
+    for row in rows or []:
+        seq.append(tuple(_cell_str(row.get(col_map[c])) for c in wanted_cols))
+    return seq
+
+
+def compare_query_result(user_cols, user_rows, sol_cols, sol_rows, ordered=False, strict_columns=False):
+    """Vergleicht Ergebnisse. Extra-Spalten und andere Aliase sind ok, außer strict_columns."""
     user_map = {c.lower(): c for c in (user_cols or [])}
     sol_map = {c.lower(): c for c in (sol_cols or [])}
     sol_names = [c.lower() for c in (sol_cols or [])]
     missing = [c for c in sol_names if c not in user_map]
     extra = sorted(set(user_map) - set(sol_names))
+    if strict_columns and extra:
+        return False, missing, extra, len(user_rows or []), len(sol_rows or [])
+    if ordered:
+        if missing:
+            return False, missing, extra, len(user_rows or []), len(sol_rows or [])
+        user_seq = project_row_seq(user_rows, sol_names, user_map)
+        sol_seq = project_row_seq(sol_rows, sol_names, sol_map)
+        return user_seq == sol_seq, missing, extra, len(user_seq), len(sol_seq)
     sol_keys = project_rows(sol_rows, sol_names, sol_map) if sol_names else []
     if not missing:
         user_keys = project_rows(user_rows, sol_names, user_map)
         if user_keys == sol_keys:
             return True, missing, extra, len(user_keys), len(sol_keys)
     ok, user_n, sol_n = compare_by_values(user_rows, sol_rows)
-    if ok:
+    if ok and not (strict_columns and extra):
         return True, [], extra, user_n, sol_n
     return False, missing, extra, user_n, sol_n
 
@@ -591,9 +620,24 @@ def lesson_nav(lesson_id):
     )
 
 
+def academy_nav(lesson_id):
+    ids = [l["id"] for l in ACADEMY["lessons"]]
+    if lesson_id not in ids:
+        return None, None
+    idx = ids.index(lesson_id)
+    return (
+        ids[idx - 1] if idx > 0 else None,
+        ids[idx + 1] if idx < len(ids) - 1 else None,
+    )
+
+
 @app.context_processor
 def inject_nav():
-    return {"tracks": TRACKS}
+    return {
+        "tracks": TRACKS,
+        "academy": ACADEMY,
+        "academy_lessons": ACADEMY["lessons"],
+    }
 
 
 @app.route("/")
@@ -601,10 +645,30 @@ def index():
     return render_template(
         "index.html",
         lessons=LESSONS,
+        academy_lessons=ACADEMY["lessons"],
+        academy_concepts=ACADEMY["concepts"],
         current_lesson_id=None,
         exercise_count=sum(len(l.get("exercises") or []) for l in LESSONS),
         quiz_count=sum(len(l.get("quiz") or []) for l in LESSONS),
         card_count=len(FLASHCARDS),
+        academy_step_count=sum(len(l.get("steps") or []) for l in ACADEMY["lessons"]),
+    )
+
+
+@app.route("/learn/<lesson_id>")
+def academy_lesson(lesson_id):
+    lesson_obj = academy_lesson_by_id(lesson_id)
+    if not lesson_obj:
+        return "Lektion nicht gefunden", 404
+    prev_id, next_id = academy_nav(lesson_id)
+    return render_template(
+        "academy.html",
+        lesson=lesson_obj,
+        lessons=LESSONS,
+        prev_id=prev_id,
+        next_id=next_id,
+        current_lesson_id=None,
+        current_academy_id=lesson_id,
     )
 
 
@@ -659,11 +723,13 @@ def wissen():
 @app.route("/api/run", methods=["POST"])
 def api_run():
     data = request.get_json(force=True)
-    result = run_sql(data.get("sql", ""))
+    sandbox = data.get("sandbox") or "wmx"
+    result = run_sql(data.get("sql", ""), sandbox=sandbox)
     if not result["ok"]:
         return jsonify({
             "ok": False,
             "error": result["error"],
+            "pg_error": result.get("pg_error"),
             "empty_select": bool(result.get("empty_select")),
         })
     return jsonify({
@@ -835,6 +901,105 @@ def api_solution(exercise_id):
     return jsonify({"ok": True, "solution": exercise["solution"]})
 
 
+def academy_sql_feedback(user_sql, step, user, solution):
+    ordered = bool(step.get("ordered"))
+    strict = bool(step.get("strict_columns"))
+    user_cols, user_rows = user["columns"] or [], user["rows"] or []
+    sol_cols, sol_rows = solution["columns"] or [], solution["rows"] or []
+    correct, missing, extra, user_n, sol_n = compare_query_result(
+        user_cols, user_rows, sol_cols, sol_rows, ordered=ordered, strict_columns=strict
+    )
+    req_coach = sql_requirement_coach(user_sql, step)
+    if req_coach:
+        correct = False
+    coach = diagnose_structure(user_sql, step.get("solution") or "", step)
+    if not correct and not coach:
+        if req_coach:
+            coach = req_coach
+        elif strict and extra and not missing:
+            coach = (
+                "SELECT bestimmt, welche Spalten erscheinen. "
+                f"Du hast zusätzlich: {', '.join(extra)}. Lass überflüssige Spalten weg."
+            )
+        elif missing:
+            coach = (
+                "Im Ergebnis fehlen noch Spalten: "
+                + ", ".join(missing)
+                + ". SELECT sagt, was du sehen möchtest."
+            )
+        elif ordered and user_n == sol_n:
+            coach = "Die Zeilen stimmen, die Reihenfolge noch nicht. Prüfe `ORDER BY` und `ASC`/`DESC`."
+        elif user_n != sol_n:
+            coach = (
+                f"Zeilenanzahl stimmt nicht: du hast {user_n}, erwartet werden {sol_n}. "
+                "Prüfe `WHERE`, `AND`/`OR` und `LIMIT`."
+            )
+        else:
+            coach = "Das Ergebnis weicht noch ab. Vergleiche Filter, Spalten und Werte mit der Aufgabenstellung."
+    elif correct:
+        coach = None
+    elif req_coach:
+        coach = req_coach
+    return {
+        "ok": True,
+        "correct": correct,
+        "columns": user_cols,
+        "rows": user_rows,
+        "row_count": len(user_rows),
+        "expected_row_count": sol_n,
+        "coach": coach,
+        "explain": explain_sql_query(user_sql) if correct else None,
+    }
+
+
+@app.route("/api/academy/check", methods=["POST"])
+def api_academy_check():
+    data = request.get_json(force=True) or {}
+    lesson_obj = academy_lesson_by_id(data.get("lesson_id"))
+    if not lesson_obj:
+        return jsonify({"ok": False, "error": "Unbekannte Lektion."})
+    try:
+        idx = int(data.get("step", 0))
+        step = lesson_obj["steps"][idx]
+    except (TypeError, ValueError, IndexError):
+        return jsonify({"ok": False, "error": "Unbekannter Schritt."})
+
+    sql_types = {"write", "build", "fill", "apply", "challenge", "demo"}
+    if step.get("type") not in sql_types and not step.get("solution"):
+        return jsonify({"ok": False, "error": "Dieser Schritt wird in der App geprüft."})
+
+    sql = data.get("sql") or ""
+    user = run_sql(sql, sandbox="learn")
+    if user.get("empty_select") or not user["ok"]:
+        coach = diagnose_structure(sql, step.get("solution") or "", step) or user.get("error")
+        return jsonify({
+            "ok": True,
+            "correct": False,
+            "columns": [],
+            "rows": [],
+            "row_count": 0,
+            "coach": coach,
+            "error": user.get("error"),
+            "pg_error": user.get("pg_error"),
+        })
+
+    solution = run_sql(step["solution"], sandbox="learn")
+    if not solution["ok"]:
+        return jsonify({"ok": False, "error": "Interner Fehler in der Musterlösung: " + solution["error"]})
+    payload = academy_sql_feedback(sql, step, user, solution)
+    return jsonify(payload)
+
+
+@app.route("/api/explain", methods=["POST"])
+def api_explain():
+    data = request.get_json(force=True) or {}
+    sql = data.get("sql") or ""
+    if not sql.strip():
+        return jsonify({"ok": False, "error": "Bitte SQL einfügen."})
+    explained = explain_sql_query(sql)
+    return jsonify({"ok": True, **explained})
+
+
 @app.route("/api/schema")
 def api_schema():
     try:
@@ -845,7 +1010,7 @@ def api_schema():
                     SELECT c.table_schema, c.table_name, c.column_name, c.data_type,
                            c.ordinal_position
                     FROM information_schema.columns c
-                    WHERE c.table_schema IN ('instance_1', 'subscription')
+                    WHERE c.table_schema IN ('instance_1', 'subscription', 'learn')
                     ORDER BY c.table_schema, c.table_name, c.ordinal_position
                     """
                 )
@@ -868,9 +1033,10 @@ def api_schema():
                 "name": row["table_name"],
                 "short": short,
                 "qualified": key,
-                "label": info.get("label") or short,
+                "sandbox": "learn" if row["table_schema"] == "learn" else "wmx",
+                "label": info.get("label") or {"orders": "Aufträge", "clients": "Kunden", "stock": "Bestand"}.get(short, short),
                 "parent": info.get("parent") or "",
-                "kind": info.get("kind") or "",
+                "kind": info.get("kind") or ("Training" if row["table_schema"] == "learn" else ""),
                 "columns": [],
             }
         tables[key]["columns"].append({
@@ -888,7 +1054,7 @@ def api_preview():
     if schema not in ALLOWED_SCHEMAS or not SAFE_IDENT.match(table):
         return jsonify({"ok": False, "error": "Ungültige Tabelle."})
     sql = f'SELECT * FROM {schema}.{table} LIMIT 8'
-    result = run_sql(sql)
+    result = run_sql(sql, sandbox="learn" if schema == "learn" else "wmx")
     if not result["ok"]:
         return jsonify({"ok": False, "error": result["error"]})
     return jsonify({
@@ -956,6 +1122,7 @@ def api_search():
 
 if __name__ == "__main__":
     ensure_write_privileges()
+    ensure_learn_schema()
     debug = os.environ.get("FLASK_DEBUG", "0") == "1"
     host = os.environ.get("APP_HOST", "0.0.0.0")
     port = int(os.environ.get("APP_PORT", "8080"))

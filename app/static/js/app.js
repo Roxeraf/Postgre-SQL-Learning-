@@ -1,15 +1,67 @@
-const STORE_KEY = "flowapp-learn-v1";
+const STORE_KEY = "flowapp-learn-v2";
+const STORE_KEY_V1 = "flowapp-learn-v1";
+
+const ACADEMY_CONCEPTS = [
+  ["TABLE", "Tabellen"],
+  ["SELECT", "SELECT"],
+  ["FROM", "FROM"],
+  ["WHERE", "WHERE"],
+  ["COMPARE", "Vergleiche"],
+  ["AND", "AND / OR"],
+  ["ORDER BY", "ORDER BY"],
+  ["LIMIT", "LIMIT"],
+];
+
+function emptyStore() {
+  return {
+    version: 2,
+    onboarded: false,
+    lessons: {},
+    lastLesson: null,
+    lastAcademy: null,
+    academy: { lessons: {} },
+    mastery: {},
+    xp: 0,
+    streak: 0,
+    lastActivity: null,
+  };
+}
 
 function loadStore() {
   try {
-    return JSON.parse(localStorage.getItem(STORE_KEY)) || { lessons: {}, lastLesson: null };
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) {
+      return { ...emptyStore(), ...JSON.parse(raw) };
+    }
   } catch {
-    return { lessons: {}, lastLesson: null };
+    /* fall through */
   }
+  try {
+    const v1 = JSON.parse(localStorage.getItem(STORE_KEY_V1) || "null");
+    if (v1) {
+      return {
+        ...emptyStore(),
+        onboarded: Boolean(v1.lastLesson || Object.keys(v1.lessons || {}).length),
+        lessons: v1.lessons || {},
+        lastLesson: v1.lastLesson || null,
+      };
+    }
+  } catch {
+    /* ignore */
+  }
+  return emptyStore();
 }
 
 function saveStore(store) {
   localStorage.setItem(STORE_KEY, JSON.stringify(store));
+}
+
+function academyState(store, id) {
+  if (!store.academy) store.academy = { lessons: {} };
+  if (!store.academy.lessons[id]) {
+    store.academy.lessons[id] = { steps: {}, complete: false, current: 0 };
+  }
+  return store.academy.lessons[id];
 }
 
 function lessonState(store, id) {
@@ -35,6 +87,23 @@ function lessonStarted(state) {
 
 function refreshChrome() {
   const store = loadStore();
+  const academyItems = [...document.querySelectorAll("[data-academy-id]")];
+  const academyIds = [...document.querySelectorAll(".lesson-list li[data-academy-id]")].map((el) => el.dataset.academyId);
+  let sqlDone = 0;
+  academyIds.forEach((id) => {
+    const state = store.academy?.lessons?.[id];
+    const complete = Boolean(state?.complete);
+    const started = Boolean(state && (state.complete || Object.keys(state.steps || {}).length));
+    if (complete) sqlDone += 1;
+    document.querySelectorAll(`[data-academy-id="${id}"]`).forEach((el) => {
+      el.classList.toggle("done", complete);
+      el.classList.toggle("started", started && !complete);
+      const badge = el.querySelector(".path-state");
+      if (badge) badge.textContent = complete ? "Fertig" : started ? "Begonnen" : "Offen";
+    });
+  });
+  const sqlPct = academyIds.length ? Math.round((sqlDone / academyIds.length) * 100) : 0;
+
   const items = [...document.querySelectorAll(".lesson-list li[data-lesson-id], .path-card[data-lesson-id]")];
   const ids = [...document.querySelectorAll(".lesson-list li[data-lesson-id]")].map((el) => el.dataset.lessonId);
   let done = 0;
@@ -50,43 +119,111 @@ function refreshChrome() {
       if (badge) badge.textContent = complete ? "Fertig" : started ? "Begonnen" : "Offen";
     });
   });
-  const pct = ids.length ? Math.round((done / ids.length) * 100) : 0;
+  const wmxPct = ids.length ? Math.round((done / ids.length) * 100) : 0;
+
   const ring = document.querySelector(".progress-ring");
   if (ring) {
-    ring.style.setProperty("--p", String(pct));
-    ring.querySelector("span").textContent = `${pct}%`;
+    ring.style.setProperty("--p", String(sqlPct));
+    ring.querySelector("span").textContent = `${sqlPct}%`;
   }
   const meta = document.getElementById("progress-meta");
   if (meta) {
-    const startedCount = ids.filter((id) => lessonStarted(store.lessons[id])).length;
-    meta.textContent = done
-      ? `${done} von ${ids.length} Lektionen`
-      : startedCount
-        ? `${startedCount} begonnen`
+    meta.textContent = sqlDone
+      ? `${sqlDone} von ${academyIds.length} Kapitel`
+      : academyIds.some((id) => store.academy?.lessons?.[id] && Object.keys(store.academy.lessons[id].steps || {}).length)
+        ? "In Bearbeitung"
         : "Noch nicht gestartet";
   }
+  const barSql = document.getElementById("bar-sql");
+  const barWmx = document.getElementById("bar-wmx");
+  const pctSql = document.getElementById("pct-sql");
+  const pctWmx = document.getElementById("pct-wmx");
+  if (barSql) barSql.style.width = `${sqlPct}%`;
+  if (barWmx) barWmx.style.width = `${wmxPct}%`;
+  if (pctSql) pctSql.textContent = `${sqlPct}%`;
+  if (pctWmx) pctWmx.textContent = `${wmxPct}%`;
+
   const stat = document.getElementById("stat-done");
   if (stat) stat.textContent = `${done}/${ids.length}`;
+  const statSql = document.getElementById("stat-sql");
+  if (statSql) statSql.textContent = `${sqlDone}/${academyIds.length || document.querySelectorAll(".path-academy [data-academy-id]").length}`;
+  const statXp = document.getElementById("stat-xp");
+  if (statXp) statXp.textContent = String(store.xp || 0);
+
   const cont = document.getElementById("continue-btn");
-  if (cont) {
-    const incomplete = ids.find((id) => !store.lessons[id]?.complete);
-    const last = store.lastLesson;
-    const stay = last && ids.includes(last) && !store.lessons[last]?.complete ? last : null;
-    const next = done === ids.length ? ids[0] : stay || incomplete || ids[0];
-    if (next) {
-      cont.href = `/lesson/${next}`;
-      cont.textContent = done === ids.length
-        ? "Nochmal von vorn"
-        : lessonStarted(store.lessons[next])
-          ? `Weiter mit Teil ${next.toUpperCase()}`
-          : next === "sql"
-            ? "Mit SQL-Grundlagen beginnen"
-        : next === ids[0]
-            ? "Mit der ersten Lektion beginnen"
-            : `Teil ${(next || "").toUpperCase()} öffnen`;
-    }
+  const nextAcademy = nextAcademyLesson(store, academyIds);
+  if (cont && nextAcademy) {
+    const started = Boolean(store.academy?.lessons?.[nextAcademy] && Object.keys(store.academy.lessons[nextAcademy].steps || {}).length);
+    cont.href = `/learn/${nextAcademy}`;
+    cont.textContent = store.onboarded || started ? "Weiterlernen" : "Lernen starten";
   }
   return store;
+}
+
+function nextAcademyLesson(store, ids) {
+  if (!ids.length) {
+    ids = [...document.querySelectorAll(".lesson-list li[data-academy-id]")].map((el) => el.dataset.academyId);
+  }
+  const last = store.lastAcademy;
+  if (last && ids.includes(last) && !store.academy?.lessons?.[last]?.complete) return last;
+  return ids.find((id) => !store.academy?.lessons?.[id]?.complete) || ids[0];
+}
+
+function initDashboard() {
+  const startHero = document.getElementById("hero-start");
+  if (!startHero) return;
+  const store = loadStore();
+  const ids = [...document.querySelectorAll(".path-academy [data-academy-id]")].map((el) => el.dataset.academyId);
+  const next = nextAcademyLesson(store, ids);
+  const nextCard = document.querySelector(`.path-card[data-academy-id="${next}"]`);
+  const nextTitle = nextCard?.querySelector("h3")?.textContent || "SQL Grundlagen";
+  const started = Boolean(store.onboarded || store.xp || Object.keys(store.academy?.lessons || {}).length);
+  document.getElementById("hero-back").hidden = !started;
+  startHero.hidden = started;
+  document.getElementById("continue-title").textContent = nextTitle;
+  const astate = store.academy?.lessons?.[next];
+  const doneSteps = astate ? Object.keys(astate.steps || {}).length : 0;
+  const total = nextCard ? Number((nextCard.querySelector(".path-meta span")?.textContent || "").split(" ")[0]) : 0;
+  document.getElementById("continue-meta").textContent = doneSteps
+    ? `Schritte ${doneSteps}${total ? ` / ${total}` : ""}`
+    : (nextCard?.querySelector(".path-goals")?.textContent || "");
+  document.getElementById("continue-card-btn").href = `/learn/${next}`;
+  document.getElementById("continue-card-btn").textContent = doneSteps ? "Weiter" : "Start";
+  if (started) {
+    document.getElementById("back-title").textContent = nextTitle;
+    document.getElementById("back-copy").textContent = doneSteps
+      ? "Dort bist du stehen geblieben. Kurze Session, direkt weiterklicken."
+      : "Als Nächstes kommt das nächste Kapitel — wieder verstehen, vorhersagen, bauen.";
+    const backBtn = document.getElementById("continue-btn");
+    if (backBtn) {
+      backBtn.href = `/learn/${next}`;
+      backBtn.textContent = "Weiter";
+    }
+  }
+
+  const list = document.getElementById("mastery-list");
+  if (list) {
+    list.innerHTML = ACADEMY_CONCEPTS.map(([id, label]) => {
+      const v = Math.round(store.mastery[id] || 0);
+      return `<div class="mastery-row"><span>${esc(label)}</span><span class="skill-bar"><i style="width:${v}%"></i></span><span>${v}%</span></div>`;
+    }).join("");
+  }
+
+  let recId = next;
+  let recWhy = "Der nächste Schritt im Lernpfad.";
+  const weak = ACADEMY_CONCEPTS
+    .map(([id, label]) => ({ id, label, v: store.mastery[id] || 0 }))
+    .filter((c) => c.v > 0 && c.v < 70)
+    .sort((a, b) => a.v - b.v)[0];
+  if (weak && started) {
+    recWhy = `${weak.label} liegt bei ${Math.round(weak.v)}%. Kurz wiederholen, dann fühlt sich das nächste Kapitel leichter an.`;
+    const map = { TABLE: "ch0", SELECT: "ch2", FROM: "ch1", WHERE: "ch3", COMPARE: "ch4", AND: "ch5", "ORDER BY": "ch6", LIMIT: "ch6" };
+    recId = map[weak.id] || next;
+  }
+  const recCard = document.querySelector(`.path-card[data-academy-id="${recId}"]`);
+  document.getElementById("rec-title").textContent = recCard?.querySelector("h3")?.textContent || "Nächstes Kapitel";
+  document.getElementById("rec-copy").textContent = recWhy;
+  document.getElementById("rec-btn").href = `/learn/${recId}`;
 }
 
 function esc(value) {
@@ -479,7 +616,7 @@ function initResetDb() {
       if (btn) btn.disabled = false;
     }
   };
-  document.querySelectorAll("#reset-db, .js-reset-db").forEach((btn) => {
+  document.querySelectorAll("#reset-db, #reset-db-pg, .js-reset-db").forEach((btn) => {
     btn.addEventListener("click", () => run(btn));
   });
 }
@@ -1005,13 +1142,70 @@ function initPlayground() {
   const runBtn = document.getElementById("pg-run");
   if (!editor || !runBtn) return;
   lastEditor = editor;
+  let sandbox = "learn";
+  let tables = [];
+  const LEARN_SQL = "SELECT *\nFROM orders;";
+  const WMX_SQL = "SELECT order_number, task_status\nFROM instance_1.flowapp_demo_order_head;";
+
+  const renderTables = () => {
+    const host = document.getElementById("pg-tables");
+    if (!host) return;
+    const filtered = tables.filter((t) => (t.sandbox || "wmx") === sandbox);
+    host.innerHTML = filtered.map((t) => `
+      <details class="schema-table" data-short="${esc(t.short)}">
+        <summary>
+          <span class="insert-name" data-insert="${sandbox === "learn" ? esc(t.name) : esc(t.qualified)}">${esc(t.label || t.short)}</span>
+          <span class="schema-type">${esc(t.short)}</span>
+        </summary>
+        <div class="schema-cols">
+          ${t.columns.map((c) => `<button class="schema-col" type="button" data-insert="${esc(c.name)}"><span>${esc(c.name)}</span><span class="schema-type">${esc(c.type)}</span></button>`).join("")}
+        </div>
+      </details>`).join("") || '<p class="muted">Keine Tabellen geladen.</p>';
+  };
+
+  fetch("/api/schema").then((r) => r.json()).then((data) => {
+    tables = data.tables || [];
+    renderTables();
+  }).catch(() => {});
+
+  const setSandbox = (next) => {
+    sandbox = next;
+    document.querySelectorAll(".pg-tab").forEach((t) => t.classList.toggle("active", t.dataset.sandbox === sandbox));
+    const lede = document.getElementById("pg-lede");
+    const mode = document.getElementById("pg-mode-label");
+    if (sandbox === "learn") {
+      if (lede) lede.textContent = "Trainingsdaten: orders, clients, stock. Nur lesen.";
+      if (mode) mode.textContent = "SELECT · EXPLAIN · max. 200 Zeilen";
+      if (!editor.value.trim() || editor.value.includes("flowapp_demo")) editor.value = LEARN_SQL;
+    } else {
+      if (lede) lede.textContent = "WMX-Übungsdatenbank. SELECT, UPDATE, DELETE — DROP/ALTER gesperrt.";
+      if (mode) mode.textContent = "SELECT · UPDATE · DELETE · BEGIN/COMMIT · max. 200 Zeilen";
+      if (!editor.value.trim() || editor.value.includes("FROM orders")) editor.value = WMX_SQL;
+    }
+    renderTables();
+  };
+
+  document.querySelector(".pg-tabs")?.addEventListener("click", (e) => {
+    const tab = e.target.closest("[data-sandbox]");
+    if (tab) setSandbox(tab.dataset.sandbox);
+  });
+  document.getElementById("pg-tables")?.addEventListener("click", (e) => {
+    const insert = e.target.closest("[data-insert]");
+    if (!insert) return;
+    e.preventDefault();
+    insertAtCursor(insert.dataset.insert, editor);
+  });
+
   const run = async () => {
     resultEl.innerHTML = '<p class="muted">Führe Abfrage aus…</p>';
     runBtn.disabled = true;
     try {
-      const data = await postJson("/api/run", { sql: editor.value });
+      const data = await postJson("/api/run", { sql: editor.value, sandbox });
       if (!data.ok) {
-        resultEl.innerHTML = `<p class="error">Fehler: ${esc(data.error)}</p>`;
+        const pg = data.pg_error && data.pg_error !== data.error
+          ? `<details class="pg-error"><summary>PostgreSQL-Meldung anzeigen</summary><pre>${esc(data.pg_error)}</pre></details>`
+          : "";
+        resultEl.innerHTML = `<p class="error">${esc(data.error)}</p>${pg}`;
         return;
       }
       resultEl.innerHTML = renderSqlResult(data);
@@ -1019,6 +1213,29 @@ function initPlayground() {
       runBtn.disabled = false;
     }
   };
+
+  document.getElementById("pg-explain")?.addEventListener("click", async () => {
+    const out = document.getElementById("pg-explain-out");
+    if (!out) return;
+    const data = await postJson("/api/explain", { sql: editor.value });
+    if (!data.ok) {
+      out.hidden = false;
+      out.innerHTML = `<p class="error">${esc(data.error)}</p>`;
+      return;
+    }
+    out.hidden = false;
+    out.innerHTML = `<p class="plain-sql">${esc(data.plain || "")}</p>`
+      + (data.parts || []).map((p, i) => `
+        <div class="explain-step">
+          <span class="explain-n">${i + 1}</span>
+          <div>
+            <strong>${esc(p.key)} — ${esc(p.title)}</strong>
+            <pre>${colorizeSql(p.sql)}</pre>
+            <p class="muted">${esc(p.blurb)}</p>
+          </div>
+        </div>`).join("");
+  });
+
   runBtn.addEventListener("click", run);
   editor.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
@@ -1167,5 +1384,18 @@ initPlayground();
 initCards();
 initWissen();
 initResetDb();
+initDashboard();
 refreshChrome();
+
+window.LearnUI = {
+  esc,
+  colorizeSql,
+  renderTable,
+  renderSqlResult,
+  postJson,
+  loadStore,
+  saveStore,
+  academyState,
+  refreshChrome,
+};
 

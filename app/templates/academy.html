@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Kapitel {{ lesson.chapter }} — {{ lesson.title }}{% endblock %}
+{% block content %}
+<article class="academy" id="academy-root"
+  data-lesson-id="{{ lesson.id }}"
+  data-next-id="{{ next_id or '' }}"
+  data-prev-id="{{ prev_id or '' }}">
+  <header class="lesson-hero academy-hero">
+    <p class="eyebrow">Kapitel {{ lesson.chapter }}{% if lesson.challenge %} · Challenge{% endif %} · ca. {{ lesson.minutes }} Min</p>
+    <h1>{{ lesson.title }}</h1>
+    <p class="lesson-path-copy">{{ lesson.goal }}</p>
+  </header>
+
+  <div class="academy-layout">
+    <div class="academy-main">
+      <div class="step-meter" id="step-meter"></div>
+      <div class="card academy-card" id="step-card">
+        <div id="step-root"></div>
+      </div>
+      <div class="academy-footer" id="step-footer"></div>
+    </div>
+    <aside class="model-rail" id="model-rail"></aside>
+  </div>
+
+  <nav class="lesson-nav">
+    {% if prev_id %}<a class="btn" href="/learn/{{ prev_id }}">← Vorheriges Kapitel</a>{% else %}<a class="btn" href="/">Zur Übersicht</a>{% endif %}
+    {% if next_id %}<a class="btn" href="/learn/{{ next_id }}">Nächstes Kapitel →</a>
+    {% else %}<a class="btn" href="/">Zur Übersicht</a>{% endif %}
+  </nav>
+</article>
+{% endblock %}
+{% block page_scripts %}
+<script id="academy-data" type="application/json">{{ lesson | tojson }}</script>
+<script src="/static/js/academy.js?v=15"></script>
+{% endblock %}
