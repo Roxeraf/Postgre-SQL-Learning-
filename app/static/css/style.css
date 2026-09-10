@@ -654,17 +654,23 @@ kbd { color: var(--text); font-size: 11px; }
 }
 .from-chip:hover { border-color: var(--accent); }
 .exercise-guide {
-  margin: 0 0 12px;
-  border: 1px solid var(--border);
+  margin: 0 0 14px;
+  border: 1px solid var(--border-strong);
   border-radius: 12px;
-  background: #0a1220;
+  background: var(--accent-dim);
   padding: 8px 12px;
 }
 .exercise-guide summary {
   cursor: pointer;
-  font-weight: 650;
+  font-weight: 700;
   font-size: 13px;
   color: var(--accent);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.exercise.is-ok .exercise-guide {
+  border-color: var(--border);
+  background: #0a1220;
 }
 .exercise-look {
   margin: 8px 0 4px;

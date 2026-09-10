@@ -81,9 +81,9 @@ function refreshChrome() {
           ? `Weiter mit Teil ${next.toUpperCase()}`
           : next === "sql"
             ? "Mit SQL-Grundlagen beginnen"
-            : next === "a"
-              ? "Mit Teil A beginnen"
-              : `Teil ${next.toUpperCase()} öffnen`;
+        : next === ids[0]
+            ? "Mit der ersten Lektion beginnen"
+            : `Teil ${(next || "").toUpperCase()} öffnen`;
     }
   }
   return store;
@@ -255,13 +255,112 @@ function namesInSelectList(text) {
     .filter(Boolean);
 }
 
+function selectItemBare(name) {
+  return String(name || "")
+    .replace(/--[^\n]*/g, " ")
+    .trim()
+    .split(/\s+as\s+/i)[0]
+    .trim()
+    .replace(/[(),]/g, " ")
+    .trim()
+    .split(/\s+/)
+    .pop()
+    .split(".")
+    .pop()
+    .toLowerCase();
+}
+
+function selectListHasColumn(text, col) {
+  const want = selectItemBare(col);
+  if (!want) return false;
+  return namesInSelectList(text).some((n) => selectItemBare(n) === want);
+}
+
+const SQL_ALIAS_STOP = /^(on|where|left|right|inner|outer|full|cross|join|select|group|order|limit|having|union|except|intersect|set|and|or|natural|using|returning|window|fetch|offset|for|when|then|else|end|distinct|all|as|with|from)$/i;
+
+function tableShortFromQualified(name) {
+  let short = String(name || "").split(".").pop().toLowerCase();
+  for (const prefix of ["flowapp_demo_", "flowapp_13d663_"]) {
+    if (short.startsWith(prefix)) {
+      short = short.slice(prefix.length);
+      break;
+    }
+  }
+  return short;
+}
+
+function fromSegmentForSelectList(sql, list) {
+  const start = list.end;
+  let depth = 0;
+  let end = sql.length;
+  for (let i = start; i < sql.length; i += 1) {
+    const ch = sql[i];
+    if (ch === "(") depth += 1;
+    else if (ch === ")") {
+      if (depth === 0) {
+        end = i;
+        break;
+      }
+      depth -= 1;
+    }
+  }
+  const stops = sqlKeywordSpans(sql, "WHERE")
+    .concat(sqlKeywordSpans(sql, "GROUP"))
+    .concat(sqlKeywordSpans(sql, "ORDER"))
+    .concat(sqlKeywordSpans(sql, "LIMIT"))
+    .concat(sqlKeywordSpans(sql, "HAVING"))
+    .concat(sqlKeywordSpans(sql, "UNION"))
+    .filter((item) => item.index > start && item.index < end)
+    .sort((a, b) => a.index - b.index);
+  if (stops.length) end = Math.min(end, stops[0].index);
+  return { start, end, text: sql.slice(start, end) };
+}
+
+function aliasesInFromSegment(sql, list) {
+  const map = {};
+  if (!list) return map;
+  const segment = fromSegmentForSelectList(sql, list).text.replace(/--[^\n]*/g, " ");
+  const re = /\b(?:FROM|JOIN)\s+((?:[A-Za-z_][\w]*\.)?[A-Za-z_][\w]*)\s+(?:AS\s+)?([A-Za-z_][\w]*)/gi;
+  let match;
+  while ((match = re.exec(segment))) {
+    const alias = match[2];
+    if (SQL_ALIAS_STOP.test(alias)) continue;
+    const short = tableShortFromQualified(match[1]);
+    if (!map[short]) map[short] = [];
+    if (!map[short].includes(alias)) map[short].push(alias);
+  }
+  return map;
+}
+
+function qualifyColumn(col, tableShort, sql, list) {
+  if (!tableShort || !isSqlIdent(col)) return col;
+  const aliases = aliasesInFromSegment(sql, list);
+  const hits = aliases[String(tableShort).toLowerCase()] || [];
+  if (hits.length === 1) return `${hits[0]}.${col}`;
+  return col;
+}
+
+function showSchemaInsert(text) {
+  const rail = document.getElementById("schema-rail");
+  if (!rail) return;
+  let status = rail.querySelector(".schema-insert-status");
+  if (!status) {
+    status = document.createElement("p");
+    status.className = "schema-insert-status";
+    const head = rail.querySelector(".schema-rail-head");
+    (head || rail).insertAdjacentElement("afterend", status);
+  }
+  status.textContent = `Eingefügt: ${text}`;
+}
+
 function insertIntoSelectList(editor, list, col) {
-  const names = namesInSelectList(list.text);
-  if (names.includes(String(col).toLowerCase())) {
+  if (selectListHasColumn(list.text, col)) {
     editor.focus();
     flashEditor(editor);
+    showSchemaInsert(col);
     return;
   }
+  const names = namesInSelectList(list.text);
   let body = list.text.replace(/\s+$/, "");
   if (names.length) {
     const codeTail = body.replace(/--[^\n]*$/, "").replace(/\s+$/, "");
@@ -274,6 +373,7 @@ function insertIntoSelectList(editor, list, col) {
   editor.focus();
   editor.selectionStart = editor.selectionEnd = pos;
   flashEditor(editor);
+  showSchemaInsert(col);
 }
 
 function placeCaretInEmptySelect(editor) {
@@ -284,7 +384,7 @@ function placeCaretInEmptySelect(editor) {
   editor.selectionStart = editor.selectionEnd = pos;
 }
 
-function insertAtCursor(text, editorEl) {
+function insertAtCursor(text, editorEl, tableShort) {
   const editor = activeSqlEditor(editorEl);
   if (!editor) {
     navigator.clipboard?.writeText(text);
@@ -298,16 +398,22 @@ function insertAtCursor(text, editorEl) {
   const caretParked = start === 0 && end === 0;
   const useDefaultSlot = !focused || caretParked;
   const ident = isSqlIdent(text);
+  const inList = lists.find((list) => start >= list.start && start <= list.end);
+  const empty = lists.find((list) => selectListIsEmpty(list.text));
+  const qualifyAgainst = inList || empty || (lists.length === 1 ? lists[0] : null);
+  const insertText = ident ? qualifyColumn(text, tableShort, editor.value, qualifyAgainst) : String(text);
 
   if (ident && lists.length) {
-    const inList = lists.find((list) => start >= list.start && start <= list.end);
-    if (inList) {
-      insertIntoSelectList(editor, inList, text);
+    if (inList && (selectListIsEmpty(inList.text) || useDefaultSlot)) {
+      insertIntoSelectList(editor, inList, insertText);
       return;
     }
-    const empty = lists.find((list) => selectListIsEmpty(list.text));
     if (empty && useDefaultSlot) {
-      insertIntoSelectList(editor, empty, text);
+      insertIntoSelectList(editor, empty, insertText);
+      return;
+    }
+    if (useDefaultSlot && lists.length === 1) {
+      insertIntoSelectList(editor, lists[0], insertText);
       return;
     }
   }
@@ -316,15 +422,16 @@ function insertAtCursor(text, editorEl) {
     start = end = editor.value.length;
   }
 
-  let insert = String(text);
+  let insert = insertText;
   const before = editor.value.slice(0, start);
-  if (ident && /[A-Za-z0-9_]$/.test(before.replace(/\s+$/, "")) && !/,\s*$/.test(before)) {
-    insert = `, ${text}`;
+  if (ident && /[A-Za-z0-9_]$/.test(before.replace(/\s+$/, "")) && !/,\s*$/.test(before) && !/\($/.test(before.replace(/\s+$/, ""))) {
+    insert = `, ${insertText}`;
   }
   editor.value = editor.value.slice(0, start) + insert + editor.value.slice(end);
   editor.focus();
   editor.selectionStart = editor.selectionEnd = start + insert.length;
   flashEditor(editor);
+  showSchemaInsert(insertText);
 }
 
 async function postJson(url, body, timeoutMs = 15000) {
@@ -421,7 +528,7 @@ function initSchema() {
           ${t.columns
             .map((c) =>
               insertable
-                ? `<button class="schema-col" type="button" data-insert="${c.name}">
+                ? `<button class="schema-col" type="button" data-insert="${esc(c.name)}" data-table="${esc(t.short)}">
               <span>${esc(c.name)}</span><span class="schema-type">${esc(c.type)}</span>
             </button>`
                 : `<div class="schema-col is-static">
@@ -510,7 +617,7 @@ function initSchema() {
     if (insert) {
       e.preventDefault();
       e.stopPropagation();
-      insertAtCursor(insert.dataset.insert);
+      insertAtCursor(insert.dataset.insert, null, insert.dataset.table);
       return;
     }
     const preview = e.target.closest("[data-preview-table]");
@@ -648,7 +755,7 @@ function initLesson() {
 
 const PHASE_HINTS = {
   learn: "Lies den Abschnitt. Unten auf Weiter — nicht die ganze Lektion auf einmal.",
-  practice: "SQL selbst schreiben. Rechts Tabellen/Spalten zum Reinklicken, dann Ausführen.",
+  practice: "Rechts Tabelle aufklappen, Spalte klicken, Ausführen, dann Stimmt das?.",
   quiz: "Eine Antwort wählen — danach kommt die Erklärung. Falsch ist ok.",
 };
 
@@ -722,9 +829,13 @@ function initExercises(lessonId, exerciseCount, quizCount) {
     let hintLevel = 0;
     lastEditor = lastEditor || editor;
 
+    const guide = exerciseEl.querySelector(".exercise-guide");
     if (state.exercises[exerciseId]) {
       exerciseEl.classList.add("is-ok");
       if (badge) badge.textContent = "Gelöst";
+      if (guide) guide.open = false;
+    } else if (guide) {
+      guide.open = true;
     }
 
     const runAction = async (action) => {
@@ -777,6 +888,7 @@ function initExercises(lessonId, exerciseCount, quizCount) {
           if (data.correct) {
             exerciseEl.classList.add("is-ok");
             if (badge) badge.textContent = "Gelöst";
+            if (guide) guide.open = false;
             const s = loadStore();
             lessonState(s, lessonId).exercises[exerciseId] = true;
             saveStore(s);
