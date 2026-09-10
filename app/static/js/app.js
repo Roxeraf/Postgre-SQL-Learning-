@@ -404,9 +404,13 @@ function insertAtCursor(text, editorEl, tableShort) {
   const insertText = ident ? qualifyColumn(text, tableShort, editor.value, qualifyAgainst) : String(text);
 
   if (ident && lists.length) {
-    if (inList && (selectListIsEmpty(inList.text) || useDefaultSlot)) {
-      insertIntoSelectList(editor, inList, insertText);
-      return;
+    if (inList) {
+      const beforeCaret = editor.value.slice(inList.start, start);
+      const intoFn = /\(\s*$/.test(beforeCaret.replace(/--[^\n]*$/, "").replace(/\s+$/, ""));
+      if (!intoFn) {
+        insertIntoSelectList(editor, inList, insertText);
+        return;
+      }
     }
     if (empty && useDefaultSlot) {
       insertIntoSelectList(editor, empty, insertText);
