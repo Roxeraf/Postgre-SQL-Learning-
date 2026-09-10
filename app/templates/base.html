@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{% block title %}plx.learnSQL — PostgreSQL Einarbeitung{% endblock %}</title>
+<title>{% block title %}plx.learnSQL — SQL lernen{% endblock %}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/css/style.css?v=10">
+<link rel="stylesheet" href="/static/css/style.css?v=11">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 </head>
 <body>
@@ -20,17 +20,34 @@
       <span class="brand-mark">🐘</span>
       <span>
         <span class="brand-title">plx.learnSQL</span>
-        <span class="brand-sub">PostgreSQL · A–P</span>
+        <span class="brand-sub">Verstehen · Schreiben · Anwenden</span>
       </span>
     </a>
 
     <div class="progress-card" id="global-progress">
       <div class="progress-ring" style="--p:0"><span>0%</span></div>
       <div>
-        <div class="progress-label">Dein Fortschritt</div>
+        <div class="progress-label">SQL Kenntnisse</div>
         <div class="progress-meta muted" id="progress-meta">Noch nicht gestartet</div>
       </div>
     </div>
+    <div class="skill-pair" id="skill-pair">
+      <div class="skill-row"><span>SQL</span><span class="skill-bar"><i id="bar-sql" style="width:0%"></i></span><span id="pct-sql">0%</span></div>
+      <div class="skill-row"><span>WMX</span><span class="skill-bar"><i id="bar-wmx" style="width:0%"></i></span><span id="pct-wmx">0%</span></div>
+    </div>
+
+    <p class="nav-label">SQL Grundlagen</p>
+    <ol class="lesson-list">
+      {% for l in academy_lessons %}
+      <li class="{{ 'active' if current_academy_id is defined and current_academy_id == l.id else '' }}" data-academy-id="{{ l.id }}">
+        <a href="/learn/{{ l.id }}">
+          <span class="lesson-status" aria-hidden="true"></span>
+          <span class="lesson-letter">{{ l.chapter }}</span>
+          <span class="lesson-name">{{ l.title }}</span>
+        </a>
+      </li>
+      {% endfor %}
+    </ol>
 
     {% for track in tracks %}
     <p class="nav-label">{{ track.label }}</p>
@@ -49,8 +66,8 @@
 
     <p class="nav-label">Werkzeuge</p>
     <div class="tool-links">
-      <a class="tool-link {{ 'active' if active_tool == 'wissen' else '' }}" href="/wissen">Wissensbasis</a>
       <a class="tool-link {{ 'active' if active_tool == 'playground' else '' }}" href="/playground">SQL-Playground</a>
+      <a class="tool-link {{ 'active' if active_tool == 'wissen' else '' }}" href="/wissen">Wissensbasis</a>
       <a class="tool-link {{ 'active' if active_tool == 'cards' else '' }}" href="/cards">Karteikarten</a>
       <button class="tool-link" type="button" id="open-schema">Alle Tabellen</button>
       <button class="tool-link" type="button" id="reset-db">Datenbank zurücksetzen</button>
@@ -74,6 +91,7 @@
   <div class="schema-list" id="schema-list"></div>
 </aside>
 
-<script src="/static/js/app.js?v=10"></script>
+<script src="/static/js/app.js?v=11"></script>
+{% block page_scripts %}{% endblock %}
 </body>
 </html>

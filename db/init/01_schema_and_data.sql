@@ -455,4 +455,59 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA subscription TO ler
 ALTER DEFAULT PRIVILEGES IN SCHEMA instance_1 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO lernuser;
 ALTER DEFAULT PRIVILEGES IN SCHEMA subscription GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO lernuser;
 
+-- ============================================================
+-- Isolierte Anfänger-Trainingsdaten (Schema learn)
+-- Einfache Tabellen für den SQL-Lernpfad. Kein WMX-Schema.
+-- Read-only für lernuser. Deterministisch, resetbar.
+-- ============================================================
+DROP SCHEMA IF EXISTS learn CASCADE;
+CREATE SCHEMA learn;
+
+CREATE TABLE learn.orders (
+    id            integer PRIMARY KEY,
+    order_number  integer NOT NULL,
+    client        text NOT NULL,
+    status        text NOT NULL,
+    quantity      integer NOT NULL,
+    created_at    date NOT NULL
+);
+
+CREATE TABLE learn.clients (
+    id       integer PRIMARY KEY,
+    name     text NOT NULL,
+    country  text NOT NULL
+);
+
+CREATE TABLE learn.stock (
+    id        integer PRIMARY KEY,
+    item      text NOT NULL,
+    quantity  integer NOT NULL,
+    weight    integer NOT NULL
+);
+
+INSERT INTO learn.orders (id, order_number, client, status, quantity, created_at) VALUES
+    (1, 4711, 'Red Bull',  'open',      12, '2026-09-08'),
+    (2, 4712, 'ETE',       'finished',   4, '2026-09-07'),
+    (3, 4713, 'Red Bull',  'open',      25, '2026-09-09'),
+    (4, 4714, 'ETE',       'open',       8, '2026-09-06'),
+    (5, 4715, 'Red Bull',  'finished',  30, '2026-09-05'),
+    (6, 4716, 'Nordlog',   'open',      15, '2026-09-10'),
+    (7, 4717, 'ETE',       'cancelled',  2, '2026-09-04'),
+    (8, 4718, 'Red Bull',  'open',      50, '2026-09-10');
+
+INSERT INTO learn.clients (id, name, country) VALUES
+    (10, 'Red Bull', 'AT'),
+    (20, 'ETE',      'DE'),
+    (30, 'Nordlog',  'CH');
+
+INSERT INTO learn.stock (id, item, quantity, weight) VALUES
+    (1, 'Palette A', 40, 120),
+    (2, 'Palette B',  8,  80),
+    (3, 'Karton C',  15,  25),
+    (4, 'Palette D',  3, 100);
+
+GRANT USAGE ON SCHEMA learn TO lernuser;
+GRANT SELECT ON ALL TABLES IN SCHEMA learn TO lernuser;
+ALTER DEFAULT PRIVILEGES IN SCHEMA learn GRANT SELECT ON TABLES TO lernuser;
+
 ALTER ROLE lernuser SET statement_timeout = '5s';

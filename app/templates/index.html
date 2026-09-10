@@ -1,62 +1,93 @@
 {% extends "base.html" %}
 {% block content %}
-<header class="hero">
-  <p class="eyebrow">PostgreSQL für FlowApp/WMX</p>
-  <h1>plx.learnSQL</h1>
-  <p class="lede">16 Lektionen aus der Einarbeitung. Du liest kurz, schreibst SQL gegen eine Übungsdatenbank und prüfst mit ein paar Fragen, ob es sitzt.</p>
+<header class="hero hero-start" id="hero-start">
+  <p class="eyebrow">SQL lernen</p>
+  <h1>Lerne, Daten selbst zu verstehen.</h1>
+  <p class="lede">In wenigen Minuten schreibst du deine erste Datenbankabfrage. Keine SQL-Erfahrung notwendig.</p>
   <div class="hero-actions">
-    <a class="btn btn-primary" id="continue-btn" href="/lesson/a">Mit Teil A beginnen</a>
-    <a class="btn" href="/wissen">Nur nachschlagen</a>
+    <a class="btn btn-primary" id="start-btn" href="/learn/ch0">Lernen starten</a>
+    <a class="btn" href="/playground">Selbst ausprobieren</a>
   </div>
 </header>
 
+<header class="hero" id="hero-back" hidden>
+  <p class="eyebrow">Willkommen zurück</p>
+  <h1 id="back-title">Weiterlernen</h1>
+  <p class="lede" id="back-copy">Als Nächstes wartet der nächste Schritt im Lernpfad.</p>
+  <div class="hero-actions">
+    <a class="btn btn-primary" id="continue-btn" href="/learn/ch0">Weiter</a>
+    <a class="btn" href="/playground">Playground</a>
+  </div>
+</header>
+
+<section class="dash-grid" id="dash-home">
+  <section class="card continue-card" id="continue-card">
+    <p class="nav-label">Weiterlernen</p>
+    <h2 id="continue-title">Daten verstehen</h2>
+    <p class="muted" id="continue-meta">Kapitel 0 · Lektionen starten</p>
+    <a class="btn btn-primary" id="continue-card-btn" href="/learn/ch0">Los</a>
+  </section>
+
+  <section class="card mastery-card">
+    <p class="nav-label">Deine Fähigkeiten</p>
+    <div id="mastery-list" class="mastery-list"></div>
+  </section>
+
+  <section class="card rec-card" id="rec-card">
+    <p class="nav-label">Empfohlen</p>
+    <h2 id="rec-title">Mit Kapitel 0 beginnen</h2>
+    <p class="muted" id="rec-copy">Kurze interaktive Schritte: anschauen, vorhersagen, bauen, schreiben.</p>
+    <a class="btn" id="rec-btn" href="/learn/ch0">Start</a>
+  </section>
+</section>
+
 <section class="stat-row" id="stat-row">
   <div class="stat-card">
-    <div class="stat-value" id="stat-done">0/{{ lessons|length }}</div>
-    <div class="stat-label">Lektionen fertig</div>
+    <div class="stat-value" id="stat-sql">0/{{ academy_lessons|length }}</div>
+    <div class="stat-label">SQL-Kapitel</div>
   </div>
   <div class="stat-card">
-    <div class="stat-value">{{ exercise_count }}</div>
-    <div class="stat-label">SQL-Übungen</div>
+    <div class="stat-value" id="stat-xp">0</div>
+    <div class="stat-label">XP</div>
   </div>
   <div class="stat-card">
-    <div class="stat-value">{{ quiz_count }}</div>
-    <div class="stat-label">Quizfragen</div>
+    <div class="stat-value">{{ academy_step_count }}</div>
+    <div class="stat-label">Interaktive Schritte</div>
   </div>
 </section>
 
-<section class="card howto">
-  <h2>So arbeitest du hier</h2>
-  <ol class="howto-steps howto-flow">
-    <li>
-      <span class="howto-num">1</span>
-      <div>
-        <strong>Verstehen</strong>
-        <p>Jede Lektion startet mit kurzen Abschnitten. Nicht scrollen und überfliegen — unten auf Weiter, dann die nächste Idee.</p>
-      </div>
-    </li>
-    <li>
-      <span class="howto-num">2</span>
-      <div>
-        <strong>Eine SQL-Aufgabe</strong>
-        <p>Du siehst immer nur eine Aufgabe. Rechts die zugehörige Tabelle. Spalte anklicken, SQL ergänzen, Ausführen, dann „Stimmt das?“.</p>
-      </div>
-    </li>
-    <li>
-      <span class="howto-num">3</span>
-      <div>
-        <strong>Kurzcheck</strong>
-        <p>Ein paar Fragen sichern den Abschnitt. Danach die nächste Lektion — oder in der Wissensbasis nachschlagen.</p>
-      </div>
-    </li>
-  </ol>
-  <p class="howto-foot muted">UPDATE/DELETE verdrehen die Beispieldaten. Dann in der Seitenleiste „Datenbank zurücksetzen“. Freies Rumspielen: SQL-Playground.</p>
-</section>
-
-{% for track in tracks %}
 <section>
   <div class="section-head">
-    <h2>{{ track.label }}</h2>
+    <h2>SQL Grundlagen</h2>
+    <p class="muted">Verstehen → Vorhersagen → Bauen → Schreiben → Anwenden</p>
+  </div>
+  <div class="path path-academy">
+    {% for l in academy_lessons %}
+    <a class="path-card" href="/learn/{{ l.id }}" data-academy-id="{{ l.id }}">
+      <div class="path-top">
+        <span class="path-letter">{{ l.chapter }}</span>
+        <span class="path-mins">{{ l.minutes }} Min</span>
+      </div>
+      <h3>{{ l.title }}</h3>
+      <p class="path-goals">{{ l.goal }}</p>
+      <div class="path-meta">
+        <span>{{ l.steps|length }} Schritte</span>
+        {% if l.challenge %}<span>Challenge</span>{% endif %}
+        <span class="path-state">Offen</span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+<section id="wmx-home">
+  <div class="section-head">
+    <h2>WMX Datenmodell</h2>
+    <p class="muted">Zweiter Skill-Tree: FlowApp/WMX-Einarbeitung auf dem echten Übungs-Schema. SQL-Grundlagen zuerst — du kannst den Bereich trotzdem öffnen.</p>
+  </div>
+  {% for track in tracks %}
+  <div class="section-head">
+    <h3>{{ track.label }}</h3>
     <p class="muted">{{ track.blurb }}</p>
   </div>
   <div class="path">
@@ -79,6 +110,6 @@
     </a>
     {% endfor %}
   </div>
+  {% endfor %}
 </section>
-{% endfor %}
 {% endblock %}
