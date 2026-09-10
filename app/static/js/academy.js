@@ -210,7 +210,7 @@ function initAcademy() {
 
   function successCard(gain, note) {
     const concepts = step().concepts || lesson.concepts || [];
-    const chips = concepts.map((c) => `<span>${ui().esc(c)} Mastery +${gain.delta}%</span>`).join("");
+    const chips = concepts.map((c) => `<span>${ui().esc(c)} Mastery +${gain.delta}%</span>`).join(" · ");
     const next = index < steps.length - 1;
     const nextLesson = root.dataset.nextId;
     return `<div class="success-card">
