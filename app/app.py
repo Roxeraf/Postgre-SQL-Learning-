@@ -76,8 +76,8 @@ for lesson in LESSONS:
 TRACKS = [
     {
         "id": "einstieg",
-        "label": "Einstieg A–J",
-        "blurb": "Grundlagen, Umgebung, Datenmodell und Arbeitsregeln aus der Einarbeitung.",
+        "label": "Einstieg · SQL, A–J",
+        "blurb": "Zuerst SELECT und JOINs, dann Grundlagen, Umgebung, Datenmodell und Arbeitsregeln aus der Einarbeitung.",
         "lessons": [l for l in LESSONS if l.get("track") == "einstieg"],
     },
     {
@@ -360,16 +360,22 @@ def friendly_sql_error(err: str, sql: str) -> str:
     low = (err or "").lower()
     hints = []
     if re.search(r"select\s+from\b", strip_sql_line_comments(sql or ""), re.I) or has_empty_select_list(sql or ""):
-                hints.append(
-                    "Die SELECT-Liste ist noch leer. Die Bausteine über dem Editor anklicken — sie landen nach SELECT."
-                )
+        hints.append(
+                "Die SELECT-Liste ist noch leer. Rechts eine Spalte anklicken — sie landet in der Lücke nach SELECT."
+        )
     elif "syntax error at end of input" in low:
         hints.append("Die Abfrage ist unvollständig. Prüfe SELECT-Liste, FROM und schließende Klammern.")
     elif "does not exist" in low:
-        hints.append(
-            "Tabellen immer voll qualifiziert: instance_1.flowapp_demo_<name>. "
-            "Rechts im Schema den deutschen Namen suchen und die Tabelle anklicken."
-        )
+        if "column" in low:
+            hints.append(
+                "Diese Spalte gibt es so nicht. Namen rechts im Schema prüfen — "
+                "zwischen zwei Spalten gehört ein Komma (order_number, task_status)."
+            )
+        else:
+            hints.append(
+                "Tabellen immer voll qualifiziert: instance_1.flowapp_demo_<name>. "
+                "Rechts im Schema den deutschen Namen suchen und die Tabelle anklicken."
+            )
     elif "statement timeout" in low or "canceling statement" in low:
         hints.append("Die Abfrage lief zu lange und wurde abgebrochen. Prüfe JOINs ohne ON-Bedingung.")
     if hints:
@@ -383,7 +389,7 @@ def run_sql(sql: str):
     if not raw:
         return {"ok": False, "error": "Bitte gib eine SQL-Abfrage ein.", "columns": None, "rows": None}
 
-    if FORBIDDEN_KEYWORDS.search(raw):
+    if FORBIDDEN_KEYWORDS.search(strip_sql_line_comments(raw)):
         return {
             "ok": False,
             "error": (
@@ -403,8 +409,7 @@ def run_sql(sql: str):
         return {
             "ok": False,
             "error": (
-                "Die SELECT-Liste ist noch leer. Die Bausteine über dem Editor anklicken "
-                "— sie landen nach SELECT."
+                "Die SELECT-Liste ist noch leer. Rechts eine Spalte anklicken — sie landet in der Lücke nach SELECT."
             ),
             "columns": None,
             "rows": None,
@@ -685,14 +690,8 @@ def sql_requirement_coach(sql: str, exercise: dict):
 def empty_select_coach(exercise: dict) -> str:
     look = exercise.get("look") or []
     hint = (exercise.get("hints") or [None])[0]
-    parts = [
-        "Die SELECT-Liste ist noch leer. Die Bausteine über dem Editor anklicken — "
-        "sie landen nach SELECT."
-    ]
-    trick = exercise.get("trick")
-    if trick:
-        parts.append(trick)
-    elif look:
+    parts = ["Die SELECT-Liste ist noch leer. Rechts eine Spalte anklicken — sie landet in der Lücke nach SELECT."]
+    if look:
         parts.append(look[0])
     elif hint:
         parts.append(hint)
