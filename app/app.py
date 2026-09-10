@@ -395,6 +395,16 @@ def restore_learn_schema():
     return True, "Lern-Datenbank ist wieder im Ausgangszustand."
 
 
+def _restore_error():
+    ok, message = restore_learn_schema()
+    if ok:
+        return None
+    return {
+        "ok": False,
+        "error": "Die Übungsdatenbank konnte nicht zurückgesetzt werden: " + (message or ""),
+    }
+
+
 def reset_learning_db():
     return restore_learn_schema()
 
@@ -673,7 +683,9 @@ def _fail_payload(user_sql, step, user):
 
 
 def academy_write_check(user_sql, step):
-    restore_learn_schema()
+    err = _restore_error()
+    if err:
+        return err
     try:
         sol = run_sql(step["solution"], allow_write=True)
         if not sol["ok"]:
@@ -682,7 +694,9 @@ def academy_write_check(user_sql, step):
         if not expected["ok"]:
             return {"ok": False, "error": "Interner Fehler in der Prüfung: " + (expected.get("error") or "")}
 
-        restore_learn_schema()
+        err = _restore_error()
+        if err:
+            return err
         user = run_sql(user_sql, allow_write=True)
         if user.get("empty_select") or not user["ok"]:
             return _fail_payload(user_sql, step, user)
@@ -714,6 +728,10 @@ def api_academy_check():
 
     sql = data.get("sql") or ""
     allow_write = bool(step.get("allow_write") or step.get("verify"))
+
+    err = _restore_error()
+    if err:
+        return jsonify(err)
 
     if step.get("check") == "explain":
         user = run_sql(sql, allow_write=False)

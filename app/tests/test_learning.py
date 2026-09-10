@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -171,6 +172,68 @@ class AcademyContentTests(unittest.TestCase):
         self.assertGreaterEqual(len(writes), 3)
         for step in writes:
             self.assertTrue(step.get("verify"), step["title"])
+
+
+class AcademyCheckRestoreTests(unittest.TestCase):
+    def test_failed_restore_blocks_write_check(self):
+        import app as flask_app
+
+        with patch.object(flask_app, "restore_learn_schema", return_value=(False, "kein Init-SQL")):
+            result = flask_app.academy_write_check(
+                "INSERT INTO stock (id, item, quantity, weight) VALUES (8, 'Karton H', 4, 18);",
+                {
+                    "solution": "INSERT INTO stock (id, item, quantity, weight) VALUES (8, 'Karton H', 4, 18);",
+                    "verify": "SELECT * FROM stock WHERE id = 8",
+                },
+            )
+        self.assertFalse(result["ok"])
+        self.assertIn("kein Init-SQL", result["error"])
+
+    def test_select_check_resets_schema_first(self):
+        import app as flask_app
+
+        client = flask_app.app.test_client()
+        ok_result = {
+            "ok": True,
+            "columns": ["*"],
+            "rows": [{"id": 1, "order_number": 4711, "client": "Helio", "status": "offen"}],
+            "empty_select": False,
+            "error": None,
+            "messages": [],
+        }
+        calls = []
+
+        def restore():
+            calls.append("restore")
+            return True, "ok"
+
+        def run_sql(*_a, **_k):
+            calls.append("run")
+            return ok_result
+
+        with patch.object(flask_app, "restore_learn_schema", side_effect=restore):
+            with patch.object(flask_app, "run_sql", side_effect=run_sql):
+                resp = client.post(
+                    "/api/academy/check",
+                    json={"lesson_id": "ch1", "step": 3, "sql": "SELECT * FROM orders"},
+                )
+        data = resp.get_json()
+        self.assertTrue(data["ok"])
+        self.assertIn("restore", calls)
+        self.assertEqual(calls[0], "restore")
+
+    def test_select_check_surfaces_restore_failure(self):
+        import app as flask_app
+
+        client = flask_app.app.test_client()
+        with patch.object(flask_app, "restore_learn_schema", return_value=(False, "boom")):
+            resp = client.post(
+                "/api/academy/check",
+                json={"lesson_id": "ch1", "step": 3, "sql": "SELECT order_number FROM orders"},
+            )
+        data = resp.get_json()
+        self.assertFalse(data["ok"])
+        self.assertIn("boom", data["error"])
 
 
 class NoCustomerNamesTests(unittest.TestCase):
