@@ -291,9 +291,15 @@ def friendly_sql_error(err: str, sql: str, sandbox: str = "wmx") -> str:
             return diagnose_structure(sql, "SELECT * FROM orders")
         return "Die Abfrage hat einen Syntaxfehler." + hint + " Lies die Query wie eine Frage: Was? Woher? Welche?"
     if "does not exist" in low and "column" in low:
+        extra = (
+            " Zwischen zwei Spalten gehört ein Komma (`order_number, task_status`)."
+            if sandbox != "learn"
+            else ""
+        )
         return (
             "Eine Spalte in deiner Abfrage gibt es in dieser Tabelle nicht. "
             "Schau in der Tabelle nach den genauen Namen — Groß/Kleinschreibung und Tippfehler zählen."
+            + extra
         )
     if "does not exist" in low:
         if sandbox == "learn":

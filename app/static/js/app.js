@@ -315,6 +315,17 @@ function activeSqlEditor(preferred) {
   );
 }
 
+function flashEditor(editor) {
+  editor.classList.remove("just-inserted");
+  void editor.offsetWidth;
+  editor.classList.add("just-inserted");
+  window.setTimeout(() => editor.classList.remove("just-inserted"), 800);
+}
+
+function isSqlIdent(text) {
+  return /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)*$/.test(text);
+}
+
 function isInsideSqlCommentOrString(sql, index) {
   let i = 0;
   let inSingle = false;
@@ -350,7 +361,7 @@ function sqlKeywordSpans(sql, keyword) {
 }
 
 function selectListIsEmpty(text) {
-  return !text.replace(/--[^\n]*/g, "").replace(/\s+/g, "");
+  return !String(text || "").replace(/--[^\n]*/g, "").replace(/\s+/g, "");
 }
 
 function selectLists(sql) {
@@ -373,272 +384,195 @@ function selectLists(sql) {
   return lists;
 }
 
-function flashEditor(editor) {
-  editor.classList.remove("just-inserted");
-  void editor.offsetWidth;
-  editor.classList.add("just-inserted");
-  window.setTimeout(() => editor.classList.remove("just-inserted"), 800);
+function namesInSelectList(text) {
+  return String(text || "")
+    .replace(/--[^\n]*/g, " ")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
 }
 
-function insertAfterNeedle(editor, needle, text) {
-  const sql = editor.value;
-  const key = String(needle || "");
-  if (!key) return false;
-  let idx = -1;
-  let from = sql.length;
-  while (from > 0) {
-    const found = sql.lastIndexOf(key, from - 1);
-    if (found < 0) break;
-    const at = found + key.length;
-    const next = sql[at] || "";
-    const danglingDot = key.endsWith(".");
-    if (!danglingDot || !next || /[\s;]/.test(next)) {
-      idx = found;
+function selectItemBare(name) {
+  return String(name || "")
+    .replace(/--[^\n]*/g, " ")
+    .trim()
+    .split(/\s+as\s+/i)[0]
+    .trim()
+    .replace(/[(),]/g, " ")
+    .trim()
+    .split(/\s+/)
+    .pop()
+    .split(".")
+    .pop()
+    .toLowerCase();
+}
+
+function selectListHasColumn(text, col) {
+  const want = selectItemBare(col);
+  if (!want) return false;
+  return namesInSelectList(text).some((n) => selectItemBare(n) === want);
+}
+
+const SQL_ALIAS_STOP = /^(on|where|left|right|inner|outer|full|cross|join|select|group|order|limit|having|union|except|intersect|set|and|or|natural|using|returning|window|fetch|offset|for|when|then|else|end|distinct|all|as|with|from)$/i;
+
+function tableShortFromQualified(name) {
+  let short = String(name || "").split(".").pop().toLowerCase();
+  for (const prefix of ["flowapp_demo_", "flowapp_13d663_"]) {
+    if (short.startsWith(prefix)) {
+      short = short.slice(prefix.length);
       break;
     }
-    from = found;
   }
-  if (idx < 0) return false;
-  const at = idx + key.length;
-  const rest = sql.slice(at);
-  let insert = String(text);
-  if (rest.replace(/^\s+/, "").toLowerCase().startsWith(insert.toLowerCase())) {
-    flashEditor(editor);
-    return true;
+  return short;
+}
+
+function fromSegmentForSelectList(sql, list) {
+  const start = list.end;
+  let depth = 0;
+  let end = sql.length;
+  for (let i = start; i < sql.length; i += 1) {
+    const ch = sql[i];
+    if (ch === "(") depth += 1;
+    else if (ch === ")") {
+      if (depth === 0) {
+        end = i;
+        break;
+      }
+      depth -= 1;
+    }
   }
-  const needsSpace = /=\s*$/.test(key) || /^(WHERE|AND|ON)\s*$/i.test(key.trim());
-  if (needsSpace && insert && !/^\s/.test(insert)) insert = ` ${insert}`;
-  editor.value = sql.slice(0, at) + insert + sql.slice(at);
-  const pos = at + insert.length;
-  lastEditor = editor;
-  if (!editor.closest(".sql-raw") || editor.closest(".sql-raw").open) {
+  const stops = sqlKeywordSpans(sql, "WHERE")
+    .concat(sqlKeywordSpans(sql, "GROUP"))
+    .concat(sqlKeywordSpans(sql, "ORDER"))
+    .concat(sqlKeywordSpans(sql, "LIMIT"))
+    .concat(sqlKeywordSpans(sql, "HAVING"))
+    .concat(sqlKeywordSpans(sql, "UNION"))
+    .filter((item) => item.index > start && item.index < end)
+    .sort((a, b) => a.index - b.index);
+  if (stops.length) end = Math.min(end, stops[0].index);
+  return { start, end, text: sql.slice(start, end) };
+}
+
+function aliasesInFromSegment(sql, list) {
+  const map = {};
+  if (!list) return map;
+  const segment = fromSegmentForSelectList(sql, list).text.replace(/--[^\n]*/g, " ");
+  const re = /\b(?:FROM|JOIN)\s+((?:[A-Za-z_][\w]*\.)?[A-Za-z_][\w]*)\s+(?:AS\s+)?([A-Za-z_][\w]*)/gi;
+  let match;
+  while ((match = re.exec(segment))) {
+    const alias = match[2];
+    if (SQL_ALIAS_STOP.test(alias)) continue;
+    const short = tableShortFromQualified(match[1]);
+    if (!map[short]) map[short] = [];
+    if (!map[short].includes(alias)) map[short].push(alias);
+  }
+  return map;
+}
+
+function qualifyColumn(col, tableShort, sql, list) {
+  if (!tableShort || !isSqlIdent(col)) return col;
+  const aliases = aliasesInFromSegment(sql, list);
+  const hits = aliases[String(tableShort).toLowerCase()] || [];
+  if (hits.length === 1) return `${hits[0]}.${col}`;
+  return col;
+}
+
+function showSchemaInsert(text) {
+  const rail = document.getElementById("schema-rail");
+  if (!rail) return;
+  let status = rail.querySelector(".schema-insert-status");
+  if (!status) {
+    status = document.createElement("p");
+    status.className = "schema-insert-status";
+    const head = rail.querySelector(".schema-rail-head");
+    (head || rail).insertAdjacentElement("afterend", status);
+  }
+  status.textContent = `Eingefügt: ${text}`;
+}
+
+function insertIntoSelectList(editor, list, col) {
+  if (selectListHasColumn(list.text, col)) {
     editor.focus();
-    editor.selectionStart = editor.selectionEnd = pos;
-  }
-  flashEditor(editor);
-  announceFill(editor, `${text} eingesetzt`);
-  return true;
-}
-
-function insertPiece(editor, pieceEl) {
-  const text = pieceEl.dataset.insert || "";
-  const into = pieceEl.dataset.into || "select";
-  if (into === "after") {
-    if (insertAfterNeedle(editor, pieceEl.dataset.after || "", text)) {
-      syncSqlFill(editor.closest(".exercise"));
-      return true;
-    }
-  }
-  if (insertColumnIntoSelect(editor, text)) {
-    syncSqlFill(editor.closest(".exercise"));
-    return true;
-  }
-  insertAtCursor(text, editor);
-  syncSqlFill(editor.closest(".exercise"));
-  return true;
-}
-
-function announceFill(editor, message) {
-  const status = editor?.closest(".exercise")?.querySelector(".sql-fill-status");
-  if (!status) return;
-  status.hidden = false;
-  status.textContent = message;
-}
-
-function pieceLabel(pieceEl) {
-  const text = [...pieceEl.childNodes]
-    .filter((n) => n.nodeType === 3)
-    .map((n) => n.textContent)
-    .join("")
-    .trim();
-  return text || pieceEl.dataset.insert || "";
-}
-
-function findDanglingNeedle(sql, key) {
-  if (!key) return -1;
-  let from = sql.length;
-  while (from > 0) {
-    const found = sql.lastIndexOf(key, from - 1);
-    if (found < 0) break;
-    const at = found + key.length;
-    const next = sql[at] || "";
-    if (!key.endsWith(".") || !next || /[\s;]/.test(next)) return found;
-    from = found;
-  }
-  return -1;
-}
-
-function sqlHasInsertAfter(sql, needle, insert) {
-  let from = sql.length;
-  const want = String(insert);
-  while (from > 0) {
-    const found = sql.lastIndexOf(needle, from - 1);
-    if (found < 0) break;
-    const at = found + needle.length;
-    const next = sql[at] || "";
-    if (needle.endsWith(".") && next && !/[\s;]/.test(next) && !next.toLowerCase().startsWith(want.toLowerCase())) {
-      from = found;
-      continue;
-    }
-    return sql.slice(at).replace(/^\s+/, "").toLowerCase().startsWith(want.toLowerCase());
-  }
-  return false;
-}
-
-function pieceIsFilled(sql, pieceEl) {
-  const insert = pieceEl.dataset.insert || "";
-  if (!insert) return false;
-  if ((pieceEl.dataset.into || "select") === "after") {
-    return sqlHasInsertAfter(sql, pieceEl.dataset.after || "", insert);
-  }
-  return selectLists(sql).some((list) =>
-    list.text.replace(/--[^\n]*/g, " ").toLowerCase().includes(insert.toLowerCase())
-  );
-}
-
-function collectGaps(sql, pieces) {
-  const gaps = [];
-  const selectPieces = pieces.filter((p) => (p.dataset.into || "select") !== "after");
-  const afterPieces = pieces.filter((p) => (p.dataset.into || "select") === "after");
-  const unfilledSelect = selectPieces.filter((p) => !pieceIsFilled(sql, p));
-  if (unfilledSelect.length) {
-    const lists = selectLists(sql);
-    const target = lists.find((list) => selectListIsEmpty(list.text)) || lists[lists.length - 1];
-    if (target) {
-      const empty = selectListIsEmpty(target.text);
-      gaps.push({
-        start: empty ? target.start : target.end,
-        end: empty ? target.end : target.end,
-        step: pieces.indexOf(unfilledSelect[0]) + 1,
-        slot: "SELECT",
-        hint: unfilledSelect.map(pieceLabel).join(" · "),
-        piece: unfilledSelect[0],
-        prefix: empty ? "" : ", ",
-      });
-    }
-  }
-  afterPieces.forEach((p) => {
-    if (pieceIsFilled(sql, p)) return;
-    const needle = p.dataset.after || "";
-    const idx = findDanglingNeedle(sql, needle);
-    if (idx < 0) return;
-    gaps.push({
-      start: idx + needle.length,
-      end: idx + needle.length,
-      step: pieces.indexOf(p) + 1,
-      slot: (p.dataset.slot || "JOIN").toUpperCase(),
-      hint: pieceLabel(p),
-      piece: p,
-      prefix: /=\s*$/.test(needle) ? " " : "",
-    });
-  });
-  return gaps.sort((a, b) => a.start - b.start);
-}
-
-function prettyChunk(text) {
-  return esc(text)
-    .replace(/instance_1\.flowapp_demo_/g, '<span class="sql-prefix" title="instance_1.flowapp_demo_">…</span>')
-    .replace(
-      /\b(SELECT|FROM|WHERE|JOIN|LEFT|RIGHT|INNER|OUTER|ON|AND|OR|NOT|NULL|AS|WITH|INSERT|UPDATE|DELETE|BEGIN|COMMIT|ROLLBACK|LIMIT|ORDER|BY|GROUP|HAVING|DISTINCT|CASE|WHEN|THEN|ELSE|END)\b/gi,
-      '<span class="kw">$1</span>'
-    );
-}
-
-function syncSqlFill(exerciseEl) {
-  if (!exerciseEl) return;
-  const editor = exerciseEl.querySelector(".sql-editor");
-  const view = exerciseEl.querySelector(".sql-fill");
-  if (!editor || !view) return;
-  const sql = editor.value;
-  const pieces = [...exerciseEl.querySelectorAll(".piece-chip")];
-  pieces.forEach((p) => p.classList.toggle("is-used", pieceIsFilled(sql, p)));
-  const left = pieces.filter((p) => !p.classList.contains("is-used")).length;
-  const doLine = exerciseEl.querySelector(".sql-do");
-  if (doLine) {
-    doLine.textContent = pieces.length
-      ? left
-        ? `${left} gelbe ${left === 1 ? "Lücke" : "Lücken"} — Baustein mit derselben Nummer klicken.`
-        : "Alle Lücken voll. Jetzt Ausführen, danach Stimmt das?"
-      : "SQL unten anpassen, dann Ausführen.";
-    doLine.classList.toggle("is-done", pieces.length > 0 && !left);
-  }
-  const raw = exerciseEl.querySelector(".sql-raw");
-  if (raw && !pieces.length) raw.open = true;
-  let startAt = 0;
-  const lead = sql.match(/^(?:[ \t]*--[^\n]*\n|[ \t]*\n)+/);
-  if (lead) startAt = lead[0].length;
-  const gaps = collectGaps(sql, pieces).filter((g) => g.end >= startAt);
-  let html = "";
-  let cursor = startAt;
-  gaps.forEach((g) => {
-    if (g.start < cursor) return;
-    html += prettyChunk(sql.slice(cursor, g.start));
-    const idx = pieces.indexOf(g.piece);
-    const emptySelect = g.slot === "SELECT" && g.end > g.start;
-    const gapBtn =
-      `<button type="button" class="sql-gap" data-piece-index="${idx}">` +
-      `<span class="sql-gap-n">${g.step}</span>` +
-      `<span class="sql-gap-h">${esc(g.hint)}</span></button>`;
-    html += emptySelect ? `\n  ${gapBtn}\n` : `${g.prefix || ""}${gapBtn}`;
-    cursor = Math.max(g.end, g.start);
-  });
-  html += prettyChunk(sql.slice(cursor));
-  view.innerHTML = html || prettyChunk(sql.slice(startAt) || sql);
-}
-
-function insertColumnIntoSelect(editor, col) {
-  const sql = editor.value;
-  const lists = selectLists(sql);
-  if (!lists.length) return false;
-  const cursor = editor.selectionStart ?? 0;
-  let target = lists.find((list) => cursor >= list.start && cursor <= list.end);
-  if (!target) target = lists.find((list) => selectListIsEmpty(list.text)) || lists[lists.length - 1];
-  const existing = target.text.replace(/--[^\n]*/g, " ").replace(/\s+/g, " ");
-  const needle = String(col).replace(/\s+/g, " ");
-  if (existing.toLowerCase().includes(needle.toLowerCase())) {
     flashEditor(editor);
-    return true;
+    showSchemaInsert(col);
+    return;
   }
-  let newList;
-  if (selectListIsEmpty(target.text)) {
-    newList = `\n  ${col}\n`;
-  } else {
-    let body = target.text.replace(/\s+$/, "");
-    if (!/,\s*$/.test(body)) body += ",";
-    newList = `${body}\n  ${col}\n`;
+  const names = namesInSelectList(list.text);
+  let body = list.text.replace(/\s+$/, "");
+  if (names.length) {
+    const codeTail = body.replace(/--[^\n]*$/, "").replace(/\s+$/, "");
+    if (!/,\s*$/.test(codeTail)) body += ",";
   }
-  editor.value = sql.slice(0, target.start) + newList + sql.slice(target.end);
-  const pos = target.start + newList.length;
+  const newList = `${body}\n  ${col}\n`;
+  editor.value = editor.value.slice(0, list.start) + newList + editor.value.slice(list.end);
+  const pos = list.start + newList.length;
   lastEditor = editor;
-  if (!editor.closest(".sql-raw") || editor.closest(".sql-raw").open) {
-    editor.focus();
-    editor.selectionStart = editor.selectionEnd = pos;
-  }
+  editor.focus();
+  editor.selectionStart = editor.selectionEnd = pos;
   flashEditor(editor);
-  announceFill(editor, `${col} eingesetzt`);
-  return true;
+  showSchemaInsert(col);
 }
 
-function insertAtCursor(text, editorEl) {
+function placeCaretInEmptySelect(editor) {
+  if (!editor) return;
+  const empty = selectLists(editor.value).find((list) => selectListIsEmpty(list.text));
+  if (!empty) return;
+  const pos = empty.start + empty.text.replace(/\s+$/, "").length;
+  editor.selectionStart = editor.selectionEnd = pos;
+}
+
+function insertAtCursor(text, editorEl, tableShort) {
   const editor = activeSqlEditor(editorEl);
   if (!editor) {
     navigator.clipboard?.writeText(text);
     return;
   }
   lastEditor = editor;
-  const ident = /^[A-Za-z_][A-Za-z0-9_]*$/.test(text);
-  const qualified = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$/.test(text);
-  if ((ident || text.includes(" ") || text.includes(">") || text.includes("(")) && insertColumnIntoSelect(editor, text)) return;
-  if (qualified && editor.value.toLowerCase().includes(text.toLowerCase())) {
-    flashEditor(editor);
-    return;
+  const lists = selectLists(editor.value);
+  let start = editor.selectionStart ?? 0;
+  let end = editor.selectionEnd ?? start;
+  const focused = document.activeElement === editor;
+  const caretParked = start === 0 && end === 0;
+  const useDefaultSlot = !focused || caretParked;
+  const ident = isSqlIdent(text);
+  const inList = lists.find((list) => start >= list.start && start <= list.end);
+  const empty = lists.find((list) => selectListIsEmpty(list.text));
+  const qualifyAgainst = inList || empty || (lists.length === 1 ? lists[0] : null);
+  const insertText = ident ? qualifyColumn(text, tableShort, editor.value, qualifyAgainst) : String(text);
+
+  if (ident && lists.length) {
+    if (inList) {
+      const beforeCaret = editor.value.slice(inList.start, start);
+      const intoFn = /\(\s*$/.test(beforeCaret.replace(/--[^\n]*$/, "").replace(/\s+$/, ""));
+      if (!intoFn) {
+        insertIntoSelectList(editor, inList, insertText);
+        return;
+      }
+    }
+    if (empty && useDefaultSlot) {
+      insertIntoSelectList(editor, empty, insertText);
+      return;
+    }
+    if (useDefaultSlot && lists.length === 1) {
+      insertIntoSelectList(editor, lists[0], insertText);
+      return;
+    }
   }
-  const start = editor.selectionStart ?? editor.value.length;
-  const end = editor.selectionEnd ?? start;
-  editor.value = editor.value.slice(0, start) + text + editor.value.slice(end);
+
+  if (useDefaultSlot) {
+    start = end = editor.value.length;
+  }
+
+  let insert = insertText;
+  const before = editor.value.slice(0, start);
+  if (ident && /[A-Za-z0-9_]$/.test(before.replace(/\s+$/, "")) && !/,\s*$/.test(before) && !/\($/.test(before.replace(/\s+$/, ""))) {
+    insert = `, ${insertText}`;
+  }
+  editor.value = editor.value.slice(0, start) + insert + editor.value.slice(end);
   editor.focus();
-  editor.selectionStart = editor.selectionEnd = start + text.length;
+  editor.selectionStart = editor.selectionEnd = start + insert.length;
   flashEditor(editor);
+  showSchemaInsert(insertText);
 }
 
 async function postJson(url, body, timeoutMs = 15000) {
@@ -735,7 +669,7 @@ function initSchema() {
           ${t.columns
             .map((c) =>
               insertable
-                ? `<button class="schema-col" type="button" data-insert="${c.name}">
+                ? `<button class="schema-col" type="button" data-insert="${esc(c.name)}" data-table="${esc(t.short)}">
               <span>${esc(c.name)}</span><span class="schema-type">${esc(c.type)}</span>
             </button>`
                 : `<div class="schema-col is-static">
@@ -764,7 +698,7 @@ function initSchema() {
     if (!railList) return;
     const shorts = !railShowAll && railShorts ? new Set(railShorts) : null;
     const filtered = shorts ? tables.filter((t) => shorts.has(t.short)) : tables;
-    railList.innerHTML = filtered.map((t) => tableCard(t, { open: false, insertable: false })).join("") || '<p class="muted">Keine Tabellen zu dieser Übung.</p>';
+    railList.innerHTML = filtered.map((t) => tableCard(t, { open: Boolean(shorts), insertable: true })).join("") || '<p class="muted">Keine Tabellen zu dieser Übung.</p>';
     const need = document.getElementById("schema-rail-need");
     if (need) {
       const needTables = railShorts ? tables.filter((t) => railShorts.includes(t.short)) : [];
@@ -824,7 +758,7 @@ function initSchema() {
     if (insert) {
       e.preventDefault();
       e.stopPropagation();
-      insertAtCursor(insert.dataset.insert);
+      insertAtCursor(insert.dataset.insert, null, insert.dataset.table);
       return;
     }
     const preview = e.target.closest("[data-preview-table]");
@@ -962,7 +896,7 @@ function initLesson() {
 
 const PHASE_HINTS = {
   learn: "Lies den Abschnitt. Unten auf Weiter — nicht die ganze Lektion auf einmal.",
-  practice: "Gelbe Felder im SQL sind Lücken. Baustein mit derselben Nummer klicken, dann Ausführen.",
+  practice: "Rechts Tabelle aufklappen, Spalte klicken, Ausführen, dann Stimmt das?.",
   quiz: "Eine Antwort wählen — danach kommt die Erklärung. Falsch ist ok.",
 };
 
@@ -993,7 +927,13 @@ function showExercise(idx, opts = {}) {
       })
       .join("");
   }
-  syncSqlFill(all[practiceIndex]);
+  if (opts.focus) {
+    const editor = all[practiceIndex].querySelector(".sql-editor");
+    if (editor) {
+      editor.focus();
+      placeCaretInEmptySelect(editor);
+    }
+  }
 }
 
 function focusExercise(exerciseEl) {
@@ -1030,9 +970,13 @@ function initExercises(lessonId, exerciseCount, quizCount) {
     let hintLevel = 0;
     lastEditor = lastEditor || editor;
 
+    const guide = exerciseEl.querySelector(".exercise-guide");
     if (state.exercises[exerciseId]) {
       exerciseEl.classList.add("is-ok");
       if (badge) badge.textContent = "Gelöst";
+      if (guide) guide.open = false;
+    } else if (guide) {
+      guide.open = true;
     }
 
     const runAction = async (action) => {
@@ -1085,6 +1029,7 @@ function initExercises(lessonId, exerciseCount, quizCount) {
           if (data.correct) {
             exerciseEl.classList.add("is-ok");
             if (badge) badge.textContent = "Gelöst";
+            if (guide) guide.open = false;
             const s = loadStore();
             lessonState(s, lessonId).exercises[exerciseId] = true;
             saveStore(s);
@@ -1124,35 +1069,16 @@ function initExercises(lessonId, exerciseCount, quizCount) {
         showExercise(practiceIndex + 1, { focus: true });
         return;
       }
-      const gap = e.target.closest(".sql-gap");
-      if (gap) {
-        e.preventDefault();
-        const piece = exerciseEl.querySelectorAll(".piece-chip")[Number(gap.dataset.pieceIndex)];
-        if (piece) {
-          piece.classList.add("is-flash");
-          window.setTimeout(() => piece.classList.remove("is-flash"), 700);
-          insertPiece(editor, piece);
-        }
-        return;
-      }
-      const piece = e.target.closest(".piece-chip");
-      if (piece) {
-        e.preventDefault();
-        insertPiece(editor, piece);
-        return;
-      }
       if (e.target.closest("[data-ex-prev], [data-ex-next], [data-goto-quiz], .ex-dot")) return;
       focusExercise(exerciseEl);
     });
     exerciseEl.addEventListener("focusin", () => focusExercise(exerciseEl));
-    editor.addEventListener("input", () => syncSqlFill(exerciseEl));
     editor.addEventListener("keydown", (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
         e.preventDefault();
         runAction("run");
       }
     });
-    syncSqlFill(exerciseEl);
   });
 
   document.getElementById("ex-stepper")?.addEventListener("click", (e) => {

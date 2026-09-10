@@ -4,11 +4,13 @@ Zwei Lernpfade in einer App:
 
 1. **SQL Grundlagen** — interaktiver Trainer für komplette Anfänger
    (verstehen → vorhersagen → bauen → schreiben → anwenden)
-2. **WMX Datenmodell** — bestehende Einarbeitung A–P gegen das FlowApp-Übungsschema
+2. **WMX Datenmodell** — Einarbeitung gegen das FlowApp-Übungsschema:
+   SQL-Grundlagen (SELECT, JOINs) auf WMX-Tabellen, danach Teile A–P plus Glossar
 
 Die Datei `PostgreSQL_FlowApp_Einarbeitung.docx` bleibt die Wissensbasis für den WMX-Pfad.
 
 - **SQL-Akademie:** Kapitel 0–6 plus Challenge, mit Explain / Predict / Build / Write
+- **WMX-Lektionen:** 17 Einheiten (SELECT/JOINs auf dem Demo-Schema, Einstieg A–J, Vertiefung K–P)
 - **SQL-Übungen im Browser** gegen isoliertes Schema `learn` (nur SELECT) und gegen `instance_1` (WMX)
 - **Kurz-Quiz und Karteikarten** (WMX)
 - **Durchsuchbare Wissensbasis** (`/wissen`)

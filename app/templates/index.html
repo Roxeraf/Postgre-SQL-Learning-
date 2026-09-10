@@ -83,8 +83,35 @@
 <section id="wmx-home">
   <div class="section-head">
     <h2>WMX Datenmodell</h2>
-    <p class="muted">Zweiter Skill-Tree: FlowApp/WMX-Einarbeitung auf dem echten Übungs-Schema. SQL-Grundlagen zuerst — du kannst den Bereich trotzdem öffnen.</p>
+    <p class="muted">Zweiter Skill-Tree: zuerst SELECT/JOINs auf den WMX-Übungstabellen, danach Teile A–P. Die Akademie oben braucht das nicht — du kannst den Bereich trotzdem öffnen.</p>
   </div>
+  <section class="card howto">
+    <h2>So arbeitest du in den WMX-Lektionen</h2>
+    <ol class="howto-steps howto-flow">
+      <li>
+        <span class="howto-num">1</span>
+        <div>
+          <strong>Verstehen</strong>
+          <p>Jede Lektion startet mit kurzen Abschnitten. Nicht scrollen und überfliegen — unten auf Weiter, dann die nächste Idee.</p>
+        </div>
+      </li>
+      <li>
+        <span class="howto-num">2</span>
+        <div>
+          <strong>Eine SQL-Aufgabe</strong>
+          <p>Du siehst immer nur eine Aufgabe. Rechts die Tabelle aufklappen, Spalte klicken (füllt die Lücke), Ausführen, dann „Stimmt das?“.</p>
+        </div>
+      </li>
+      <li>
+        <span class="howto-num">3</span>
+        <div>
+          <strong>Kurzcheck</strong>
+          <p>Ein paar Fragen sichern den Abschnitt. Danach die nächste Lektion — oder in der Wissensbasis nachschlagen.</p>
+        </div>
+      </li>
+    </ol>
+    <p class="howto-foot muted">UPDATE/DELETE verdrehen die Beispieldaten. Dann in der Seitenleiste „Datenbank zurücksetzen“. Freies Rumspielen: SQL-Playground.</p>
+  </section>
   {% for track in tracks %}
   <div class="section-head">
     <h3>{{ track.label }}</h3>

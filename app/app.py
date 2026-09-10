@@ -85,8 +85,8 @@ for lesson in LESSONS:
 TRACKS = [
     {
         "id": "einstieg",
-        "label": "Einstieg A–J",
-        "blurb": "Grundlagen, Umgebung, Datenmodell und Arbeitsregeln aus der Einarbeitung.",
+        "label": "Einstieg · SQL, A–J",
+        "blurb": "Zuerst SELECT und JOINs, dann Grundlagen, Umgebung, Datenmodell und Arbeitsregeln aus der Einarbeitung.",
         "lessons": [l for l in LESSONS if l.get("track") == "einstieg"],
     },
     {
@@ -342,7 +342,7 @@ def run_sql(sql: str, sandbox: str = "wmx"):
     if not raw:
         return {"ok": False, "error": "Bitte gib eine SQL-Abfrage ein.", "columns": None, "rows": None, "pg_error": None}
 
-    if FORBIDDEN_KEYWORDS.search(raw):
+    if FORBIDDEN_KEYWORDS.search(strip_sql_line_comments(raw)):
         msg = (
             "Im Übungsbereich darfst du das Datenbank-Schema nicht ändern (kein DROP/ALTER/CREATE)."
             if sandbox == "learn"
@@ -363,8 +363,7 @@ def run_sql(sql: str, sandbox: str = "wmx"):
             "Nach SELECT fehlt noch, **was** du sehen möchtest — zum Beispiel `*` oder Spaltennamen."
             if sandbox == "learn"
             else (
-                "Die SELECT-Liste ist noch leer. Die Bausteine über dem Editor anklicken "
-                "— sie landen nach SELECT."
+                "Die SELECT-Liste ist noch leer. Rechts eine Spalte anklicken — sie landet in der Lücke nach SELECT."
             )
         )
         return {
@@ -757,14 +756,8 @@ def sql_requirement_coach(sql: str, exercise: dict):
 def empty_select_coach(exercise: dict) -> str:
     look = exercise.get("look") or []
     hint = (exercise.get("hints") or [None])[0]
-    parts = [
-        "Die SELECT-Liste ist noch leer. Die Bausteine über dem Editor anklicken — "
-        "sie landen nach SELECT."
-    ]
-    trick = exercise.get("trick")
-    if trick:
-        parts.append(trick)
-    elif look:
+    parts = ["Die SELECT-Liste ist noch leer. Rechts eine Spalte anklicken — sie landet in der Lücke nach SELECT."]
+    if look:
         parts.append(look[0])
     elif hint:
         parts.append(hint)

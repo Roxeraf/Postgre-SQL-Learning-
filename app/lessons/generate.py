@@ -25,20 +25,198 @@ def EX(id, why, task, look, starter, hints, solution, **extra):
     return data
 
 
-def P(insert, slot="SELECT", **kw):
-    """Klickbarer Baustein: slot sagt, welche Lücke gefüllt wird."""
-    into = kw.pop("into", "select" if slot == "SELECT" else "after")
-    data = {
-        "insert": insert,
-        "label": kw.pop("label", insert),
-        "slot": slot,
-        "into": into,
-    }
-    data.update(kw)
-    return data
-
-
 # ---------------------------------------------------------------------------
+L(
+    id="sql",
+    letter="SQL",
+    track="einstieg",
+    title="SQL-Grundlagen: SELECT und JOINs",
+    minutes=14,
+    goals=[
+        "SELECT, FROM und WHERE als Gerüst einer Abfrage nutzen",
+        "INNER JOIN und LEFT JOIN unterscheiden",
+        "NULL nach einem JOIN als fehlenden Treffer lesen",
+    ],
+    content="""## Was ist eine Abfrage?
+
+Eine SQL-Abfrage fragt Tabellen. Drei Bausteine reichen für den Start:
+
+- **SELECT** — welche Spalten willst du sehen?
+- **FROM** — aus welcher Tabelle?
+- **WHERE** — welche Zeilen behalten? (ohne WHERE kommen alle Zeilen)
+
+```sql
+SELECT order_number, task_status
+FROM instance_1.flowapp_demo_order_head
+WHERE order_number = '100504_A';
+```
+
+In dieser App stehen die Tabellen immer voll qualifiziert: `instance_1.flowapp_demo_…`. Rechts im Übungsteil siehst du den deutschen Namen (**Auftrag**) und darunter den technischen (`order_head`).
+
+## INNER JOIN
+
+Ein **INNER JOIN** behält nur Zeilen, die **in beiden Tabellen** einen Treffer haben.
+
+Auftrag ohne Position? Fliegt raus. Position ohne Auftrag? Fliegt raus.
+
+```sql
+SELECT oh.order_number, op.quantity
+FROM instance_1.flowapp_demo_order_head oh
+INNER JOIN instance_1.flowapp_demo_order_position op
+  ON op.order_head_id = oh.id;
+```
+
+`ON` sagt, *worüber* die Tabellen zusammengehören. Hier: die Position hängt am Auftrag (`order_head_id` = `oh.id`).
+
+In der Übungs-DB haben nur drei Aufträge Positionen — INNER JOIN liefert also drei Zeilen. `JOIN` ohne Wort davor ist dasselbe wie `INNER JOIN`.
+
+## LEFT JOIN
+
+**LEFT JOIN** (ausgeschrieben **LEFT OUTER JOIN**) behält **alle Zeilen der linken Tabelle**. Fehlt rechts ein Treffer, stehen dort **NULL**.
+
+```sql
+SELECT oh.order_number, op.quantity
+FROM instance_1.flowapp_demo_order_head oh
+LEFT JOIN instance_1.flowapp_demo_order_position op
+  ON op.order_head_id = oh.id;
+```
+
+Dieselbe Verknüpfung wie eben — aber jetzt bleiben Aufträge ohne Position in der Liste, `quantity` ist dann leer. In der Übungs-DB: sieben Aufträge, vier davon ohne Position.
+
+Im Lageralltag: Auftragsliste mit Mandant, auch wenn `client_id` fehlt. Deshalb steht bei uns fast immer **LEFT JOIN**.
+
+## RIGHT und FULL JOIN
+
+**RIGHT OUTER JOIN** ist LEFT JOIN mit vertauschten Tabellen: alle Zeilen **rechts** bleiben. Bei uns liegt der Auftrag üblicherweise links — dann schreibst du LEFT JOIN, nicht RIGHT.
+
+**FULL OUTER JOIN** behält Zeilen **beider** Seiten, auch ohne Treffer. Mandant `DEMO` hat in der Übungs-DB keinen Auftrag: ein FULL JOIN Auftrag/Mandant würde ihn trotzdem zeigen. Im Shop selten nötig; wenn, dann für Abgleiche („was hängt nirgends?“).
+
+## Welchen JOIN wann?
+
+Sprache aus dem Lager: **Auftrag**, **Mandant**, **Position**.
+
+| Ziel | JOIN |
+|---|---|
+| Nur Aufträge, die wirklich Positionen haben | **INNER JOIN** |
+| Alle Aufträge, Lücken sichtbar lassen | **LEFT JOIN** Auftrag → Position |
+| Auftrag plus Mandant, Auftrag darf nicht verschwinden | **LEFT JOIN** Auftrag → Mandant |
+| Zwei Listen vollständig gegeneinander halten | **FULL OUTER JOIN** (selten) |
+
+Faustregel: Was darf nicht verloren gehen? Das gehört **nach links**, dann LEFT JOIN.
+
+## NULL nach dem JOIN
+
+NULL heißt hier: **kein Treffer**, nicht die Zahl 0.
+
+- `quantity IS NULL` — dieser Auftrag hat keine Position.
+- `quantity = 0` — findet diese Lücken **nicht** (NULL ist nicht 0).
+- `c.code IS NULL` — dieser Auftrag hat keinen Mandanten.
+
+Die Zeile links existiert. Rechts ist die Zelle leer. Genau das willst du sehen, wenn du mit LEFT JOIN nach fehlenden Daten suchst.
+
+JOIN-Arten sitzen jetzt. Teil A nimmt Postgres-Eigenheiten (Schema, UUID, Window Functions).""",
+    exercises=[
+        EX(
+            "sql-ex1",
+            why="Bevor Joins kommen: eine Zeile gezielt finden.",
+            task="Gib Auftragsnummer und Status für den Auftrag 100504_A aus.",
+            look=[
+                "Rechts „Auftrag“ (order_head) öffnen.",
+                "SELECT: order_number und task_status.",
+                "WHERE filtert auf genau diese Auftragsnummer.",
+            ],
+            starter="-- Eine Zeile: Auftrag 100504_A.\n-- Rechts: Tabelle „Auftrag“.\n\nSELECT\n  -- Spalten einsetzen\n  \nFROM instance_1.flowapp_demo_order_head\nWHERE\n",
+            hints=[
+                "SELECT order_number, task_status — beide Spalten stehen rechts bei Auftrag.",
+                "WHERE order_number = '100504_A' — Text in einfachen Anführungszeichen.",
+            ],
+            solution="SELECT order_number, task_status FROM instance_1.flowapp_demo_order_head WHERE order_number = '100504_A';",
+        ),
+        EX(
+            "sql-ex2",
+            why="Nur Aufträge, die wirklich Positionen haben — der Rest soll nicht in der Liste stehen.",
+            task="Verknüpfe Auftrag und Position per INNER JOIN. Gib Auftragsnummer und Menge aus.",
+            look=[
+                "SELECT: oh.order_number und op.quantity.",
+                "ON op.order_head_id = oh.id — die Position hängt am Auftrag.",
+            ],
+            starter="-- Nur Treffer in beiden Tabellen.\n-- Rechts: „Auftrag“ und „Position“ (hängt am Auftrag).\n\nSELECT\n  \nFROM instance_1.flowapp_demo_order_head oh\nINNER JOIN instance_1.flowapp_demo_order_position op\n  ON \n",
+            hints=[
+                "SELECT oh.order_number, op.quantity — Alias oh und op stehen schon im FROM.",
+                "ON op.order_head_id = oh.id — nicht order_id (integer) mit id (UUID) mischen.",
+            ],
+            solution="SELECT oh.order_number, op.quantity FROM instance_1.flowapp_demo_order_head oh INNER JOIN instance_1.flowapp_demo_order_position op ON op.order_head_id = oh.id;",
+        ),
+        EX(
+            "sql-ex3",
+            why="Dieselbe Liste, aber Aufträge ohne Position sollen bleiben — Menge dann leer (NULL).",
+            task="Verknüpfe Auftrag und Position per LEFT JOIN. Gib Auftragsnummer und Menge aus.",
+            look=[
+                "Gleicher SELECT wie eben: oh.order_number, op.quantity.",
+                "ON bleibt op.order_head_id = oh.id. LEFT statt INNER hält Aufträge ohne Position.",
+            ],
+            starter="-- Alle Aufträge, auch ohne Position.\n-- Rechts: „Auftrag“ und „Position“.\n\nSELECT\n  \nFROM instance_1.flowapp_demo_order_head oh\nLEFT JOIN instance_1.flowapp_demo_order_position op\n  ON \n",
+            hints=[
+                "SELECT oh.order_number, op.quantity",
+                "ON op.order_head_id = oh.id — wer LEFT durch INNER ersetzt, verliert die Aufträge ohne Position.",
+            ],
+            solution="SELECT oh.order_number, op.quantity FROM instance_1.flowapp_demo_order_head oh LEFT JOIN instance_1.flowapp_demo_order_position op ON op.order_head_id = oh.id;",
+        ),
+    ],
+    quiz=[
+        {
+            "q": "Was bleibt bei einem INNER JOIN Auftrag → Position übrig?",
+            "options": [
+                "Alle Aufträge, Positionen ohne Treffer als NULL",
+                "Nur Aufträge, die mindestens eine Position haben",
+                "Alle Positionen, auch ohne Auftrag",
+                "Immer genau eine Zeile",
+            ],
+            "correct": 1,
+            "explain": "INNER JOIN behält nur Zeilen mit Treffer in beiden Tabellen. Auftrag ohne Position fliegt raus.",
+        },
+        {
+            "q": "Was bedeutet NULL in der Spalte der rechten Tabelle nach einem LEFT JOIN?",
+            "options": [
+                "Die Menge ist 0",
+                "Die Zeile ist gelöscht",
+                "Links gab es keine passende Zeile rechts",
+                "Der JOIN ist fehlgeschlagen und muss wiederholt werden",
+            ],
+            "correct": 2,
+            "explain": "Die linke Zeile bleibt. Rechts war kein Treffer — die Zelle ist leer (NULL), nicht 0.",
+        },
+        {
+            "q": "Du willst alle Aufträge sehen, auch ohne Mandant. Welcher JOIN?",
+            "options": [
+                "INNER JOIN",
+                "LEFT JOIN, Auftrag links",
+                "RIGHT JOIN, Mandant links",
+                "FULL JOIN ist die einzige Möglichkeit",
+            ],
+            "correct": 1,
+            "explain": "Was nicht verloren gehen darf, gehört nach links: LEFT JOIN Auftrag → Mandant. So bleibt der Auftrag, Mandanten-Spalten werden NULL.",
+        },
+        {
+            "q": "Warum schreiben wir im Shop selten RIGHT JOIN?",
+            "options": [
+                "Postgres kennt kein RIGHT JOIN",
+                "RIGHT JOIN liefert immer 0 Zeilen",
+                "Wir legen die führende Tabelle nach links und schreiben LEFT JOIN",
+                "RIGHT JOIN ignoriert die ON-Bedingung",
+            ],
+            "correct": 2,
+            "explain": "RIGHT JOIN ist LEFT JOIN mit vertauschten Seiten. Üblich: Auftrag links, dann LEFT JOIN.",
+        },
+    ],
+    flashcards=[
+        {"id": "sql-fc1", "front": "SELECT / FROM / WHERE?", "back": "SELECT = Spalten, FROM = Tabelle, WHERE = Filter. Ohne WHERE kommen alle Zeilen."},
+        {"id": "sql-fc2", "front": "INNER JOIN", "back": "Nur Zeilen mit Treffer in beiden Tabellen. JOIN ohne Zusatzwort ist INNER JOIN."},
+        {"id": "sql-fc3", "front": "LEFT JOIN", "back": "Alle Zeilen links bleiben. Kein Treffer rechts → NULL. Bei uns die übliche Form (Auftrag links)."},
+        {"id": "sql-fc4", "front": "NULL nach einem JOIN", "back": "Kein Treffer, nicht die Zahl 0. Suchen mit IS NULL, nicht mit = 0."},
+    ],
+)
+
 L(
     id="a",
     letter="A",
@@ -47,7 +225,7 @@ L(
     minutes=12,
     goals=[
         "Schema vs. Tabelle vs. vollqualifizierter Name unterscheiden",
-        "INNER JOIN vs. LEFT JOIN und UUID-vs-Integer-Fallen kennen",
+        "UUID- vs. Integer-Schlüssel nicht durcheinander joinen",
         "Window Functions und CTEs als Standardwerkzeuge nutzen",
     ],
     content="""## A.1 Was ist PostgreSQL?
@@ -85,15 +263,13 @@ FROM instance_1.flowapp_demo_order_head;
 | jsonb | binäres JSON, indexierbar | z. B. `name->>'de'` |
 | boolean | Wahr/Falsch | — |
 
-## A.4 JOINs
+## A.4 JOINs in dieser Datenbank
 
-- **INNER JOIN**: nur Zeilen mit Treffer in beiden Tabellen.
-- **LEFT JOIN**: alle Zeilen der linken Tabelle, plus Treffer rechts (sonst NULL).
-- Ein JOIN braucht eine Verknüpfungsbedingung (`ON ... = ...`) — bei uns oft über UUID-Spalten (`id`) oder fachliche Referenzfelder (Teil D.4).
+JOIN-Arten (INNER, LEFT, RIGHT, FULL) und NULL bei fehlendem Treffer stehen in den [SQL-Grundlagen](/lesson/sql). Hier die FlowApp-Falle:
 
-**Achtung:** Datentypen müssen zusammenpassen. `integer = uuid` führt zum Laufzeitfehler — ein häufiger Anfängerfehler, da manche Referenzfelder integer (z. B. `order_id`) und andere UUID (z. B. `order_head.id`) sind.
+**Datentypen müssen zusammenpassen.** `integer = uuid` führt zum Laufzeitfehler — häufig, weil manche Felder integer sind (z. B. `order_id`) und der Primärschlüssel UUID (`order_head.id`). Die Verknüpfung geht über `ON … = …`, oft UUID (`id`) oder fachliche Referenzfelder (Teil D.4).
 
-Komplettes Beispiel: Auftrag mit Mandant (LEFT JOIN, damit Aufträge ohne Mandant bleiben):
+Auftrag mit Mandant — LEFT JOIN, damit der Auftrag bleibt, falls `client_id` fehlt (in der Übungs-DB hat jeder Auftrag einen Mandanten, INNER und LEFT sind hier gleich):
 
 ```sql
 SELECT oh.order_number, c.code
@@ -140,48 +316,51 @@ Eine View ist eine gespeicherte SELECT-Abfrage. Views übernehmen **nicht automa
     exercises=[
         EX(
             "a-ex1",
-            why="Ein Kollege braucht eine einfache Auftragsliste: Nummer und Status, sonst nichts.",
-            task="Lies aus der Tabelle Auftrag die Auftragsnummer und den Status.",
+            why="Zum Schichtstart will ein Kollege nur sehen, welche Aufträge es gibt und wo sie stehen — keine Extra-Spalten.",
+            task="Zeig alle Aufträge: Nummer und Status.",
             look=[
-                "Rechts im Schema „Auftrag“ öffnen (technisch: order_head).",
-                "Die Spalten order_number und task_status anklicken — sie landen in der SELECT-Liste.",
-                "FROM ist schon vorbereitet. Du trägst nur die zwei Spalten nach SELECT ein.",
+                "Rechts „Auftrag“ aufklappen (steht unter „In dieser Aufgabe“).",
+                "order_number klicken — die Spalte landet in der Lücke nach SELECT.",
+                "Dann task_status klicken. Das Komma setzt die App.",
+                "Ausführen, danach Stimmt das?.",
             ],
-            starter="-- Alltag: Auftragsliste für einen Kollegen.\n-- Rechts: Tabelle „Auftrag“ aufklappen.\n\nSELECT\n  -- hier die zwei Spalten aus dem Schema einsetzen\n  \nFROM instance_1.flowapp_demo_order_head;\n",
+            starter="SELECT\n  \nFROM instance_1.flowapp_demo_order_head;\n",
             hints=[
-                "Rechts bei Auftrag siehst du order_number (Auftragsnummer) und task_status (Status). Kein JOIN nötig.",
+                "Bei Auftrag: order_number ist die Nummer, task_status der Status. Kein zweiter Tisch, kein Filter.",
                 "SELECT order_number, task_status FROM instance_1.flowapp_demo_order_head;",
             ],
             solution="SELECT order_number, task_status FROM instance_1.flowapp_demo_order_head;",
         ),
         EX(
             "a-ex2",
-            why="Dieselbe Liste, aber der Kollege will auch den Mandanten sehen.",
-            task="Verknüpfe Auftrag mit Mandant und gib Auftragsnummer plus Mandanten-Code aus.",
+            why="Dieselbe Liste, aber der Kollege will hinter jeder Nummer auch den Mandanten sehen.",
+            task="Zeig zu jedem Auftrag die Nummer und den Mandanten-Code.",
             look=[
-                "Baustein SELECT: order_number und code.",
-                "Baustein JOIN: c.id = oh.client_id — die Lücke nach ON.",
+                "LEFT JOIN steht schon: Auftrag bleibt, auch ohne Mandant (wie in den SQL-Grundlagen).",
+                "Rechts Auftrag aufklappen → order_number klicken. Die Tabelle heißt oh, deshalb wird oh.order_number eingefügt.",
+                "Dann Mandant aufklappen → code klicken (wird zu c.code).",
+                "In die leere Zeile nach ON klicken und schreiben: c.id = oh.client_id",
             ],
-            starter="-- Lücken mit den Bausteinen füllen (SELECT / JOIN).\n\nSELECT\n  -- Baustein SELECT\nFROM instance_1.flowapp_demo_order_head oh\nLEFT JOIN instance_1.flowapp_demo_client c\n  ON \n",
+            starter="SELECT\n  \nFROM instance_1.flowapp_demo_order_head oh\nLEFT JOIN instance_1.flowapp_demo_client c\n  ON \n",
             hints=[
-                "SELECT oh.order_number, c.code — Alias oh und c stehen schon im FROM.",
-                "ON c.id = oh.client_id — nicht client_id mit code verwechseln.",
+                "Nach SELECT gehören oh.order_number und c.code — die Kurznamen oh und c stehen schon im FROM.",
+                "ON c.id = oh.client_id — Mandanten-Schlüssel, nicht der Code.",
             ],
             solution="SELECT oh.order_number, c.code FROM instance_1.flowapp_demo_order_head oh LEFT JOIN instance_1.flowapp_demo_client c ON c.id = oh.client_id;",
         ),
         EX(
             "a-ex3",
-            why="Bestand (Quant) hat oft mehrere Zeilen pro HU-Position. Für Reports willst du nur die neueste.",
-            task="Pro handling_unit_position_id nur den neuesten Quant behalten und handling_unit_position_id, batch_a, updated_date ausgeben.",
+            why="Im Bestand stehen oft mehrere Zeilen pro Palettenfach. Der Report soll nur die aktuelle zeigen.",
+            task="Behalt pro Lagerplatz-Position nur die neueste Bestandszeile. Gib Positions-ID, Charge und Änderungsdatum aus.",
             look=[
-                "Rechts „Quant“ (stock_quant) öffnen: handling_unit_position_id, batch_a, updated_date.",
-                "Das Muster aus A.6/A.7: ROW_NUMBER in einer CTE, außen WHERE rn = 1.",
-                "PARTITION BY die Positions-ID, ORDER BY updated_date DESC (neueste zuerst).",
+                "Die innere Abfrage nummeriert schon: 1 = neueste Zeile je Position.",
+                "Nach WHERE rn = die Zahl 1 eintragen.",
+                "Dann Ausführen.",
             ],
-            starter="-- Nur den neuesten Quant je HU-Position.\n-- Rechts: Tabelle „Quant“.\n\nWITH ranked AS (\n  SELECT\n    handling_unit_position_id,\n    batch_a,\n    updated_date,\n    ROW_NUMBER() OVER (\n      PARTITION BY handling_unit_position_id\n      ORDER BY updated_date DESC\n    ) AS rn\n  FROM instance_1.flowapp_demo_stock_quant\n)\nSELECT\n  -- die drei Spalten, nur wo rn = 1\n  \nFROM ranked\nWHERE\n",
+            starter="WITH ranked AS (\n  SELECT\n    handling_unit_position_id,\n    batch_a,\n    updated_date,\n    ROW_NUMBER() OVER (\n      PARTITION BY handling_unit_position_id\n      ORDER BY updated_date DESC\n    ) AS rn\n  FROM instance_1.flowapp_demo_stock_quant\n)\nSELECT handling_unit_position_id, batch_a, updated_date\nFROM ranked\nWHERE rn = \n",
             hints=[
-                "Außen dieselben drei Spalten wie in der CTE: handling_unit_position_id, batch_a, updated_date.",
-                "WHERE rn = 1 filtert auf die neueste Zeile je Position.",
+                "rn = 1 lässt nur die neueste Zeile je Position durch.",
+                "WHERE rn = 1",
             ],
             solution="WITH ranked AS (SELECT handling_unit_position_id, batch_a, updated_date, ROW_NUMBER() OVER (PARTITION BY handling_unit_position_id ORDER BY updated_date DESC) AS rn FROM instance_1.flowapp_demo_stock_quant) SELECT handling_unit_position_id, batch_a, updated_date FROM ranked WHERE rn = 1;",
         ),
@@ -388,49 +567,48 @@ FROM instance_1.flowapp_demo_order_head;
     exercises=[
         EX(
             "d-ex1",
-            why="Support fragt: Welche Artikel gehören zu welchem Mandanten? Am Artikelstamm gibt es keine client_id.",
-            task="Gib die deutsche Artikelbezeichnung und den Mandanten-Code aus.",
+            why="Support fragt, welche Artikel zu welchem Mandanten gehören. Am Artikel selbst gibt es keine Mandanten-Spalte.",
+            task="Zeig die deutsche Artikelbezeichnung und den Mandanten-Code.",
             look=[
-                "Baustein 1: deutscher Text — designation_a->>'de' (die Spalte heißt designation_a).",
-                "Baustein 2: Mandanten-Code.",
-                "Der Join ist vorbereitet (parent_id, nicht client_id).",
+                "Rechts Artikelstamm aufklappen → designation_a klicken (wird zu im.designation_a). Dahinter tippen: ->>'de'",
+                "Dann Mandant → code klicken (wird zu c.code).",
+                "Der JOIN steht schon — über parent_id, nicht über eine client_id.",
             ],
-            starter="-- Deutsche Bezeichnung und Mandanten-Code. Join ist schon da.\n\nSELECT\n  -- Baustein SELECT\nFROM instance_1.flowapp_demo_item_master im\nJOIN instance_1.flowapp_demo_client c\n  ON im.parent_id = c.accounting_area_item_master_id;\n",
+            starter="SELECT\n  \nFROM instance_1.flowapp_demo_item_master im\nJOIN instance_1.flowapp_demo_client c\n  ON im.parent_id = c.accounting_area_item_master_id;\n",
             hints=[
-                "Bezeichnung: im.designation_a->>'de'. Nicht designation, sondern designation_a.",
-                "Mandant: c.code. Join-Spalte am Mandanten: accounting_area_item_master_id.",
+                "Deutscher Text: im.designation_a->>'de' — die Spalte heißt designation_a, nicht designation.",
+                "Mandant: c.code. Ein Alias wie AS bezeichnung ist optional.",
             ],
             solution="SELECT im.designation_a->>'de' AS bezeichnung, c.code AS mandant FROM instance_1.flowapp_demo_item_master im JOIN instance_1.flowapp_demo_client c ON im.parent_id = c.accounting_area_item_master_id;",
         ),
         EX(
             "d-ex2",
-            why="Jemand will wissen, in welchen Zonen Auftrag 100501 geplant ist.",
-            task="Gib für die lesbare Nummer 100501 alle Zonentypen (consolidation_type) aus der Zonierung aus.",
+            why="Die Halle will wissen, in welchen Zonen Auftrag 100501 geplant ist.",
+            task="Zeig die Zonentypen von Auftrag 100501.",
             look=[
-                "Baustein SELECT: consolidation_type — nur das soll in der Ergebnisliste stehen.",
-                "Baustein JOIN: id — schließt die Lücke oh. (UUID). Nicht order_id.",
-                "Baustein WHERE: 100501 — ohne Anführungszeichen, das ist ein Integer.",
+                "Nach oh. die Spalte id eintragen — das ist der interne Schlüssel, nicht die lesbare Nummer order_id.",
+                "Rechts Zonierung aufklappen, falls du consolidation_type nachschauen willst. Die SELECT-Liste steht schon.",
             ],
-            starter="-- Lücken mit den Bausteinen füllen (SELECT / JOIN / WHERE).\n\nSELECT\n  -- Baustein SELECT\nFROM instance_1.flowapp_demo_order_head oh\nJOIN instance_1.flowapp_demo_order_consolidation oc\n  ON oc.parent_id = oh.\nWHERE oh.order_id =\n",
+            starter="SELECT oc.consolidation_type\nFROM instance_1.flowapp_demo_order_head oh\nJOIN instance_1.flowapp_demo_order_consolidation oc\n  ON oc.parent_id = oh.\nWHERE oh.order_id = 100501;\n",
             hints=[
-                "Ausgeben: oc.consolidation_type. Join auf oh.id (UUID), nicht auf order_id.",
-                "WHERE oh.order_id = 100501 — ohne Anführungszeichen, das ist ein Integer.",
+                "Die Zonierung hängt am Auftrag über oh.id (UUID). order_id wäre die falsche Spalte und der falsche Typ.",
+                "ON oc.parent_id = oh.id",
             ],
             solution="SELECT oc.consolidation_type FROM instance_1.flowapp_demo_order_head oh JOIN instance_1.flowapp_demo_order_consolidation oc ON oc.parent_id = oh.id WHERE oh.order_id = 100501;",
         ),
         EX(
             "d-ex3",
-            why="Beim Vergleich von Aufträgen stört das Suffix _A in der Auftragsnummer (100501_A vs. 100501).",
-            task="Schneide alles nach dem ersten Unterstrich ab und gib die normalisierte Nummer plus order_id aus.",
+            why="Beim Abgleich stört das Suffix _A (100501_A gegen 100501).",
+            task="Kürze jede Auftragsnummer vor dem Unterstrich und zeig sie zusammen mit der lesbaren ID.",
             look=[
-                "Rechts nur „Auftrag“: Spalten order_number und order_id.",
-                "Funktion: split_part(order_number, '_', 1) — wie im Lerntext D.4.",
-                "FROM ist vorbereitet. Zwei Spalten nach SELECT einsetzen.",
+                "In die Klammern von split_part klicken.",
+                "Rechts Auftrag → order_number klicken — sie landet in der Funktion.",
+                "order_id steht schon in der zweiten Spalte.",
             ],
-            starter="-- 100501_A soll zu 100501 werden.\n-- Rechts: Auftrag → order_number, order_id.\n\nSELECT\n  -- Spalten rechts anklicken\nFROM instance_1.flowapp_demo_order_head;\n",
+            starter="SELECT\n  split_part(, '_', 1) AS order_number_norm,\n  order_id\nFROM instance_1.flowapp_demo_order_head;\n",
             hints=[
-                "split_part(order_number, '_', 1) AS order_number_norm",
-                "Zweite Spalte: order_id. Kein JOIN nötig.",
+                "split_part zerteilt am Unterstrich und nimmt das erste Stück: split_part(order_number, '_', 1).",
+                "SELECT split_part(order_number, '_', 1) AS order_number_norm, order_id FROM instance_1.flowapp_demo_order_head;",
             ],
             solution="SELECT split_part(order_number, '_', 1) AS order_number_norm, order_id FROM instance_1.flowapp_demo_order_head;",
         ),
@@ -477,17 +655,17 @@ Beispiele: `task_position.storage_date`, `planned_processing_date`. Diese Spalte
     exercises=[
         EX(
             "e-ex1",
-            why="Ein Dashboard zeigt die letzte Änderung am Vorgang zwei Stunden falsch, weil die Zeitzone doppelt gewandelt wurde.",
-            task="Gib id und updated_date des Vorgangs genau einmal nach Europe/Berlin konvertiert aus.",
+            why="Das Dashboard zeigt die letzte Änderung am Vorgang zwei Stunden falsch — die Uhr wurde doppelt umgerechnet.",
+            task="Zeig Vorgangs-ID und letzte Änderung, einmal nach Berlin-Zeit.",
             look=[
-                "Rechts „Vorgang“ (task_head): Spalten id und updated_date (timestamptz).",
-                "Spalte rechts anklicken — sie landet in der SELECT-Liste. Danach AT TIME ZONE 'Europe/Berlin' dazuschreiben.",
-                "FROM ist vorbereitet. Genau einmal konvertieren, kein Alias nötig.",
+                "Rechts Vorgang aufklappen → updated_date klicken (id steht schon).",
+                "Direkt dahinter schreiben: AT TIME ZONE 'Europe/Berlin'",
+                "Genau einmal — kein zweites AT TIME ZONE.",
             ],
-            starter="-- timestamptz: genau EINE Konvertierung, nie doppelt.\n-- Rechts: Vorgang → id, updated_date.\n\nSELECT\n  -- Spalten rechts anklicken\nFROM instance_1.flowapp_demo_task_head;\n",
+            starter="SELECT\n  id,\n  \nFROM instance_1.flowapp_demo_task_head;\n",
             hints=[
-                "updated_date AT TIME ZONE 'Europe/Berlin' — Alias ist optional.",
-                "Zwei Spalten: id und die konvertierte Zeit.",
+                "Eine Umrechnung: updated_date AT TIME ZONE 'Europe/Berlin'. Ein Spaltenname danach ist optional.",
+                "SELECT id, updated_date AT TIME ZONE 'Europe/Berlin' AS updated_berlin FROM instance_1.flowapp_demo_task_head;",
             ],
             solution="SELECT id, updated_date AT TIME ZONE 'Europe/Berlin' AS updated_berlin FROM instance_1.flowapp_demo_task_head;",
             require=["AT TIME ZONE", "Europe/Berlin"],
@@ -495,16 +673,16 @@ Beispiele: `task_position.storage_date`, `planned_processing_date`. Diese Spalte
         ),
         EX(
             "e-ex2",
-            why="Für den Einlagerungstag braucht ihr nur das Datum, keine Uhrzeit und keine Zeitzonen-Rechnung.",
-            task="Gib id und das reine Datum von storage_date aus — ohne AT TIME ZONE.",
+            why="Für den Einlagerungstag braucht ihr nur das Kalenderdatum — keine Uhrzeit und keine Zeitzonen-Rechnung.",
+            task="Zeig Positions-ID und das Datum der Einlagerung, ohne Zeitzone.",
             look=[
-                "Rechts „Position“ unter Vorgang (task_position): id und storage_date (timestamp ohne tz).",
-                "Spalte rechts anklicken — sie landet nach SELECT. Dann ::date an storage_date hängen.",
+                "Rechts „Position“ unter Vorgang aufklappen → storage_date klicken.",
+                "Direkt dahinter ::date schreiben — kein AT TIME ZONE, die Spalte ist schon Ortszeit.",
             ],
-            starter="-- storage_date ist bereits lokal — kein AT TIME ZONE.\n-- Rechts: Position (Vorgang) → id, storage_date.\n\nSELECT\n  -- Spalten rechts anklicken\nFROM instance_1.flowapp_demo_task_position;\n",
+            starter="SELECT\n  id,\n  \nFROM instance_1.flowapp_demo_task_position;\n",
             hints=[
-                "storage_date::date — Alias ist optional.",
-                "Zwei Spalten: id und das Datum.",
+                "storage_date::date macht aus der Uhr ein Datum. Ein Spaltenname danach ist optional.",
+                "SELECT id, storage_date::date AS storage_day FROM instance_1.flowapp_demo_task_position;",
             ],
             solution="SELECT id, storage_date::date AS storage_day FROM instance_1.flowapp_demo_task_position;",
             require=["storage_date"],
@@ -554,32 +732,31 @@ Die feinere Statuslogik auf `order_head` (Codes `'00'`, `'80'`, `'X0'`, `'--'`) 
     exercises=[
         EX(
             "f-ex1",
-            why="Du sollst alle Vorgänge finden, die eine bestimmte Buchungsart haben — nicht über eine UUID, sondern über den sprechenden Alias.",
-            task="Gib die IDs aller Vorgänge aus, deren Buchungsklasse den Alias 'goods-receipt-single-hu-movement' hat.",
+            why="Du sollst alle Vorgänge einer Buchungsart finden — über den lesbaren Namen, nicht über eine UUID.",
+            task="Zeig die IDs aller Vorgänge mit der Buchungsart goods-receipt-single-hu-movement.",
             look=[
-                "Rechts „Vorgang“ (task_head): id und task_booking_class_id.",
-                "Rechts „Klasse (Vorgangsbuchung)“: id und alias.",
-                "FROM und JOIN sind vorbereitet. SELECT und WHERE ergänzen.",
+                "Nach tbc.alias = den Namen in einfache Anführungszeichen setzen.",
+                "Rechts „Klasse (Vorgangsbuchung)“ aufklappen, wenn du den alias nachschlagen willst.",
             ],
-            starter="-- Welche Vorgänge haben diese Buchungsklasse?\n-- Rechts: Vorgang und Klasse (Vorgangsbuchung) → alias.\n\nSELECT\n  -- Spalten rechts anklicken\nFROM instance_1.flowapp_demo_task_head th\nJOIN instance_1.flowapp_demo_task_booking_class tbc\n  ON tbc.id = th.task_booking_class_id\nWHERE\n",
+            starter="SELECT th.id\nFROM instance_1.flowapp_demo_task_head th\nJOIN instance_1.flowapp_demo_task_booking_class tbc\n  ON tbc.id = th.task_booking_class_id\nWHERE tbc.alias = \n",
             hints=[
-                "Ausgeben: th.id",
+                "Der Filter ist ein Text: 'goods-receipt-single-hu-movement' — mit Anführungszeichen.",
                 "WHERE tbc.alias = 'goods-receipt-single-hu-movement'",
             ],
             solution="SELECT th.id FROM instance_1.flowapp_demo_task_head th JOIN instance_1.flowapp_demo_task_booking_class tbc ON tbc.id = th.task_booking_class_id WHERE tbc.alias = 'goods-receipt-single-hu-movement';",
         ),
         EX(
             "f-ex2",
-            why="Für einen WE-Abschlussbericht zählen nur Vorgänge, die wirklich fertig und physisch eingelagert sind — nicht nur der Auftragsstatus.",
-            task="Finde abgeschlossene Wareneingangs-Vorgänge auf HU-Ebene. Gib task_head.id eindeutig aus.",
+            why="Im WE-Abschlussbericht zählen nur Vorgänge, die fertig sind und wirklich im Fach stehen — nicht der bloße Auftragsstatus.",
+            task="Finde abgeschlossene Wareneingänge, die schon eingelagert sind. Jede Vorgangs-ID nur einmal.",
             look=[
-                "Drei Tabellen rechts: Vorgang, Position (Vorgang), Klasse (Vorgangsbuchung).",
-                "WE: alias beginnt mit goods-receipt. Fertig: task_state = '90'. Eingelagert: storage_date IS NOT NULL.",
-                "JOIN ist vorbereitet. SELECT DISTINCT und die drei Filter mit AND.",
+                "Die drei Tabellen und DISTINCT stehen schon. Es fehlt der Filter nach WHERE.",
+                "Wareneingang: tbc.alias beginnt mit goods-receipt.",
+                "Fertig: th.task_state = '90'. Eingelagert: tp.storage_date IS NOT NULL. Die drei mit AND verbinden.",
             ],
-            starter="-- WE fertig und physisch eingelagert.\n-- Rechts: Vorgang.task_state, Position.storage_date, Klasse.alias.\n\nSELECT\n  -- Spalten rechts anklicken\nFROM instance_1.flowapp_demo_task_head th\nJOIN instance_1.flowapp_demo_task_position tp\n  ON tp.task_head_id = th.id\nJOIN instance_1.flowapp_demo_task_booking_class tbc\n  ON tbc.id = th.task_booking_class_id\nWHERE\n",
+            starter="SELECT DISTINCT th.id\nFROM instance_1.flowapp_demo_task_head th\nJOIN instance_1.flowapp_demo_task_position tp\n  ON tp.task_head_id = th.id\nJOIN instance_1.flowapp_demo_task_booking_class tbc\n  ON tbc.id = th.task_booking_class_id\nWHERE\n  \n",
             hints=[
-                "SELECT DISTINCT th.id — sonst verdoppelt der Join über Positionen denselben Vorgang.",
+                "Drei Bedingungen: Buchungsart, Status 90, Einlagerungsdatum gesetzt.",
                 "WHERE tbc.alias LIKE 'goods-receipt%' AND th.task_state = '90' AND tp.storage_date IS NOT NULL",
             ],
             solution="SELECT DISTINCT th.id FROM instance_1.flowapp_demo_task_head th JOIN instance_1.flowapp_demo_task_position tp ON tp.task_head_id = th.id JOIN instance_1.flowapp_demo_task_booking_class tbc ON tbc.id = th.task_booking_class_id WHERE tbc.alias LIKE 'goods-receipt%' AND th.task_state = '90' AND tp.storage_date IS NOT NULL;",
@@ -627,16 +804,17 @@ COMMIT;
     exercises=[
         EX(
             "g-ex1",
-            why="Der Auftrag 100507_A soll fachlich als abgeschlossen gelten (Status 80). Das darf nie ohne Vorab-SELECT und Transaktion passieren.",
-            task="Setze task_status von Auftrag 100507_A auf '80'. Muster: SELECT → BEGIN → UPDATE → Kontroll-SELECT → COMMIT.",
+            why="Auftrag 100507_A soll als abgeschlossen gelten. Ohne vorheriges Nachschauen und ohne Transaktion ändert man hier nichts.",
+            task="Setze den Status von Auftrag 100507_A auf abgeschlossen (80).",
             look=[
-                "Rechts „Auftrag“: order_number und task_status.",
-                "Das Vorab-SELECT steht schon da. Darunter BEGIN, UPDATE, dieselbe SELECT nochmal, COMMIT.",
+                "Das Skript ist schon in der richtigen Reihenfolge: nachschauen, BEGIN, ändern, nochmal nachschauen, COMMIT.",
+                "Nach SET task_status = den neuen Wert '80' eintragen (mit Anführungszeichen).",
+                "Ausführen, dann Stimmt das?. Wenn die Daten schon geändert sind: Datenbank zurücksetzen.",
             ],
-            starter="-- Erst nachschauen, dann ändern, dann kontrollieren.\n-- Rechts: Auftrag → order_number, task_status.\n\nSELECT order_number, task_status\nFROM instance_1.flowapp_demo_order_head\nWHERE order_number = '100507_A';\n\n-- BEGIN;\n-- UPDATE …\n-- SELECT … (Kontrolle)\n-- COMMIT;\n",
+            starter="SELECT order_number, task_status\nFROM instance_1.flowapp_demo_order_head\nWHERE order_number = '100507_A';\n\nBEGIN;\nUPDATE instance_1.flowapp_demo_order_head\nSET task_status =\nWHERE order_number = '100507_A';\n\nSELECT order_number, task_status\nFROM instance_1.flowapp_demo_order_head\nWHERE order_number = '100507_A';\n\nCOMMIT;\n",
             hints=[
-                "Nach dem SELECT: BEGIN; dann UPDATE … SET task_status = '80' WHERE order_number = '100507_A';",
-                "Danach dieselbe SELECT-Zeile zur Kontrolle, zum Schluss COMMIT;",
+                "Abgeschlossen ist der Text '80', nicht die Zahl 80 ohne Anführungszeichen.",
+                "SET task_status = '80' WHERE order_number = '100507_A'; — COMMIT steht schon am Ende.",
             ],
             solution="SELECT order_number, task_status FROM instance_1.flowapp_demo_order_head WHERE order_number = '100507_A';\nBEGIN;\nUPDATE instance_1.flowapp_demo_order_head SET task_status = '80' WHERE order_number = '100507_A';\nSELECT order_number, task_status FROM instance_1.flowapp_demo_order_head WHERE order_number = '100507_A';\nCOMMIT;",
             kind="write",
@@ -645,17 +823,17 @@ COMMIT;
         ),
         EX(
             "g-ex2",
-            why="Eine offene Vorgangsposition soll weg. Daran hängen noch Referenzen — Kind zuerst, sonst bleiben Reste.",
-            task="Lösche die Position aaaaaaab-0000-0000-0000-000000000002. Erst die Referenz, dann die Position. Mit BEGIN → DELETE → Kontrolle → COMMIT.",
+            why="Eine Vorgangsposition soll weg. Daran hängen noch Verweise — die zuerst löschen, sonst bleiben Reste.",
+            task="Lösche die Position aaaaaaab-0000-0000-0000-000000000002. Zuerst den Verweis, dann die Position.",
             look=[
-                "Rechts „Referenz“ (task_position_reference) hängt an Position (Eltern: Position).",
-                "Rechts „Position“ (task_position) unter Vorgang.",
-                "Vorab-SELECT steht. In der Transaktion: erst Kind löschen, dann Eltern.",
+                "Kind zuerst: das erste DELETE (Referenz) ist fertig.",
+                "Im zweiten DELETE nach WHERE id = dieselbe UUID in Anführungszeichen eintragen, dann ein Semikolon.",
+                "Danach Kontroll-SELECT und COMMIT — beides steht schon.",
             ],
-            starter="-- Kind zuerst, dann Eltern.\n-- Rechts: Referenz (Vorgangsposition) und Position (Vorgang).\n\nSELECT id, task_position_id\nFROM instance_1.flowapp_demo_task_position_reference\nWHERE task_position_id = 'aaaaaaab-0000-0000-0000-000000000002';\n",
+            starter="SELECT id, task_position_id\nFROM instance_1.flowapp_demo_task_position_reference\nWHERE task_position_id = 'aaaaaaab-0000-0000-0000-000000000002';\n\nBEGIN;\nDELETE FROM instance_1.flowapp_demo_task_position_reference\nWHERE task_position_id = 'aaaaaaab-0000-0000-0000-000000000002';\n\nDELETE FROM instance_1.flowapp_demo_task_position\nWHERE id =\n\nSELECT id\nFROM instance_1.flowapp_demo_task_position\nWHERE id = 'aaaaaaab-0000-0000-0000-000000000002';\n\nCOMMIT;\n",
             hints=[
-                "Erst DELETE FROM …_task_position_reference WHERE task_position_id = '…'; sonst bleibt die Kind-Zeile.",
-                "Danach DELETE FROM …_task_position WHERE id = '…'; Kontroll-SELECT muss leer sein, dann COMMIT;",
+                "Die Eltern-Zeile hat dieselbe UUID in der Spalte id: 'aaaaaaab-0000-0000-0000-000000000002'.",
+                "DELETE FROM instance_1.flowapp_demo_task_position WHERE id = 'aaaaaaab-0000-0000-0000-000000000002';",
             ],
             solution="SELECT id FROM instance_1.flowapp_demo_task_position_reference WHERE task_position_id = 'aaaaaaab-0000-0000-0000-000000000002';\nBEGIN;\nDELETE FROM instance_1.flowapp_demo_task_position_reference WHERE task_position_id = 'aaaaaaab-0000-0000-0000-000000000002';\nDELETE FROM instance_1.flowapp_demo_task_position WHERE id = 'aaaaaaab-0000-0000-0000-000000000002';\nSELECT id FROM instance_1.flowapp_demo_task_position WHERE id = 'aaaaaaab-0000-0000-0000-000000000002';\nCOMMIT;",
             kind="write",
@@ -731,16 +909,17 @@ L(
     exercises=[
         EX(
             "i-ex1",
-            why="Bevor du eine große Query baust, schaust du erst eine Zeile an — so testest du Spaltennamen ohne die ganze Tabelle zu laden.",
-            task="Lies storage_location_id aus der Handling-Unit, aber nur eine Zeile (LIMIT 1).",
+            why="Bevor eine große Abfrage gebaut wird, schaust du eine Zeile an — so prüfst du den Spaltennamen, ohne die ganze Tabelle zu laden.",
+            task="Zeig den Lagerort einer Handling Unit, aber nur eine Zeile.",
             look=[
-                "Rechts „Handling-Unit“: die Spalte heißt storage_location_id, nicht location_id.",
-                "FROM und LIMIT sind vorbereitet. Nur die Spalte nach SELECT.",
+                "Rechts Handling-Unit aufklappen.",
+                "storage_location_id klicken — nicht location_id, die Spalte heißt länger.",
+                "LIMIT 1 steht schon.",
             ],
-            starter="-- Erst eine Zeile, dann skalieren.\n-- Rechts: Handling-Unit → storage_location_id (nicht location_id).\n\nSELECT\n  -- Spalten rechts anklicken\nFROM instance_1.flowapp_demo_handling_unit\nLIMIT 1;\n",
+            starter="SELECT\n  \nFROM instance_1.flowapp_demo_handling_unit\nLIMIT 1;\n",
             hints=[
-                "Eine Spalte reicht: storage_location_id.",
-                "LIMIT 1 steht schon am Ende.",
+                "Die Lagerort-Spalte heißt storage_location_id.",
+                "SELECT storage_location_id FROM instance_1.flowapp_demo_handling_unit LIMIT 1;",
             ],
             solution="SELECT storage_location_id FROM instance_1.flowapp_demo_handling_unit LIMIT 1;",
         )
@@ -895,46 +1074,47 @@ Stammdaten filtert man über sprechende `alias`-Spalten statt über UUIDs — De
     exercises=[
         EX(
             "k-ex1",
-            why="Ein Drucker-Job ist fehlgeschlagen. Die Events liegen nicht in instance_1, sondern im Print-Schema.",
-            task="Lies event_type und payload aus den Druck-Events.",
+            why="Ein Drucker-Job ist fehlgeschlagen. Die Events liegen nicht bei den Aufträgen, sondern im Print-Schema.",
+            task="Zeig Ereignistyp und Inhalt der Druck-Events.",
             look=[
-                "Rechts nach „Druck-Event“ suchen (processevents_printer).",
-                "Schema ist subscription — ohne flowapp-Präfix. FROM ist vorbereitet.",
+                "Rechts „Druck-Event“ aufklappen — die Tabelle liegt in subscription, nicht in instance_1.",
+                "event_type klicken, dann payload klicken.",
             ],
-            starter="-- Print liegt in subscription, nicht in instance_1.\n-- Rechts: Druck-Event → event_type, payload.\n\nSELECT\n  -- Spalten rechts anklicken\nFROM subscription.processevents_printer;\n",
+            starter="SELECT\n  \nFROM subscription.processevents_printer;\n",
             hints=[
-                "Zwei Spalten: event_type, payload.",
-                "Kein instance_1 und kein flowapp_demo_ vor dem Tabellennamen.",
+                "Zwei Spalten: event_type, payload. Kein instance_1 und kein flowapp_demo_ davor.",
+                "SELECT event_type, payload FROM subscription.processevents_printer;",
             ],
             solution="SELECT event_type, payload FROM subscription.processevents_printer;",
         ),
         EX(
             "k-ex2",
-            why="Bestand und Artikelstamm haben unterschiedliche Mengeneinheiten — das fällt in Reports als Mengen-Mismatch auf.",
-            task="Gib HU-Positions-ID, Bestandseinheit und Artikeleinheit (jeweils alias) aus, nur wo sie ungleich sind. Je Position den neuesten Quant.",
+            why="Bestand und Artikelstamm haben unterschiedliche Mengeneinheiten — Reports zeigen dann falsche Stückzahlen.",
+            task="Zeig Position, Bestandseinheit und Artikeleinheit, nur wo die beiden Einheiten nicht zusammenpassen.",
             look=[
-                "Rechts: Quant, Position (HU), Artikelstamm, Einheit (Mengen) — Einheit zweimal joinen (Bestand vs. Stamm).",
-                "CTE ranked ist vorbereitet (neueste Zeile). Außen JOIN und WHERE alias ungleich.",
+                "Die JOINs und die neueste Bestandszeile (rn = 1) stehen schon.",
+                "Nach <> die Artikeleinheit schreiben: qu_item.alias",
+                "Einheit (Mengen) ist zweimal gejoint: qu_stock = Bestand, qu_item = Stamm.",
             ],
-            starter="-- Neueste Quant-Zeile je HU-Position, dann Einheiten vergleichen.\n-- Rechts: Quant, Position (Handling-Unit), Artikelstamm, Einheit (Mengen).\n\nWITH ranked AS (\n  SELECT sq.*,\n         ROW_NUMBER() OVER (\n           PARTITION BY sq.handling_unit_position_id\n           ORDER BY sq.updated_date DESC\n         ) AS rn\n  FROM instance_1.flowapp_demo_stock_quant sq\n)\nSELECT\n  -- Spalten rechts anklicken\nFROM ranked r\nJOIN instance_1.flowapp_demo_handling_unit_position hup ON hup.id = r.handling_unit_position_id\nJOIN instance_1.flowapp_demo_item_master im ON im.id = hup.item_master_id\nJOIN instance_1.flowapp_demo_quantity_unit qu_stock ON qu_stock.id = r.quantity_unit_id\nJOIN instance_1.flowapp_demo_quantity_unit qu_item ON qu_item.id = im.quantity_unit_id\nWHERE r.rn = 1\n  AND \n",
+            starter="WITH ranked AS (\n  SELECT sq.*,\n         ROW_NUMBER() OVER (\n           PARTITION BY sq.handling_unit_position_id\n           ORDER BY sq.updated_date DESC\n         ) AS rn\n  FROM instance_1.flowapp_demo_stock_quant sq\n)\nSELECT\n  r.handling_unit_position_id,\n  qu_stock.alias AS bestand_einheit,\n  qu_item.alias AS artikel_einheit\nFROM ranked r\nJOIN instance_1.flowapp_demo_handling_unit_position hup ON hup.id = r.handling_unit_position_id\nJOIN instance_1.flowapp_demo_item_master im ON im.id = hup.item_master_id\nJOIN instance_1.flowapp_demo_quantity_unit qu_stock ON qu_stock.id = r.quantity_unit_id\nJOIN instance_1.flowapp_demo_quantity_unit qu_item ON qu_item.id = im.quantity_unit_id\nWHERE r.rn = 1\n  AND qu_stock.alias <> \n",
             hints=[
-                "SELECT r.handling_unit_position_id, qu_stock.alias AS bestand_einheit, qu_item.alias AS artikel_einheit",
+                "Ungleich heißt <>. Rechts daneben gehört qu_item.alias.",
                 "AND qu_stock.alias <> qu_item.alias",
             ],
             solution="WITH ranked AS (SELECT sq.*, ROW_NUMBER() OVER (PARTITION BY sq.handling_unit_position_id ORDER BY sq.updated_date DESC) AS rn FROM instance_1.flowapp_demo_stock_quant sq) SELECT r.handling_unit_position_id, qu_stock.alias AS bestand_einheit, qu_item.alias AS artikel_einheit FROM ranked r JOIN instance_1.flowapp_demo_handling_unit_position hup ON hup.id = r.handling_unit_position_id JOIN instance_1.flowapp_demo_item_master im ON im.id = hup.item_master_id JOIN instance_1.flowapp_demo_quantity_unit qu_stock ON qu_stock.id = r.quantity_unit_id JOIN instance_1.flowapp_demo_quantity_unit qu_item ON qu_item.id = im.quantity_unit_id WHERE r.rn = 1 AND qu_stock.alias <> qu_item.alias;",
         ),
         EX(
             "k-ex3",
-            why="Test und Prod haben verschiedene UUIDs. Zum Konfigurationsabgleich brauchst du Mandanten-Code plus Hash der ganzen Zeile.",
-            task="Gib code und MD5(to_jsonb(c)::text) für jeden Mandanten aus.",
+            why="Test und Prod haben verschiedene interne IDs. Zum Abgleich braucht ihr den Mandanten-Code plus einen Hash der ganzen Zeile.",
+            task="Zeig Mandanten-Code und Fingerprint jeder Mandantenzeile.",
             look=[
-                "Rechts „Mandant“: Alias der Tabelle im FROM ist c.",
-                "FROM ist vorbereitet. Zwei Ausdrücke nach SELECT.",
+                "code steht schon. In der zweiten Spalte den Hash eintragen.",
+                "Muster: MD5(to_jsonb(c)::text) — c ist der Tabellenname im FROM.",
             ],
-            starter="-- Nie die UUID vergleichen — Business Key + Fingerprint.\n-- Rechts: Mandant.\n\nSELECT\n  -- Spalten rechts anklicken\nFROM instance_1.flowapp_demo_client c;\n",
+            starter="SELECT\n  code,\n  \nFROM instance_1.flowapp_demo_client c;\n",
             hints=[
-                "Erste Spalte: code",
-                "Zweite: MD5(to_jsonb(c)::text) AS fingerprint",
+                "Zweite Spalte: MD5(to_jsonb(c)::text) AS fingerprint",
+                "SELECT code, MD5(to_jsonb(c)::text) AS fingerprint FROM instance_1.flowapp_demo_client c;",
             ],
             solution="SELECT code, MD5(to_jsonb(c)::text) AS fingerprint FROM instance_1.flowapp_demo_client c;",
         ),
@@ -1030,44 +1210,44 @@ Dieses Muster — fachliche Cutoffs in der WHERE-Klausel dokumentieren — lohnt
         EX(
             "l-ex1",
             why="Stornierte Aufträge dürfen in fast keinem Report auftauchen — sonst stimmen die Zahlen nicht.",
-            task="Gib Auftragsnummer und Status aller nicht stornierten Aufträge aus.",
+            task="Zeig Nummer und Status aller Aufträge, die nicht storniert sind.",
             look=[
-                "Rechts „Auftrag“: order_number und task_status.",
-                "Storniert ist der Code 'X0' (varchar, mit Anführungszeichen). FROM ist vorbereitet.",
+                "Nummer und Status stehen schon. Es fehlt der Filter nach WHERE.",
+                "Storniert ist der Text 'X0'. Alles außer diesem Status: task_status <> 'X0'",
             ],
-            starter="-- Pflichtfilter in fast jedem Auftragsreport.\n-- Rechts: Auftrag → order_number, task_status.\n\nSELECT\n  -- Spalten rechts anklicken\nFROM instance_1.flowapp_demo_order_head\nWHERE\n",
+            starter="SELECT order_number, task_status\nFROM instance_1.flowapp_demo_order_head\nWHERE\n  \n",
             hints=[
-                "SELECT order_number, task_status",
+                "Ungleich schreibt man <>. Der Status ist Text, also mit Anführungszeichen.",
                 "WHERE task_status <> 'X0'",
             ],
             solution="SELECT order_number, task_status FROM instance_1.flowapp_demo_order_head WHERE task_status <> 'X0';",
         ),
         EX(
             "l-ex2",
-            why="loading_status kann '--' sein (Feld nicht relevant). Ein direkter Vergleich mit '80' würde diese Zeilen falsch behandeln.",
-            task="Finde Aufträge mit fachlich abgeschlossenem Verladestatus. Gib order_number und loading_status aus.",
+            why="Verladestatus kann '--' heißen (Feld gilt für diesen Auftrag nicht). Ein direkter Vergleich mit 80 würde das falsch werten.",
+            task="Zeig Nummer und Verladestatus der Aufträge, die fachlich fertig verladen sind.",
             look=[
-                "Rechts „Auftrag“: loading_status.",
-                "Muster aus dem Lerntext schon als Kommentar: COALESCE(NULLIF(...),'00') = '80'. FROM ist vorbereitet.",
+                "Die Umwandlung von '--' nach '00' steht schon in der WHERE-Zeile.",
+                "Nach dem Gleichheitszeichen '80' eintragen — das ist abgeschlossen.",
             ],
-            starter="-- '--' zuerst auf '00' normalisieren, dann auf Abschluss prüfen.\n-- Rechts: Auftrag → order_number, loading_status.\n\nSELECT\n  -- Spalten rechts anklicken\nFROM instance_1.flowapp_demo_order_head\nWHERE COALESCE(NULLIF(loading_status, '--'), '00') =\n",
+            starter="SELECT order_number, loading_status\nFROM instance_1.flowapp_demo_order_head\nWHERE COALESCE(NULLIF(loading_status, '--'), '00') =\n",
             hints=[
-                "SELECT order_number, loading_status",
-                "Der Vergleich ist = '80'",
+                "Abgeschlossen ist der Text '80'.",
+                "WHERE COALESCE(NULLIF(loading_status, '--'), '00') = '80'",
             ],
             solution="SELECT order_number, loading_status FROM instance_1.flowapp_demo_order_head WHERE COALESCE(NULLIF(loading_status, '--'), '00') = '80';",
         ),
         EX(
             "l-ex3",
-            why="Zur Sendung SHP-01 gehören mehrere WA-Aufträge plus eine Kopfzeile der Klasse sendung. Die Kopfzeile soll nicht in der Liste stehen.",
-            task="Gib order_number und loading_status der WA-Aufträge von SHP-01 aus, ohne die Sendungs-Kopfzeile.",
+            why="Zu Sendung SHP-01 gehören mehrere Warenausgänge plus eine Kopfzeile. Die Kopfzeile soll nicht in der Liste stehen.",
+            task="Zeig Nummer und Verladestatus der Warenausgänge von SHP-01, ohne die Sendungs-Kopfzeile.",
             look=[
-                "Rechts „Auftrag“: shipment_number.",
-                "Rechts „Klasse (Auftrag)“: alias (sendung vs. warenausgang). JOIN ist vorbereitet.",
+                "Sendungsnummer und JOINs stehen schon.",
+                "Nach oc.alias <> den Typ der Kopfzeile ausschließen: 'sendung'",
             ],
-            starter="-- Sendung SHP-01, aber nicht die Kopfzeile selbst.\n-- Rechts: Auftrag.shipment_number und Klasse (Auftrag).alias.\n\nSELECT\n  -- Spalten rechts anklicken\nFROM instance_1.flowapp_demo_order_head oh\nJOIN instance_1.flowapp_demo_order_class oc\n  ON oc.id = oh.order_class_id\nWHERE\n",
+            starter="SELECT oh.order_number, oh.loading_status\nFROM instance_1.flowapp_demo_order_head oh\nJOIN instance_1.flowapp_demo_order_class oc\n  ON oc.id = oh.order_class_id\nWHERE oh.shipment_number = 'SHP-01'\n  AND oc.alias <> \n",
             hints=[
-                "SELECT oh.order_number, oh.loading_status",
+                "Die Kopfzeile hat oc.alias = 'sendung'. Die willst du nicht: <> 'sendung'.",
                 "WHERE oh.shipment_number = 'SHP-01' AND oc.alias <> 'sendung'",
             ],
             solution="SELECT oh.order_number, oh.loading_status FROM instance_1.flowapp_demo_order_head oh JOIN instance_1.flowapp_demo_order_class oc ON oc.id = oh.order_class_id WHERE oh.shipment_number = 'SHP-01' AND oc.alias <> 'sendung';",
@@ -1133,31 +1313,32 @@ Nicht jede bestehende Abfrage folgt schon dem Alias-Prinzip. In älteren Queries
     exercises=[
         EX(
             "m-ex1",
-            why="WA-Aufträge sollen nach Auftragsklasse gefiltert werden — nie über eine UUID, die zwischen Test und Prod wechselt.",
-            task="Gib Auftragsnummer und Mandanten-Alias aller Warenausgangs-Aufträge aus.",
+            why="Warenausgänge sollen über den lesbaren Klassennamen gefiltert werden — nie über eine interne ID, die zwischen Test und Prod wechselt.",
+            task="Zeig Auftragsnummer und Mandanten-Kürzel aller Warenausgänge.",
             look=[
-                "Rechts „Klasse (Auftrag)“: alias = warenausgang.",
-                "Rechts „Mandant“: alias. JOINs sind vorbereitet.",
+                "JOINs und SELECT stehen schon. Es fehlt der Filter.",
+                "Nach oc.alias = den Text 'warenausgang' eintragen.",
+                "Rechts „Klasse (Auftrag)“ aufklappen, wenn du den alias nachschlagen willst.",
             ],
-            starter="-- Filter über alias, nicht über UUID.\n-- Rechts: Klasse (Auftrag), Mandant, Auftrag.\n\nSELECT\n  -- Spalten rechts anklicken\nFROM instance_1.flowapp_demo_order_head oh\nJOIN instance_1.flowapp_demo_order_class oc ON oc.id = oh.order_class_id\nJOIN instance_1.flowapp_demo_client c ON c.id = oh.client_id\nWHERE\n",
+            starter="SELECT oh.order_number, c.alias\nFROM instance_1.flowapp_demo_order_head oh\nJOIN instance_1.flowapp_demo_order_class oc ON oc.id = oh.order_class_id\nJOIN instance_1.flowapp_demo_client c ON c.id = oh.client_id\nWHERE oc.alias =\n",
             hints=[
-                "SELECT oh.order_number, c.alias",
+                "Warenausgang heißt in den Stammdaten 'warenausgang'.",
                 "WHERE oc.alias = 'warenausgang'",
             ],
             solution="SELECT oh.order_number, c.alias FROM instance_1.flowapp_demo_order_head oh JOIN instance_1.flowapp_demo_order_class oc ON oc.id = oh.order_class_id JOIN instance_1.flowapp_demo_client c ON c.id = oh.client_id WHERE oc.alias = 'warenausgang';",
         ),
         EX(
             "m-ex2",
-            why="Bevor du Adressen filterst, schaust du nach, welche alias-Werte die Kategorien wirklich haben.",
-            task="Liste alias und deutsche Bezeichnung aller Adresskategorien.",
+            why="Bevor du Adressen filterst, schaust du nach, welche Kurznamen die Kategorien wirklich haben.",
+            task="List die Kurznamen und die deutsche Bezeichnung aller Adresskategorien.",
             look=[
-                "Rechts „Kategorie (Adresse)“: alias und name (jsonb).",
-                "FROM ist vorbereitet. name->>'de' für den deutschen Text.",
+                "alias steht schon. Rechts Kategorie (Adresse) aufklappen → name klicken.",
+                "Dahinter tippen: ->>'de' — so kommt der deutsche Text aus dem JSON.",
             ],
-            starter="-- Stammdaten erst lesen, dann in Filtern verwenden.\n-- Rechts: Kategorie (Adresse) → alias, name.\n\nSELECT\n  -- Spalten rechts anklicken\nFROM instance_1.flowapp_demo_address_category;\n",
+            starter="SELECT\n  alias,\n  \nFROM instance_1.flowapp_demo_address_category;\n",
             hints=[
-                "Zwei Spalten aus einer Tabelle, kein JOIN.",
-                "alias, name->>'de' AS bezeichnung",
+                "Zweite Spalte: name->>'de' AS bezeichnung — kein JOIN nötig.",
+                "SELECT alias, name->>'de' AS bezeichnung FROM instance_1.flowapp_demo_address_category;",
             ],
             solution="SELECT alias, name->>'de' AS bezeichnung FROM instance_1.flowapp_demo_address_category;",
         ),
@@ -1207,15 +1388,15 @@ Unbekannte Alias-Werte fallen auf den Rohwert zurück (`ELSE`) — ein Hinweis, 
     exercises=[
         EX(
             "n-ex1",
-            why="Für die Verladeplanung braucht ihr den Palettentyp je Artikel (Ebene 3), nicht den technischen Alias.",
-            task="Gib die deutsche Artikelbezeichnung und den Palettentyp der Ebene 3 aus. palette-typ-a/b als Typ A/Typ B, sonst den Roh-Alias.",
+            why="Für die Verladeplanung braucht ihr den Palettentyp je Artikel, lesbar — nicht den technischen Kurznamen.",
+            task="Zeig deutsche Artikelbezeichnung und Palettentyp der Ebene 3. palette-typ-a/b als Typ A/Typ B, sonst den Rohwert.",
             look=[
-                "Rechts: Artikelstamm → Verpackungsstruktur (Eltern: Artikelstamm) → Verpackungsstrukturposition → Einheit (Gebinde).",
-                "JOINs und WHERE packaging_level = 3 sind vorbereitet. SELECT mit CASE ergänzen.",
+                "Die JOINs und Ebene 3 stehen schon. Die Bezeichnung auch.",
+                "In der zweiten Spalte das CASE aus dem Lerntext eintragen: palette-typ-a → Typ A, palette-typ-b → Typ B, sonst bu.alias.",
             ],
-            starter="-- Ebene 3 = Palette. Rechts: Artikelstamm, Verpackungsstruktur, Verpackungsstrukturposition, Einheit (Gebinde).\n\nSELECT\n  -- Spalten rechts anklicken\nFROM instance_1.flowapp_demo_item_master im\nJOIN instance_1.flowapp_demo_packaging_structure ps ON ps.parent_id = im.id\nJOIN instance_1.flowapp_demo_packaging_structure_pos psp ON psp.packaging_structure_id = ps.id\nJOIN instance_1.flowapp_demo_bundling_unit bu ON bu.id = psp.bundling_unit_id\nWHERE psp.packaging_level = 3;\n",
+            starter="SELECT\n  im.designation_a->>'de' AS bezeichnung,\n  \nFROM instance_1.flowapp_demo_item_master im\nJOIN instance_1.flowapp_demo_packaging_structure ps ON ps.parent_id = im.id\nJOIN instance_1.flowapp_demo_packaging_structure_pos psp ON psp.packaging_structure_id = ps.id\nJOIN instance_1.flowapp_demo_bundling_unit bu ON bu.id = psp.bundling_unit_id\nWHERE psp.packaging_level = 3;\n",
             hints=[
-                "Erste Spalte: im.designation_a->>'de' AS bezeichnung",
+                "Der Palettentyp kommt aus bu.alias und wird mit CASE übersetzt.",
                 "CASE bu.alias WHEN 'palette-typ-a' THEN 'Typ A' WHEN 'palette-typ-b' THEN 'Typ B' ELSE bu.alias END AS hu_typ",
             ],
             solution="SELECT im.designation_a->>'de' AS bezeichnung, CASE bu.alias WHEN 'palette-typ-a' THEN 'Typ A' WHEN 'palette-typ-b' THEN 'Typ B' ELSE bu.alias END AS hu_typ FROM instance_1.flowapp_demo_item_master im JOIN instance_1.flowapp_demo_packaging_structure ps ON ps.parent_id = im.id JOIN instance_1.flowapp_demo_packaging_structure_pos psp ON psp.packaging_structure_id = ps.id JOIN instance_1.flowapp_demo_bundling_unit bu ON bu.id = psp.bundling_unit_id WHERE psp.packaging_level = 3;",
@@ -1267,15 +1448,15 @@ In älteren Abfragen wird statt des Alias die übersetzte Bezeichnung verglichen
     exercises=[
         EX(
             "o-ex1",
-            why="Zoll will je Bestand TARIC, Ursprungsland und Zollstatus — immer die neueste Quant-Zeile.",
-            task="Gib deutsche Artikelbezeichnung, TARIC, ISO-Ursprungsland und Zollstatus-Alias aus.",
+            why="Zoll will je Bestand Tarifnummer, Ursprungsland und Zollstatus — immer die aktuelle Bestandszeile.",
+            task="Zeig deutsche Bezeichnung, TARIC, ISO-Ursprungsland und Zollstatus. Nur die neueste Zeile je Position.",
             look=[
-                "Rechts: Quant, Position (HU), Artikelstamm (customs_tariff_number_taric), Länderkennzeichen, Profil (Zollstatus).",
-                "CTE und JOINs sind vorbereitet. SELECT-Liste und WHERE rn = 1 ergänzen.",
+                "SELECT und JOINs stehen. Es fehlt der Filter auf die neueste Bestandszeile.",
+                "Nach WHERE r.rn = die Zahl 1 eintragen.",
             ],
-            starter="-- Neueste Quant-Zeile, dann Zollfelder dazuholen.\n-- Rechts: Quant, Position (HU), Artikelstamm, Länderkennzeichen, Profil (Zollstatus).\n\nWITH ranked AS (\n  SELECT sq.*,\n         ROW_NUMBER() OVER (\n           PARTITION BY sq.handling_unit_position_id\n           ORDER BY sq.updated_date DESC\n         ) AS rn\n  FROM instance_1.flowapp_demo_stock_quant sq\n)\nSELECT\n  -- Spalten rechts anklicken\nFROM ranked r\nJOIN instance_1.flowapp_demo_handling_unit_position hup ON hup.id = r.handling_unit_position_id\nJOIN instance_1.flowapp_demo_item_master im ON im.id = hup.item_master_id\nJOIN instance_1.flowapp_demo_country_code cc ON cc.id = r.country_of_origin_id\nJOIN instance_1.flowapp_demo_customs_status_profile csp ON csp.id = r.customs_status_id\nWHERE\n",
+            starter="WITH ranked AS (\n  SELECT sq.*,\n         ROW_NUMBER() OVER (\n           PARTITION BY sq.handling_unit_position_id\n           ORDER BY sq.updated_date DESC\n         ) AS rn\n  FROM instance_1.flowapp_demo_stock_quant sq\n)\nSELECT\n  im.designation_a->>'de' AS bezeichnung,\n  im.customs_tariff_number_taric AS taric,\n  cc.iso_code AS ursprungsland,\n  csp.alias AS zollstatus\nFROM ranked r\nJOIN instance_1.flowapp_demo_handling_unit_position hup ON hup.id = r.handling_unit_position_id\nJOIN instance_1.flowapp_demo_item_master im ON im.id = hup.item_master_id\nJOIN instance_1.flowapp_demo_country_code cc ON cc.id = r.country_of_origin_id\nJOIN instance_1.flowapp_demo_customs_status_profile csp ON csp.id = r.customs_status_id\nWHERE r.rn =\n",
             hints=[
-                "SELECT im.designation_a->>'de' AS bezeichnung, im.customs_tariff_number_taric AS taric, cc.iso_code AS ursprungsland, csp.alias AS zollstatus",
+                "Wie in Teil A: rn = 1 ist die neueste Zeile je Position.",
                 "WHERE r.rn = 1",
             ],
             solution="WITH ranked AS (SELECT sq.*, ROW_NUMBER() OVER (PARTITION BY sq.handling_unit_position_id ORDER BY sq.updated_date DESC) AS rn FROM instance_1.flowapp_demo_stock_quant sq) SELECT im.designation_a->>'de' AS bezeichnung, im.customs_tariff_number_taric AS taric, cc.iso_code AS ursprungsland, csp.alias AS zollstatus FROM ranked r JOIN instance_1.flowapp_demo_handling_unit_position hup ON hup.id = r.handling_unit_position_id JOIN instance_1.flowapp_demo_item_master im ON im.id = hup.item_master_id JOIN instance_1.flowapp_demo_country_code cc ON cc.id = r.country_of_origin_id JOIN instance_1.flowapp_demo_customs_status_profile csp ON csp.id = r.customs_status_id WHERE r.rn = 1;",
@@ -1283,15 +1464,15 @@ In älteren Abfragen wird statt des Alias die übersetzte Bezeichnung verglichen
         EX(
             "o-ex2",
             why="Für Auftrag 100504_A braucht der Zoll die Lieferadresse, nicht die Rechnungsadresse.",
-            task="Gib Kategorie-Alias, Adressname und ISO-Ländercode der Lieferadresse aus.",
+            task="Zeig Kategorie, Name und Ländercode der Lieferadresse von Auftrag 100504_A.",
             look=[
-                "Rechts „Adresse“ hängt am Auftrag (parent_id).",
-                "Rechts „Kategorie (Adresse)“: alias = lieferadresse. JOINs sind vorbereitet.",
+                "Auftrag, JOINs und SELECT stehen. Der Auftrag ist schon gefiltert.",
+                "Nach ac.alias = den Kurznamen der Lieferadresse eintragen: 'lieferadresse'",
             ],
-            starter="-- Nur die Lieferadresse dieses Auftrags.\n-- Rechts: Auftrag, Adresse, Kategorie (Adresse), Länderkennzeichen.\n\nSELECT\n  -- Spalten rechts anklicken\nFROM instance_1.flowapp_demo_order_head oh\nJOIN instance_1.flowapp_demo_address_data ad ON ad.parent_id = oh.id\nJOIN instance_1.flowapp_demo_address_category ac ON ac.id = ad.address_category_id\nJOIN instance_1.flowapp_demo_country_code cc ON cc.id = ad.country_id\nWHERE\n",
+            starter="SELECT ac.alias AS kategorie, ad.name, cc.iso_code\nFROM instance_1.flowapp_demo_order_head oh\nJOIN instance_1.flowapp_demo_address_data ad ON ad.parent_id = oh.id\nJOIN instance_1.flowapp_demo_address_category ac ON ac.id = ad.address_category_id\nJOIN instance_1.flowapp_demo_country_code cc ON cc.id = ad.country_id\nWHERE oh.order_number = '100504_A'\n  AND ac.alias =\n",
             hints=[
-                "SELECT ac.alias AS kategorie, ad.name, cc.iso_code",
-                "WHERE oh.order_number = '100504_A' AND ac.alias = 'lieferadresse'",
+                "Die Kategorie heißt in den Stammdaten 'lieferadresse'.",
+                "AND ac.alias = 'lieferadresse'",
             ],
             solution="SELECT ac.alias AS kategorie, ad.name, cc.iso_code FROM instance_1.flowapp_demo_order_head oh JOIN instance_1.flowapp_demo_address_data ad ON ad.parent_id = oh.id JOIN instance_1.flowapp_demo_address_category ac ON ac.id = ad.address_category_id JOIN instance_1.flowapp_demo_country_code cc ON cc.id = ad.country_id WHERE oh.order_number = '100504_A' AND ac.alias = 'lieferadresse';",
         ),
@@ -1354,15 +1535,15 @@ END AS "TNR_oder_HU_Nummer"
     exercises=[
         EX(
             "p-ex1",
-            why="Eine Übersicht soll je HU die Seriennummern zählen — HUs ohne SN dürfen nicht verschwinden.",
-            task="Gib je Handling Unit die interne Nummer, die Anzahl distinkter Seriennummern und die Semikolon-Liste (sortiert) aus.",
+            why="Eine Übersicht soll je Palette die Seriennummern zählen — Paletten ohne Nummer dürfen nicht verschwinden.",
+            task="Zeig je Handling Unit die interne Nummer, die Anzahl verschiedener Seriennummern und die sortierte Liste mit Semikolon.",
             look=[
-                "Rechts: Handling-Unit, Position (hängt an HU), Seriennummer (hängt an Position über parent_id).",
-                "LEFT JOIN und GROUP BY sind vorbereitet. SELECT mit COUNT/STRING_AGG ergänzen.",
+                "LEFT JOIN und GROUP BY stehen schon, damit leere Paletten bleiben.",
+                "handling_unit_id und die Anzahl stehen. In der dritten Spalte die Liste bauen: STRING_AGG(DISTINCT psn.serial_number, '; ' ORDER BY psn.serial_number)",
             ],
-            starter="-- LEFT JOIN, damit HUs ohne Seriennummer bleiben.\n-- Rechts: Handling-Unit, Position, Seriennummer.\n\nSELECT\n  -- Spalten rechts anklicken\nFROM instance_1.flowapp_demo_handling_unit hu\nJOIN instance_1.flowapp_demo_handling_unit_position hup ON hu.id = hup.handling_unit_id\nLEFT JOIN instance_1.flowapp_demo_hu_position_serial_number psn ON hup.id = psn.parent_id\nGROUP BY hu.handling_unit_id;\n",
+            starter="SELECT\n  hu.handling_unit_id,\n  COUNT(DISTINCT psn.serial_number) AS anzahl_seriennummern,\n  \nFROM instance_1.flowapp_demo_handling_unit hu\nJOIN instance_1.flowapp_demo_handling_unit_position hup ON hu.id = hup.handling_unit_id\nLEFT JOIN instance_1.flowapp_demo_hu_position_serial_number psn ON hup.id = psn.parent_id\nGROUP BY hu.handling_unit_id;\n",
             hints=[
-                "hu.handling_unit_id, COUNT(DISTINCT psn.serial_number) AS anzahl_seriennummern",
+                "STRING_AGG klebt die Nummern aneinander. DISTINCT und ORDER BY gehören hinein.",
                 "STRING_AGG(DISTINCT psn.serial_number, '; ' ORDER BY psn.serial_number) AS seriennummern_liste",
             ],
             solution="SELECT hu.handling_unit_id, COUNT(DISTINCT psn.serial_number) AS anzahl_seriennummern, STRING_AGG(DISTINCT psn.serial_number, '; ' ORDER BY psn.serial_number) AS seriennummern_liste FROM instance_1.flowapp_demo_handling_unit hu JOIN instance_1.flowapp_demo_handling_unit_position hup ON hu.id = hup.handling_unit_id LEFT JOIN instance_1.flowapp_demo_hu_position_serial_number psn ON hup.id = psn.parent_id GROUP BY hu.handling_unit_id;",
@@ -1370,14 +1551,14 @@ END AS "TNR_oder_HU_Nummer"
         EX(
             "p-ex2",
             why="Auf dem Label soll die externe Tracking-Nummer stehen, falls vorhanden — sonst die interne HU-Nummer.",
-            task="Gib je HU handling_unit_number und die Anzeige-Kennung aus (TNR oder interne Nummer).",
+            task="Zeig je Handling Unit die interne Nummer und die Anzeige-Kennung (externe Tracking-Nummer oder interne Nummer).",
             look=[
-                "Rechts: Handling-Unit, Identifikation (hängt an HU), Typ (HU-Identifikation) mit alias.",
-                "LEFT JOINs sind vorbereitet. SELECT mit CASE auf t.alias ergänzen.",
+                "Die JOINs und die interne Nummer stehen schon.",
+                "Zweite Spalte: CASE WHEN t.alias = 'externe-tracking-nummer' THEN i.handling_unit_identification ELSE hu.handling_unit_number END",
             ],
-            starter="-- TNR wenn der Typ passt, sonst interne Nummer.\n-- Rechts: Handling-Unit, Identifikation, Typ (HU-Identifikation).\n\nSELECT\n  -- Spalten rechts anklicken\nFROM instance_1.flowapp_demo_handling_unit hu\nLEFT JOIN instance_1.flowapp_demo_handling_unit_identification i ON i.handling_unit_id = hu.id\nLEFT JOIN instance_1.flowapp_demo_handling_unit_identification_type t ON t.id = i.identification_type_id;\n",
+            starter="SELECT\n  hu.handling_unit_number,\n  \nFROM instance_1.flowapp_demo_handling_unit hu\nLEFT JOIN instance_1.flowapp_demo_handling_unit_identification i ON i.handling_unit_id = hu.id\nLEFT JOIN instance_1.flowapp_demo_handling_unit_identification_type t ON t.id = i.identification_type_id;\n",
             hints=[
-                "Erste Spalte: hu.handling_unit_number",
+                "Wenn der Typ externe-tracking-nummer ist, nimm i.handling_unit_identification, sonst die interne Nummer.",
                 "CASE WHEN t.alias = 'externe-tracking-nummer' THEN i.handling_unit_identification ELSE hu.handling_unit_number END AS tnr_oder_hu_nummer",
             ],
             solution="SELECT hu.handling_unit_number, CASE WHEN t.alias = 'externe-tracking-nummer' THEN i.handling_unit_identification ELSE hu.handling_unit_number END AS tnr_oder_hu_nummer FROM instance_1.flowapp_demo_handling_unit hu LEFT JOIN instance_1.flowapp_demo_handling_unit_identification i ON i.handling_unit_id = hu.id LEFT JOIN instance_1.flowapp_demo_handling_unit_identification_type t ON t.id = i.identification_type_id;",
@@ -1395,200 +1576,8 @@ END AS "TNR_oder_HU_Nummer"
     ],
 )
 
-# Kurze Drehpunkte + klickbare Bausteine für die mittlere Übungsspalte.
-GUIDE = {
-    "a-ex1": {
-        "pieces": [P("order_number"), P("task_status")],
-        "trick": "Kein JOIN. Zwei Spalten aus Auftrag nach SELECT.",
-    },
-    "a-ex2": {
-        "pieces": [
-            P("oh.order_number", label="order_number"),
-            P("c.code", label="code"),
-            P("c.id = oh.client_id", slot="JOIN", after="ON "),
-        ],
-        "trick": "JOIN-Lücke nach ON: c.id = oh.client_id (beides UUID, nicht code).",
-    },
-    "a-ex3": {
-        "pieces": [
-            P("handling_unit_position_id"),
-            P("batch_a"),
-            P("updated_date"),
-            P("rn = 1", slot="WHERE", after="WHERE"),
-        ],
-        "trick": "SELECT dieselben drei Spalten wie in der CTE. WHERE-Lücke: rn = 1.",
-    },
-    "d-ex1": {
-        "pieces": [
-            P("im.designation_a->>'de'", label="deutscher Text"),
-            P("c.code", label="code"),
-        ],
-        "trick": "JSONB: designation_a->>'de' — die Spalte heißt designation_a, nicht designation.",
-    },
-    "d-ex2": {
-        "pieces": [
-            P("oc.consolidation_type", label="consolidation_type"),
-            P("id", slot="JOIN", after="oh."),
-            P("100501", slot="WHERE", after="oh.order_id ="),
-        ],
-        "trick": "Drei Lücken: SELECT = consolidation_type, JOIN = oh.id (UUID), WHERE = 100501 ohne Anführungszeichen.",
-    },
-    "d-ex3": {
-        "pieces": [
-            P("split_part(order_number, '_', 1)", label="split_part …"),
-            P("order_id"),
-        ],
-        "trick": "split_part(order_number, '_', 1) schneidet das Suffix _A ab.",
-    },
-    "e-ex1": {
-        "pieces": [
-            P("id"),
-            P("updated_date AT TIME ZONE 'Europe/Berlin'", label="Zeit nach Berlin"),
-        ],
-        "trick": "Genau einmal: updated_date AT TIME ZONE 'Europe/Berlin'. Nicht doppelt, nicht UTC.",
-    },
-    "e-ex2": {
-        "pieces": [
-            P("id"),
-            P("storage_date::date", label="nur Datum"),
-        ],
-        "trick": "storage_date ist schon lokal. Nur ::date — kein AT TIME ZONE.",
-    },
-    "f-ex1": {
-        "pieces": [
-            P("th.id", label="id"),
-            P("tbc.alias = 'goods-receipt-single-hu-movement'", slot="WHERE", after="WHERE"),
-        ],
-        "trick": "SELECT th.id. WHERE-Lücke: tbc.alias = 'goods-receipt-single-hu-movement'.",
-    },
-    "f-ex2": {
-        "pieces": [
-            P("DISTINCT th.id", label="DISTINCT th.id"),
-            P("tbc.alias LIKE 'goods-receipt%' AND th.task_state = '90' AND tp.storage_date IS NOT NULL", slot="WHERE", after="WHERE"),
-        ],
-        "trick": "SELECT DISTINCT th.id. WHERE: WE-Alias, task_state 90, storage_date vorhanden.",
-    },
-    "g-ex1": {
-        "pieces": [P("order_number"), P("task_status")],
-        "trick": "Muster: SELECT → BEGIN → UPDATE → dieselbe SELECT → COMMIT.",
-    },
-    "g-ex2": {
-        "pieces": [P("id"), P("task_position_id")],
-        "trick": "Erst die Kind-Tabelle (Referenz) löschen, dann die Position. Dann COMMIT.",
-    },
-    "i-ex1": {
-        "pieces": [P("storage_location_id")],
-        "trick": "Die Spalte heißt storage_location_id — nicht location_id. LIMIT 1 steht schon.",
-    },
-    "k-ex1": {
-        "pieces": [P("event_type"), P("payload")],
-        "trick": "Schema subscription — ohne instance_1 und ohne flowapp_demo_.",
-    },
-    "k-ex2": {
-        "pieces": [
-            P("r.handling_unit_position_id", label="handling_unit_position_id"),
-            P("qu_stock.alias AS bestand_einheit", label="bestand_einheit"),
-            P("qu_item.alias AS artikel_einheit", label="artikel_einheit"),
-            P("qu_stock.alias <> qu_item.alias", slot="WHERE", after="AND"),
-        ],
-        "trick": "WHERE-Lücke nach AND: qu_stock.alias <> qu_item.alias.",
-    },
-    "k-ex3": {
-        "pieces": [
-            P("code"),
-            P("MD5(to_jsonb(c)::text)", label="Fingerprint"),
-        ],
-        "trick": "code plus MD5(to_jsonb(c)::text) — nie die UUID vergleichen.",
-    },
-    "l-ex1": {
-        "pieces": [
-            P("order_number"),
-            P("task_status"),
-            P("task_status <> 'X0'", slot="WHERE", after="WHERE"),
-        ],
-        "trick": "WHERE-Lücke: task_status <> 'X0' — X0 ist storniert.",
-    },
-    "l-ex2": {
-        "pieces": [
-            P("order_number"),
-            P("loading_status"),
-            P("'80'", slot="WHERE", after="NULLIF(loading_status, '--'), '00') ="),
-        ],
-        "trick": "Die Normalisierung steht schon. WHERE-Lücke: = '80'.",
-    },
-    "l-ex3": {
-        "pieces": [
-            P("oh.order_number", label="order_number"),
-            P("oh.loading_status", label="loading_status"),
-            P("oh.shipment_number = 'SHP-01' AND oc.alias <> 'sendung'", slot="WHERE", after="WHERE"),
-        ],
-        "trick": "WHERE-Lücke: shipment_number = 'SHP-01' und alias <> 'sendung'.",
-    },
-    "m-ex1": {
-        "pieces": [
-            P("oh.order_number", label="order_number"),
-            P("c.alias", label="alias"),
-            P("oc.alias = 'warenausgang'", slot="WHERE", after="WHERE"),
-        ],
-        "trick": "WHERE-Lücke: oc.alias = 'warenausgang' — nicht über eine UUID.",
-    },
-    "m-ex2": {
-        "pieces": [
-            P("alias"),
-            P("name->>'de'", label="deutscher Name"),
-        ],
-        "trick": "alias und name->>'de'. Eine Tabelle, kein JOIN.",
-    },
-    "n-ex1": {
-        "pieces": [
-            P("im.designation_a->>'de'", label="deutscher Text"),
-            P("CASE bu.alias WHEN 'palette-typ-a' THEN 'Typ A' WHEN 'palette-typ-b' THEN 'Typ B' ELSE bu.alias END", label="CASE Palettentyp"),
-        ],
-        "trick": "CASE bu.alias: palette-typ-a → Typ A, palette-typ-b → Typ B, sonst den Roh-Alias.",
-    },
-    "o-ex1": {
-        "pieces": [
-            P("im.designation_a->>'de'", label="deutscher Text"),
-            P("im.customs_tariff_number_taric", label="TARIC"),
-            P("cc.iso_code", label="iso_code"),
-            P("csp.alias", label="alias"),
-            P("r.rn = 1", slot="WHERE", after="WHERE"),
-        ],
-        "trick": "WHERE-Lücke: r.rn = 1 — nur die neueste Quant-Zeile.",
-    },
-    "o-ex2": {
-        "pieces": [
-            P("ac.alias", label="alias"),
-            P("ad.name", label="name"),
-            P("cc.iso_code", label="iso_code"),
-            P("oh.order_number = '100504_A' AND ac.alias = 'lieferadresse'", slot="WHERE", after="WHERE"),
-        ],
-        "trick": "WHERE-Lücke: Auftragsnummer 100504_A und alias = lieferadresse.",
-    },
-    "p-ex1": {
-        "pieces": [
-            P("hu.handling_unit_id", label="handling_unit_id"),
-            P("COUNT(DISTINCT psn.serial_number)", label="COUNT DISTINCT"),
-            P("STRING_AGG(DISTINCT psn.serial_number, '; ' ORDER BY psn.serial_number)", label="STRING_AGG"),
-        ],
-        "trick": "COUNT(DISTINCT …) und STRING_AGG(DISTINCT … ORDER BY …). GROUP BY steht schon.",
-    },
-    "p-ex2": {
-        "pieces": [
-            P("hu.handling_unit_number", label="handling_unit_number"),
-            P("CASE WHEN t.alias = 'externe-tracking-nummer' THEN i.handling_unit_identification ELSE hu.handling_unit_number END", label="CASE TNR oder HU"),
-        ],
-        "trick": "CASE WHEN t.alias = 'externe-tracking-nummer' THEN … ELSE interne Nummer.",
-    },
-}
-
 
 def main():
-    for lesson in LESSONS:
-        for ex in lesson.get("exercises") or []:
-            extra = GUIDE.get(ex["id"])
-            if extra:
-                ex.update(extra)
     out = Path(__file__).with_name("lessons.json")
     out.write_text(json.dumps(LESSONS, ensure_ascii=False, indent=2), encoding="utf-8")
     ex = sum(len(l.get("exercises") or []) for l in LESSONS)
