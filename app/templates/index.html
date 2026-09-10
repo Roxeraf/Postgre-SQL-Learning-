@@ -59,7 +59,7 @@
 <section>
   <div class="section-head">
     <h2>SQL Grundlagen</h2>
-    <p class="muted">Verstehen → Vorhersagen → Bauen → Schreiben → Anwenden</p>
+    <p class="muted">Verstehen → Schreiben → Kurzcheck. Inklusive NULL, GROUP BY und JOIN.</p>
   </div>
   <div class="path path-academy">
     {% for l in academy_lessons %}
@@ -72,6 +72,7 @@
       <p class="path-goals">{{ l.goal }}</p>
       <div class="path-meta">
         <span>{{ l.steps|length }} Schritte</span>
+        {% if l.quiz %}<span>{{ l.quiz|length }} Quiz</span>{% endif %}
         {% if l.challenge %}<span>Challenge</span>{% endif %}
         <span class="path-state">Offen</span>
       </div>
@@ -83,7 +84,7 @@
 <section id="wmx-home">
   <div class="section-head">
     <h2>WMX Datenmodell</h2>
-    <p class="muted">Zweiter Skill-Tree: zuerst SELECT/JOINs auf den WMX-Übungstabellen, danach Teile A–P. Die Akademie oben braucht das nicht — du kannst den Bereich trotzdem öffnen.</p>
+    <p class="muted">Zweiter Skill-Tree: dieselben SQL-Befehle auf den Lager-Tabellen, danach Teile A–P. Die Akademie oben bringt JOIN und Filter schon mit.</p>
   </div>
   <section class="card howto">
     <h2>So arbeitest du in den WMX-Lektionen</h2>
@@ -98,8 +99,8 @@
       <li>
         <span class="howto-num">2</span>
         <div>
-          <strong>Eine SQL-Aufgabe</strong>
-          <p>Du siehst immer nur eine Aufgabe. Rechts die Tabelle aufklappen, Spalte klicken (füllt die Lücke), Ausführen, dann „Stimmt das?“.</p>
+          <strong>SQL-Aufgaben</strong>
+          <p>Erst geführt (FROM steht), dann selbst schreiben. Rechts Tabelle aufklappen, Ausführen, „Stimmt das?“.</p>
         </div>
       </li>
       <li>

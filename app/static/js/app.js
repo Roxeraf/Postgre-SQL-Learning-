@@ -10,6 +10,9 @@ const ACADEMY_CONCEPTS = [
   ["AND", "AND / OR"],
   ["ORDER BY", "ORDER BY"],
   ["LIMIT", "LIMIT"],
+  ["NULL", "NULL"],
+  ["GROUP BY", "GROUP BY"],
+  ["JOIN", "JOIN"],
 ];
 
 function emptyStore() {
@@ -59,7 +62,7 @@ function saveStore(store) {
 function academyState(store, id) {
   if (!store.academy) store.academy = { lessons: {} };
   if (!store.academy.lessons[id]) {
-    store.academy.lessons[id] = { steps: {}, complete: false, current: 0 };
+    store.academy.lessons[id] = { steps: {}, quiz: {}, complete: false, current: 0 };
   }
   return store.academy.lessons[id];
 }
@@ -217,7 +220,7 @@ function initDashboard() {
     .sort((a, b) => a.v - b.v)[0];
   if (weak && started) {
     recWhy = `${weak.label} liegt bei ${Math.round(weak.v)}%. Kurz wiederholen, dann fühlt sich das nächste Kapitel leichter an.`;
-    const map = { TABLE: "ch0", SELECT: "ch2", FROM: "ch1", WHERE: "ch3", COMPARE: "ch4", AND: "ch5", "ORDER BY": "ch6", LIMIT: "ch6" };
+    const map = { TABLE: "ch0", SELECT: "ch2", FROM: "ch1", WHERE: "ch3", COMPARE: "ch4", AND: "ch5", "ORDER BY": "ch6", LIMIT: "ch6", NULL: "ch7", "GROUP BY": "ch8", JOIN: "ch9" };
     recId = map[weak.id] || next;
   }
   const recCard = document.querySelector(`.path-card[data-academy-id="${recId}"]`);
@@ -417,7 +420,7 @@ const SQL_ALIAS_STOP = /^(on|where|left|right|inner|outer|full|cross|join|select
 
 function tableShortFromQualified(name) {
   let short = String(name || "").split(".").pop().toLowerCase();
-  for (const prefix of ["flowapp_demo_", "flowapp_13d663_"]) {
+  for (const prefix of ["flowapp_demo_"]) {
     if (short.startsWith(prefix)) {
       short = short.slice(prefix.length);
       break;

@@ -30,20 +30,22 @@ L(
     id="sql",
     letter="SQL",
     track="einstieg",
-    title="SQL-Grundlagen: SELECT und JOINs",
-    minutes=14,
+    title="SQL auf den Lager-Tabellen",
+    minutes=16,
     goals=[
-        "SELECT, FROM und WHERE als Gerüst einer Abfrage nutzen",
-        "INNER JOIN und LEFT JOIN unterscheiden",
-        "NULL nach einem JOIN als fehlenden Treffer lesen",
+        "Dieselben SELECT/WHERE/JOIN-Befehle voll qualifiziert auf order_head schreiben",
+        "INNER JOIN vs. LEFT JOIN an echten Lücken in den Übungsdaten sehen",
+        "UUID-Naht (oh.id) nicht mit der lesbaren order_id verwechseln",
     ],
-    content="""## Was ist eine Abfrage?
+    content="""## Transfer: dieselbe SQL-Sprache, andere Tabellen
 
-Eine SQL-Abfrage fragt Tabellen. Drei Bausteine reichen für den Start:
+SELECT, WHERE, INNER/LEFT JOIN kennst du aus der Akademie. Hier heißen die Dinge **Auftrag**, **Position**, **Mandant** — und jede Tabelle braucht den vollen Namen:
 
-- **SELECT** — welche Spalten willst du sehen?
-- **FROM** — aus welcher Tabelle?
-- **WHERE** — welche Zeilen behalten? (ohne WHERE kommen alle Zeilen)
+```sql
+instance_1.flowapp_demo_<tabellenname>
+```
+
+Rechts im Übungsteil steht der deutsche Name (**Auftrag**) und darunter der technische (`order_head`). Ohne `instance_1.` sucht Postgres im falschen Schema.
 
 ```sql
 SELECT order_number, task_status
@@ -51,13 +53,15 @@ FROM instance_1.flowapp_demo_order_head
 WHERE order_number = '100504_A';
 ```
 
-In dieser App stehen die Tabellen immer voll qualifiziert: `instance_1.flowapp_demo_…`. Rechts im Übungsteil siehst du den deutschen Namen (**Auftrag**) und darunter den technischen (`order_head`).
+## Die Naht ist eine UUID
 
-## INNER JOIN
+Die Position hängt am Auftrag über `order_position.order_head_id = order_head.id`.
 
-Ein **INNER JOIN** behält nur Zeilen, die **in beiden Tabellen** einen Treffer haben.
+`order_head.order_id` ist die **lesbare Nummer** (integer, z. B. 100504). `order_head.id` ist der **UUID-Primärschlüssel**. `integer = uuid` knallt zur Laufzeit — deshalb joinst du nicht über `order_id`.
 
-Auftrag ohne Position? Fliegt raus. Position ohne Auftrag? Fliegt raus.
+## INNER JOIN Auftrag → Position
+
+Nur Paare. Auftrag ohne Position fliegt raus.
 
 ```sql
 SELECT oh.order_number, op.quantity
@@ -66,69 +70,47 @@ INNER JOIN instance_1.flowapp_demo_order_position op
   ON op.order_head_id = oh.id;
 ```
 
-`ON` sagt, *worüber* die Tabellen zusammengehören. Hier: die Position hängt am Auftrag (`order_head_id` = `oh.id`).
+In der Übungs-DB haben **drei** von acht Aufträgen Positionen — INNER JOIN liefert drei Zeilen. `JOIN` ohne Wort davor ist INNER JOIN.
 
-In der Übungs-DB haben nur drei Aufträge Positionen — INNER JOIN liefert also drei Zeilen. `JOIN` ohne Wort davor ist dasselbe wie `INNER JOIN`.
+## LEFT JOIN — Lücken sichtbar
 
-## LEFT JOIN
+LEFT JOIN behält alle Aufträge. Ohne Position ist `quantity` **NULL** (kein Treffer, nicht 0).
 
-**LEFT JOIN** (ausgeschrieben **LEFT OUTER JOIN**) behält **alle Zeilen der linken Tabelle**. Fehlt rechts ein Treffer, stehen dort **NULL**.
+Acht Aufträge, fünf ohne Position. Ein Auftrag hat **keinen Mandanten** (`100508_A`) — LEFT JOIN Auftrag → Mandant zeigt `c.code` dort leer.
 
 ```sql
-SELECT oh.order_number, op.quantity
+SELECT oh.order_number, c.code
 FROM instance_1.flowapp_demo_order_head oh
-LEFT JOIN instance_1.flowapp_demo_order_position op
-  ON op.order_head_id = oh.id;
+LEFT JOIN instance_1.flowapp_demo_client c
+  ON c.id = oh.client_id;
 ```
 
-Dieselbe Verknüpfung wie eben — aber jetzt bleiben Aufträge ohne Position in der Liste, `quantity` ist dann leer. In der Übungs-DB: sieben Aufträge, vier davon ohne Position.
-
-Im Lageralltag: Auftragsliste mit Mandant, auch wenn `client_id` fehlt. Deshalb steht bei uns fast immer **LEFT JOIN**.
-
-## RIGHT und FULL JOIN
-
-**RIGHT OUTER JOIN** ist LEFT JOIN mit vertauschten Tabellen: alle Zeilen **rechts** bleiben. Bei uns liegt der Auftrag üblicherweise links — dann schreibst du LEFT JOIN, nicht RIGHT.
-
-**FULL OUTER JOIN** behält Zeilen **beider** Seiten, auch ohne Treffer. Mandant `DEMO` hat in der Übungs-DB keinen Auftrag: ein FULL JOIN Auftrag/Mandant würde ihn trotzdem zeigen. Im Shop selten nötig; wenn, dann für Abgleiche („was hängt nirgends?“).
+Im Lageralltag fast immer LEFT JOIN, Auftrag links: die Auftragsliste darf nicht verschwinden.
 
 ## Welchen JOIN wann?
-
-Sprache aus dem Lager: **Auftrag**, **Mandant**, **Position**.
 
 | Ziel | JOIN |
 |---|---|
 | Nur Aufträge, die wirklich Positionen haben | **INNER JOIN** |
 | Alle Aufträge, Lücken sichtbar lassen | **LEFT JOIN** Auftrag → Position |
 | Auftrag plus Mandant, Auftrag darf nicht verschwinden | **LEFT JOIN** Auftrag → Mandant |
-| Zwei Listen vollständig gegeneinander halten | **FULL OUTER JOIN** (selten) |
 
-Faustregel: Was darf nicht verloren gehen? Das gehört **nach links**, dann LEFT JOIN.
+Mandant `DEMO` hat keinen Auftrag. Ein FULL JOIN Auftrag/Mandant würde ihn trotzdem zeigen — im Shop selten.
 
-## NULL nach dem JOIN
-
-NULL heißt hier: **kein Treffer**, nicht die Zahl 0.
-
-- `quantity IS NULL` — dieser Auftrag hat keine Position.
-- `quantity = 0` — findet diese Lücken **nicht** (NULL ist nicht 0).
-- `c.code IS NULL` — dieser Auftrag hat keinen Mandanten.
-
-Die Zeile links existiert. Rechts ist die Zelle leer. Genau das willst du sehen, wenn du mit LEFT JOIN nach fehlenden Daten suchst.
-
-JOIN-Arten sitzen jetzt. Teil A nimmt Postgres-Eigenheiten (Schema, UUID, Window Functions).""",
+Teil A nimmt Postgres-Eigenheiten: Schema, UUID vs. Integer, CTE und Window Functions.""",
     exercises=[
         EX(
             "sql-ex1",
-            why="Bevor Joins kommen: eine Zeile gezielt finden.",
+            why="Dieselben drei Satzteile wie in der Akademie — jetzt mit vollem Tabellennamen.",
             task="Gib Auftragsnummer und Status für den Auftrag 100504_A aus.",
             look=[
-                "Rechts „Auftrag“ (order_head) öffnen.",
-                "SELECT: order_number und task_status.",
-                "WHERE filtert auf genau diese Auftragsnummer.",
+                "Rechts „Auftrag“ öffnen. Die Tabelle im FROM steht schon voll qualifiziert.",
+                "Zwei Spalten: order_number und task_status. Filter: genau diese Auftragsnummer.",
             ],
-            starter="-- Eine Zeile: Auftrag 100504_A.\n-- Rechts: Tabelle „Auftrag“.\n\nSELECT\n  -- Spalten einsetzen\n  \nFROM instance_1.flowapp_demo_order_head\nWHERE\n",
+            starter="-- Eine Zeile: Auftrag 100504_A.\n\nSELECT\n  \nFROM instance_1.flowapp_demo_order_head\nWHERE\n",
             hints=[
-                "SELECT order_number, task_status — beide Spalten stehen rechts bei Auftrag.",
-                "WHERE order_number = '100504_A' — Text in einfachen Anführungszeichen.",
+                "Spalten heißen order_number und task_status.",
+                "Textfilter in einfachen Anführungszeichen: order_number = '100504_A'.",
             ],
             solution="SELECT order_number, task_status FROM instance_1.flowapp_demo_order_head WHERE order_number = '100504_A';",
         ),
@@ -137,13 +119,13 @@ JOIN-Arten sitzen jetzt. Teil A nimmt Postgres-Eigenheiten (Schema, UUID, Window
             why="Nur Aufträge, die wirklich Positionen haben — der Rest soll nicht in der Liste stehen.",
             task="Verknüpfe Auftrag und Position per INNER JOIN. Gib Auftragsnummer und Menge aus.",
             look=[
+                "Die Position hängt am Auftrag: op.order_head_id = oh.id (UUID, nicht order_id).",
                 "SELECT: oh.order_number und op.quantity.",
-                "ON op.order_head_id = oh.id — die Position hängt am Auftrag.",
             ],
-            starter="-- Nur Treffer in beiden Tabellen.\n-- Rechts: „Auftrag“ und „Position“ (hängt am Auftrag).\n\nSELECT\n  \nFROM instance_1.flowapp_demo_order_head oh\nINNER JOIN instance_1.flowapp_demo_order_position op\n  ON \n",
+            starter="-- Nur Treffer in beiden Tabellen.\n\nSELECT\n  \nFROM instance_1.flowapp_demo_order_head oh\nINNER JOIN instance_1.flowapp_demo_order_position op\n  ON \n",
             hints=[
-                "SELECT oh.order_number, op.quantity — Alias oh und op stehen schon im FROM.",
-                "ON op.order_head_id = oh.id — nicht order_id (integer) mit id (UUID) mischen.",
+                "Alias oh und op stehen schon im FROM.",
+                "ON op.order_head_id = oh.id — nicht die lesbare order_id.",
             ],
             solution="SELECT oh.order_number, op.quantity FROM instance_1.flowapp_demo_order_head oh INNER JOIN instance_1.flowapp_demo_order_position op ON op.order_head_id = oh.id;",
         ),
@@ -152,15 +134,30 @@ JOIN-Arten sitzen jetzt. Teil A nimmt Postgres-Eigenheiten (Schema, UUID, Window
             why="Dieselbe Liste, aber Aufträge ohne Position sollen bleiben — Menge dann leer (NULL).",
             task="Verknüpfe Auftrag und Position per LEFT JOIN. Gib Auftragsnummer und Menge aus.",
             look=[
-                "Gleicher SELECT wie eben: oh.order_number, op.quantity.",
-                "ON bleibt op.order_head_id = oh.id. LEFT statt INNER hält Aufträge ohne Position.",
+                "Gleicher JOIN-Schlüssel wie eben. LEFT statt INNER hält die fünf Aufträge ohne Position.",
+                "Erwartet: mehr Zeilen als bei der INNER-JOIN-Aufgabe.",
             ],
-            starter="-- Alle Aufträge, auch ohne Position.\n-- Rechts: „Auftrag“ und „Position“.\n\nSELECT\n  \nFROM instance_1.flowapp_demo_order_head oh\nLEFT JOIN instance_1.flowapp_demo_order_position op\n  ON \n",
+            starter="-- Alle Aufträge, auch ohne Position.\n\nSELECT\n  \nFROM instance_1.flowapp_demo_order_head oh\nLEFT JOIN instance_1.flowapp_demo_order_position op\n  ON \n",
             hints=[
-                "SELECT oh.order_number, op.quantity",
-                "ON op.order_head_id = oh.id — wer LEFT durch INNER ersetzt, verliert die Aufträge ohne Position.",
+                "SELECT oh.order_number, op.quantity.",
+                "ON bleibt op.order_head_id = oh.id. Wer INNER nimmt, verliert Aufträge ohne Position.",
             ],
             solution="SELECT oh.order_number, op.quantity FROM instance_1.flowapp_demo_order_head oh LEFT JOIN instance_1.flowapp_demo_order_position op ON op.order_head_id = oh.id;",
+        ),
+        EX(
+            "sql-ex4",
+            why="Ein Auftrag hat keinen Mandanten. Die Auftragsliste darf trotzdem vollständig sein.",
+            task="Zeig zu jedem Auftrag die Nummer und den Mandanten-Code. Aufträge ohne Mandant sollen bleiben.",
+            look=[
+                "Mandant = Tabelle client, Naht c.id = oh.client_id.",
+                "LEFT JOIN, Auftrag links. 100508_A hat dann einen leeren Code.",
+            ],
+            starter="-- Auftragsliste inkl. Lücke beim Mandanten.\n\n",
+            hints=[
+                "FROM order_head, LEFT JOIN client. Was nicht verschwinden darf, gehört nach links.",
+                "ON c.id = oh.client_id — der Code ist c.code, nicht die UUID.",
+            ],
+            solution="SELECT oh.order_number, c.code FROM instance_1.flowapp_demo_order_head oh LEFT JOIN instance_1.flowapp_demo_client c ON c.id = oh.client_id;",
         ),
     ],
     quiz=[
@@ -269,7 +266,7 @@ JOIN-Arten (INNER, LEFT, RIGHT, FULL) und NULL bei fehlendem Treffer stehen in d
 
 **Datentypen müssen zusammenpassen.** `integer = uuid` führt zum Laufzeitfehler — häufig, weil manche Felder integer sind (z. B. `order_id`) und der Primärschlüssel UUID (`order_head.id`). Die Verknüpfung geht über `ON … = …`, oft UUID (`id`) oder fachliche Referenzfelder (Teil D.4).
 
-Auftrag mit Mandant — LEFT JOIN, damit der Auftrag bleibt, falls `client_id` fehlt (in der Übungs-DB hat jeder Auftrag einen Mandanten, INNER und LEFT sind hier gleich):
+Auftrag mit Mandant — LEFT JOIN, damit der Auftrag bleibt, falls `client_id` fehlt. In der Übungs-DB hat **100508_A keinen Mandanten**: INNER JOIN würde ihn verlieren, LEFT JOIN zeigt `c.code` als NULL.
 
 ```sql
 SELECT oh.order_number, c.code
@@ -316,54 +313,98 @@ Eine View ist eine gespeicherte SELECT-Abfrage. Views übernehmen **nicht automa
     exercises=[
         EX(
             "a-ex1",
-            why="Zum Schichtstart will ein Kollege nur sehen, welche Aufträge es gibt und wo sie stehen — keine Extra-Spalten.",
-            task="Zeig alle Aufträge: Nummer und Status.",
+            why="Ohne Schema-Präfix sucht Postgres im search_path und findet die Tabelle nicht.",
+            task="Zeig Auftragsnummer und Status aller Aufträge. Tabelle voll qualifiziert ansprechen.",
             look=[
-                "Rechts „Auftrag“ aufklappen (steht unter „In dieser Aufgabe“).",
-                "order_number klicken — die Spalte landet in der Lücke nach SELECT.",
-                "Dann task_status klicken. Das Komma setzt die App.",
-                "Ausführen, danach Stimmt das?.",
+                "Muster: instance_1.flowapp_demo_order_head — Schema, Präfix, Name.",
+                "Rechts „Auftrag“ — der technische Name steht unter der deutschen Bezeichnung.",
             ],
-            starter="SELECT\n  \nFROM instance_1.flowapp_demo_order_head;\n",
+            starter="-- Vollständiger Name: instance_1.flowapp_demo_…\n\nSELECT\n  \nFROM \n",
             hints=[
-                "Bei Auftrag: order_number ist die Nummer, task_status der Status. Kein zweiter Tisch, kein Filter.",
-                "SELECT order_number, task_status FROM instance_1.flowapp_demo_order_head;",
+                "SELECT order_number, task_status.",
+                "FROM instance_1.flowapp_demo_order_head — ohne instance_1. findet Postgres nichts.",
             ],
+            require=["instance_1.flowapp_demo_order_head"],
             solution="SELECT order_number, task_status FROM instance_1.flowapp_demo_order_head;",
         ),
         EX(
             "a-ex2",
-            why="Dieselbe Liste, aber der Kollege will hinter jeder Nummer auch den Mandanten sehen.",
-            task="Zeig zu jedem Auftrag die Nummer und den Mandanten-Code.",
+            why="order_id ist die lesbare Nummer (integer). Joins laufen über id (UUID). Mischen knallt.",
+            task="Zeig die Zonentypen von Auftrag 100501. Die Zonierung hängt am UUID-Schlüssel des Auftrags.",
             look=[
-                "LEFT JOIN steht schon: Auftrag bleibt, auch ohne Mandant (wie in den SQL-Grundlagen).",
-                "Rechts Auftrag aufklappen → order_number klicken. Die Tabelle heißt oh, deshalb wird oh.order_number eingefügt.",
-                "Dann Mandant aufklappen → code klicken (wird zu c.code).",
-                "In die leere Zeile nach ON klicken und schreiben: c.id = oh.client_id",
+                "Tabelle Zonierung (order_consolidation): parent_id = order_head.id, nicht order_id.",
+                "Filter auf die lesbare Nummer 100501 darfst du in WHERE nutzen — der JOIN nicht.",
             ],
-            starter="SELECT\n  \nFROM instance_1.flowapp_demo_order_head oh\nLEFT JOIN instance_1.flowapp_demo_client c\n  ON \n",
+            starter="SELECT oc.consolidation_type\nFROM instance_1.flowapp_demo_order_head oh\nJOIN instance_1.flowapp_demo_order_consolidation oc\n  ON oc.parent_id = oh.\nWHERE oh.order_id = 100501;\n",
             hints=[
-                "Nach SELECT gehören oh.order_number und c.code — die Kurznamen oh und c stehen schon im FROM.",
-                "ON c.id = oh.client_id — Mandanten-Schlüssel, nicht der Code.",
+                "Nach oh. kommt id (UUID). order_id wäre der falsche Typ.",
+                "ON oc.parent_id = oh.id",
             ],
-            solution="SELECT oh.order_number, c.code FROM instance_1.flowapp_demo_order_head oh LEFT JOIN instance_1.flowapp_demo_client c ON c.id = oh.client_id;",
+            solution="SELECT oc.consolidation_type FROM instance_1.flowapp_demo_order_head oh JOIN instance_1.flowapp_demo_order_consolidation oc ON oc.parent_id = oh.id WHERE oh.order_id = 100501;",
         ),
         EX(
             "a-ex3",
             why="Im Bestand stehen oft mehrere Zeilen pro Palettenfach. Der Report soll nur die aktuelle zeigen.",
             task="Behalt pro Lagerplatz-Position nur die neueste Bestandszeile. Gib Positions-ID, Charge und Änderungsdatum aus.",
             look=[
-                "Die innere Abfrage nummeriert schon: 1 = neueste Zeile je Position.",
-                "Nach WHERE rn = die Zahl 1 eintragen.",
-                "Dann Ausführen.",
+                "Tabelle stock_quant. Mehrere Zeilen je handling_unit_position_id — die mit dem neuesten updated_date behalten.",
+                "Muster: ROW_NUMBER() OVER (PARTITION BY … ORDER BY updated_date DESC), danach WHERE rn = 1.",
+                "Eine CTE (WITH … AS) hält die Nummerierung lesbar.",
             ],
-            starter="WITH ranked AS (\n  SELECT\n    handling_unit_position_id,\n    batch_a,\n    updated_date,\n    ROW_NUMBER() OVER (\n      PARTITION BY handling_unit_position_id\n      ORDER BY updated_date DESC\n    ) AS rn\n  FROM instance_1.flowapp_demo_stock_quant\n)\nSELECT handling_unit_position_id, batch_a, updated_date\nFROM ranked\nWHERE rn = \n",
+            starter="-- Pro handling_unit_position_id nur die neueste Zeile (updated_date DESC).\n-- Ausgabe: handling_unit_position_id, batch_a, updated_date\n\n",
             hints=[
-                "rn = 1 lässt nur die neueste Zeile je Position durch.",
-                "WHERE rn = 1",
+                "WITH ranked AS ( SELECT …, ROW_NUMBER() OVER (PARTITION BY handling_unit_position_id ORDER BY updated_date DESC) AS rn FROM … )",
+                "Außen nur noch WHERE rn = 1 und die drei Ausgabespalten. Tabelle: instance_1.flowapp_demo_stock_quant.",
             ],
+            require=["ROW_NUMBER", "PARTITION BY"],
             solution="WITH ranked AS (SELECT handling_unit_position_id, batch_a, updated_date, ROW_NUMBER() OVER (PARTITION BY handling_unit_position_id ORDER BY updated_date DESC) AS rn FROM instance_1.flowapp_demo_stock_quant) SELECT handling_unit_position_id, batch_a, updated_date FROM ranked WHERE rn = 1;",
         ),
+    ],
+    quiz=[
+        {
+            "q": "Wie lautet die voll qualifizierte Ansprache von order_head bei uns?",
+            "options": [
+                "order_head",
+                "flowapp_demo_order_head",
+                "instance_1.flowapp_demo_order_head",
+                "instance_1.order_head",
+            ],
+            "correct": 2,
+            "explain": "Immer Schema + Präfix + Tabellenname. Ohne instance_1 sucht Postgres im search_path.",
+        },
+        {
+            "q": "Worüber joinst du eine Kindtabelle an den Auftrag?",
+            "options": [
+                "order_head.order_id (integer, lesbare Nummer)",
+                "order_head.id (UUID-Primärschlüssel)",
+                "order_number als Text",
+                "Immer über den Mandanten",
+            ],
+            "correct": 1,
+            "explain": "order_id ist die lesbare Nummer. Die Naht ist id. integer = uuid wirft einen Laufzeitfehler.",
+        },
+        {
+            "q": "Was macht ROW_NUMBER() … WHERE rn = 1?",
+            "options": [
+                "Es löscht alle alten Zeilen in der Tabelle.",
+                "Pro Partition bleibt die erste Zeile der Sortierung — z. B. die neueste Qualifikation.",
+                "Es zählt die Aufträge.",
+                "Es ist dasselbe wie LIMIT 1 auf die ganze Tabelle.",
+            ],
+            "correct": 1,
+            "explain": "Window Function nummeriert innerhalb der Gruppe. rn = 1 nach ORDER BY datum DESC = neueste Zeile je Schlüssel.",
+        },
+        {
+            "q": "Wozu eine CTE (WITH … AS)?",
+            "options": [
+                "Sie ersetzt JOIN.",
+                "Ein benanntes Zwischenergebnis, auf das die äußere Query zugreift — z. B. die nummerierten Zeilen.",
+                "Sie schreibt in die Tabelle.",
+                "Sie ist in Postgres verboten.",
+            ],
+            "correct": 1,
+            "explain": "WITH ranked AS (…) SELECT … FROM ranked WHERE rn = 1. Lesbarer als verschachtelte Subselects.",
+        },
     ],
 )
 
@@ -415,6 +456,23 @@ Das System ist multi-tenant-fähig: Jeder Kunde wird als eigener Mandant (`clien
 Für die tägliche Arbeit: Bei praktisch jeder Abfrage über mehrere Mandanten hinweg **früh auf den Mandanten filtern** — wegen Index-Nutzung und damit Daten nicht vermischt werden.
 
 In dieser Lern-Datenbank liegen sechs Übungs-Mandanten: `NORD`, `SUED`, `WEST`, `OST`, `ZENTRAL`, `DEMO`. Das sind erfundene Beispieldaten — keine echten Kunden.""",
+    exercises=[
+        EX(
+            "b-ex1",
+            why="Multi-Tenant: früh auf den Mandanten filtern, sonst mischst du Daten und nutzt den Index nicht.",
+            task="Zeig Auftragsnummer und Status aller Aufträge des Mandanten WEST.",
+            look=[
+                "Auftrag joinen mit Mandant (client). Filter auf c.code = 'WEST' — nicht auf eine UUID.",
+                "LEFT JOIN, damit die Idee aus Teil SQL bleibt; WEST hat Aufträge, INNER ginge hier auch.",
+            ],
+            starter="SELECT oh.order_number, oh.task_status\nFROM instance_1.flowapp_demo_order_head oh\nJOIN instance_1.flowapp_demo_client c\n  ON c.id = oh.client_id\nWHERE \n",
+            hints=[
+                "Der Mandanten-Code steht in client.code.",
+                "WHERE c.code = 'WEST'",
+            ],
+            solution="SELECT oh.order_number, oh.task_status FROM instance_1.flowapp_demo_order_head oh JOIN instance_1.flowapp_demo_client c ON c.id = oh.client_id WHERE c.code = 'WEST';",
+        ),
+    ],
     quiz=[
         {"q": "Wie lautet die korrekte, voll qualifizierte Ansprache einer Tabelle bei uns?", "options": ["order_head", "flowapp_demo_order_head", "instance_1.flowapp_demo_order_head", "instance_1.order_head"], "correct": 2, "explain": "Immer Schema + Präfix + Tabellenname. Ohne instance_1 sucht Postgres im search_path (meist public) und findet nichts."},
         {"q": "In welchem Schema liegen die Print-Subscription-Tabellen?", "options": ["instance_1", "subscription", "flowapp_demo_print", "public"], "correct": 1, "explain": "Print liegt bewusst nicht in instance_1, sondern im Schema subscription (z. B. processevents_*)."},
@@ -608,7 +666,7 @@ FROM instance_1.flowapp_demo_order_head;
             starter="SELECT\n  split_part(, '_', 1) AS order_number_norm,\n  order_id\nFROM instance_1.flowapp_demo_order_head;\n",
             hints=[
                 "split_part zerteilt am Unterstrich und nimmt das erste Stück: split_part(order_number, '_', 1).",
-                "SELECT split_part(order_number, '_', 1) AS order_number_norm, order_id FROM instance_1.flowapp_demo_order_head;",
+                "Erstes Argument ist die Textspalte, nicht die lesbare ID. Zweites Argument ist der Trenner.",
             ],
             solution="SELECT split_part(order_number, '_', 1) AS order_number_norm, order_id FROM instance_1.flowapp_demo_order_head;",
         ),
@@ -618,6 +676,12 @@ FROM instance_1.flowapp_demo_order_head;
         {"id": "d-fc2", "front": "Wie kommt item_master zum Mandanten?", "back": "item_master.parent_id = client.accounting_area_item_master_id — es gibt keine client_id am Artikel."},
         {"id": "d-fc3", "front": "Was speichert order_consolidation wirklich?", "back": "Zonen-Einträge (eine Zeile pro Auftrag + Zonentyp), nicht den Auftragskopf. Join: parent_id = order_head.id"},
         {"id": "d-fc4", "front": "Auftrag → Task: welcher reference_key?", "back": "#X.order-id (oder #X.order-number), source_slug_name = 'order-head'"},
+    ],
+    quiz=[
+        {"q": "Wie liest man den deutschen Text aus designation_a?", "options": ["designation_a.de", "designation_a->>'de'", "designation", "designation_a->de ohne Quotes"], "correct": 1, "explain": "JSONB: ->> liefert Text. Die Spalte heißt designation_a, nicht designation."},
+        {"q": "Wie kommt item_master zum Mandanten?", "options": ["item_master.client_id", "item_master.parent_id = client.accounting_area_item_master_id", "Über order_head", "Gar nicht"], "correct": 1, "explain": "Keine client_id am Artikel. Join über den Buchungskreis Artikelstamm."},
+        {"q": "Was speichert order_consolidation?", "options": ["Den Auftragskopf", "Zonen-Einträge (eine Zeile pro Auftrag + Zonentyp)", "Den Mandanten", "Die Sendungsnummer"], "correct": 1, "explain": "parent_id = order_head.id. consolidation_type ist der Zonencode."},
+        {"q": "Worüber hängt die Zonierung am Auftrag?", "options": ["order_id (integer)", "order_head.id (UUID)", "order_number", "client_id"], "correct": 1, "explain": "parent_id ist UUID. Filter auf 100501 darfst du in WHERE über order_id machen — der JOIN nicht."},
     ],
 )
 
@@ -665,7 +729,7 @@ Beispiele: `task_position.storage_date`, `planned_processing_date`. Diese Spalte
             starter="SELECT\n  id,\n  \nFROM instance_1.flowapp_demo_task_head;\n",
             hints=[
                 "Eine Umrechnung: updated_date AT TIME ZONE 'Europe/Berlin'. Ein Spaltenname danach ist optional.",
-                "SELECT id, updated_date AT TIME ZONE 'Europe/Berlin' AS updated_berlin FROM instance_1.flowapp_demo_task_head;",
+                "Genau einmal Berlin, kein UTC davor. id steht schon in der ersten Spalte.",
             ],
             solution="SELECT id, updated_date AT TIME ZONE 'Europe/Berlin' AS updated_berlin FROM instance_1.flowapp_demo_task_head;",
             require=["AT TIME ZONE", "Europe/Berlin"],
@@ -682,7 +746,7 @@ Beispiele: `task_position.storage_date`, `planned_processing_date`. Diese Spalte
             starter="SELECT\n  id,\n  \nFROM instance_1.flowapp_demo_task_position;\n",
             hints=[
                 "storage_date::date macht aus der Uhr ein Datum. Ein Spaltenname danach ist optional.",
-                "SELECT id, storage_date::date AS storage_day FROM instance_1.flowapp_demo_task_position;",
+                "Kein AT TIME ZONE — die Spalte ist schon Ortszeit.",
             ],
             solution="SELECT id, storage_date::date AS storage_day FROM instance_1.flowapp_demo_task_position;",
             require=["storage_date"],
@@ -692,6 +756,12 @@ Beispiele: `task_position.storage_date`, `planned_processing_date`. Diese Spalte
     flashcards=[
         {"id": "e-fc1", "front": "Wie wandelt man timestamptz korrekt nach Berlin?", "back": "spalte AT TIME ZONE 'Europe/Berlin' — genau einmal, nie doppelt in Filtern."},
         {"id": "e-fc2", "front": "Was gilt für timestamp ohne Zeitzone (z. B. storage_date)?", "back": "Bereits lokale Zeit. Nur ::date casten, kein AT TIME ZONE."},
+    ],
+    quiz=[
+        {"q": "Wie wandelt man timestamptz nach Berlin?", "options": ["AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin'", "Genau einmal: spalte AT TIME ZONE 'Europe/Berlin'", "Nur ::date", "EXTRACT(TIMEZONE FROM …)"], "correct": 1, "explain": "Eine Konvertierung. Doppelt verschiebt um zwei Stunden — nie in WHERE-Filtern."},
+        {"q": "Was gilt für storage_date (timestamp ohne TZ)?", "options": ["Auch AT TIME ZONE 'Europe/Berlin'", "Bereits lokale Zeit, nur ::date", "Immer UTC", "Die Spalte ist JSONB"], "correct": 1, "explain": "Ohne Zeitzone gespeichert als Ortszeit. Kein AT TIME ZONE."},
+        {"q": "Warum keine doppelte Konvertierung in WHERE?", "options": ["Postgres verbietet das", "Die Uhr verschiebt sich um zwei Stunden, der Filter trifft die falschen Zeilen", "Metabase kann kein AT TIME ZONE", "Nur in SELECT verboten"], "correct": 1, "explain": "Filter auf die verschobene Uhr finden andere Zeilen als gedacht."},
+        {"q": "Wo darf doppelte Konvertierung vorkommen?", "options": ["In jedem WHERE", "Gelegentlich nur zur Anzeige in SELECT, wenn das Dashboard das so vorsieht — nie im Filter", "In JOIN-ON", "Nirgends, auch nicht in SELECT"], "correct": 1, "explain": "Anzeige vs. Filter trennen. Rechnen und filtern immer mit der einfachen Form."},
     ],
 )
 
@@ -761,6 +831,12 @@ Die feinere Statuslogik auf `order_head` (Codes `'00'`, `'80'`, `'X0'`, `'--'`) 
             ],
             solution="SELECT DISTINCT th.id FROM instance_1.flowapp_demo_task_head th JOIN instance_1.flowapp_demo_task_position tp ON tp.task_head_id = th.id JOIN instance_1.flowapp_demo_task_booking_class tbc ON tbc.id = th.task_booking_class_id WHERE tbc.alias LIKE 'goods-receipt%' AND th.task_state = '90' AND tp.storage_date IS NOT NULL;",
         ),
+    ],
+    quiz=[
+        {"q": "Wo liegt task_status wirklich?", "options": ["task_head", "order_head", "task_position", "client"], "correct": 1, "explain": "Am Auftrag. Am Vorgang heißt das Pendant task_state."},
+        {"q": "Was bedeutet task_state = '90'?", "options": ["Auftrag storniert", "Task abgeschlossen", "WE auf Auftragsebene", "Nur geplant"], "correct": 1, "explain": "90 = Task fertig. Storno des Auftrags ist X0 auf order_head.task_status."},
+        {"q": "Präziser WE-Abschluss auf HU-Ebene?", "options": ["Nur putaway_status = '80'", "task_state = '90' UND storage_date IS NOT NULL", "Nur updated_date am Task", "loading_status = '80'"], "correct": 1, "explain": "storage_date ist der physische Einlagerungszeitpunkt, nicht die letzte Datensatz-Änderung."},
+        {"q": "Wie unterscheidest du WE- und WA-Vorgänge in SQL?", "options": ["Über UUID der booking_class", "Über tbc.alias (z. B. goods-receipt-… vs. outgoing-goods-…)", "Über den Mandanten", "Über TARIC"], "correct": 1, "explain": "Alias ist portabel zwischen Test und Prod. UUIDs nicht."},
     ],
 )
 
@@ -918,11 +994,33 @@ L(
             ],
             starter="SELECT\n  \nFROM instance_1.flowapp_demo_handling_unit\nLIMIT 1;\n",
             hints=[
-                "Die Lagerort-Spalte heißt storage_location_id.",
-                "SELECT storage_location_id FROM instance_1.flowapp_demo_handling_unit LIMIT 1;",
+                "Die Lagerort-Spalte heißt storage_location_id — nicht location_id.",
+                "LIMIT 1 steht schon; du brauchst nur die Spalte nach SELECT.",
             ],
             solution="SELECT storage_location_id FROM instance_1.flowapp_demo_handling_unit LIMIT 1;",
-        )
+        ),
+        EX(
+            "i-ex2",
+            why="Vor Metabase testest du mit LIMIT, damit eine Tippfehler-Query nicht die Replica killt.",
+            task="Zeig interne HU-Nummer und Lagerort der Handling Units, höchstens zwei Zeilen.",
+            look=[
+                "Spalten: handling_unit_number und storage_location_id.",
+                "LIMIT 2 selbst setzen — nicht die ganze Tabelle ziehen.",
+            ],
+            starter="-- Erst eine Mini-Stichprobe, dann die große Query.\n\n",
+            hints=[
+                "Zwei Spalten, dann LIMIT 2.",
+                "Tabelle instance_1.flowapp_demo_handling_unit.",
+            ],
+            require=["LIMIT"],
+            solution="SELECT handling_unit_number, storage_location_id FROM instance_1.flowapp_demo_handling_unit LIMIT 2;",
+        ),
+    ],
+    quiz=[
+        {"q": "Was prüfst du, bevor du einen JOIN schreibst?", "options": ["Nur den Tabellennamen", "Spaltennamen und Datentypen der Naht (UUID vs. integer)", "Ob Metabase online ist", "Die Farbe des Dashboards"], "correct": 1, "explain": "integer = uuid knallt. Erst Schema, dann JOIN."},
+        {"q": "Warum zuerst LIMIT im Playground?", "options": ["LIMIT ist Pflicht in Postgres", "Kleine Stichprobe, bevor eine teure Query die Replica belastet", "Ohne LIMIT kommt immer 0 Zeilen", "Metabase ignoriert LIMIT"], "correct": 1, "explain": "Punkt 5 im Ablauf: erst klein testen."},
+        {"q": "Wo prüfst du echte FK-Constraints?", "options": ["Nur Schema-CSV", "pg_constraint / Systemkataloge", "Im Auftragstext", "Gar nicht, FKs sind immer erzwungen"], "correct": 1, "explain": "Die CSV ist unvollständig. Viele Beziehungen sind fachlich, nicht technisch."},
+        {"q": "Daten ändern: welches Muster?", "options": ["Direkt DELETE ohne SELECT", "SELECT → BEGIN → Änderung → Verifikation → COMMIT (Teil G)", "Nur ROLLBACK", "DROP TABLE"], "correct": 1, "explain": "Ohne Ausnahme, auch in der Lern-App."},
     ],
 )
 
@@ -1083,24 +1181,25 @@ Stammdaten filtert man über sprechende `alias`-Spalten statt über UUIDs — De
             starter="SELECT\n  \nFROM subscription.processevents_printer;\n",
             hints=[
                 "Zwei Spalten: event_type, payload. Kein instance_1 und kein flowapp_demo_ davor.",
-                "SELECT event_type, payload FROM subscription.processevents_printer;",
+                "FROM steht schon. Nur die beiden Spaltennamen nach SELECT.",
             ],
             solution="SELECT event_type, payload FROM subscription.processevents_printer;",
         ),
         EX(
             "k-ex2",
             why="Bestand und Artikelstamm haben unterschiedliche Mengeneinheiten — Reports zeigen dann falsche Stückzahlen.",
-            task="Zeig Position, Bestandseinheit und Artikeleinheit, nur wo die beiden Einheiten nicht zusammenpassen.",
+            task="Zeig Position, Bestandseinheit und Artikeleinheit, nur wo die beiden Einheiten nicht zusammenpassen. Nur die neueste Bestandszeile je Position.",
             look=[
-                "Die JOINs und die neueste Bestandszeile (rn = 1) stehen schon.",
-                "Nach <> die Artikeleinheit schreiben: qu_item.alias",
-                "Einheit (Mengen) ist zweimal gejoint: qu_stock = Bestand, qu_item = Stamm.",
+                "Neueste Qualifikation: ROW_NUMBER je handling_unit_position_id, ORDER BY updated_date DESC, rn = 1.",
+                "Einheit am Bestand: stock_quant.quantity_unit_id → quantity_unit.alias.",
+                "Einheit am Stamm: handling_unit_position → item_master.quantity_unit_id → quantity_unit.alias. Vergleich mit <> .",
             ],
-            starter="WITH ranked AS (\n  SELECT sq.*,\n         ROW_NUMBER() OVER (\n           PARTITION BY sq.handling_unit_position_id\n           ORDER BY sq.updated_date DESC\n         ) AS rn\n  FROM instance_1.flowapp_demo_stock_quant sq\n)\nSELECT\n  r.handling_unit_position_id,\n  qu_stock.alias AS bestand_einheit,\n  qu_item.alias AS artikel_einheit\nFROM ranked r\nJOIN instance_1.flowapp_demo_handling_unit_position hup ON hup.id = r.handling_unit_position_id\nJOIN instance_1.flowapp_demo_item_master im ON im.id = hup.item_master_id\nJOIN instance_1.flowapp_demo_quantity_unit qu_stock ON qu_stock.id = r.quantity_unit_id\nJOIN instance_1.flowapp_demo_quantity_unit qu_item ON qu_item.id = im.quantity_unit_id\nWHERE r.rn = 1\n  AND qu_stock.alias <> \n",
+            starter="-- Pro Position nur die neueste stock_quant-Zeile, dann Einheiten vergleichen.\n-- Tabellen: stock_quant, handling_unit_position, item_master, quantity_unit (zweimal).\n\n",
             hints=[
-                "Ungleich heißt <>. Rechts daneben gehört qu_item.alias.",
-                "AND qu_stock.alias <> qu_item.alias",
+                "CTE mit ROW_NUMBER() OVER (PARTITION BY handling_unit_position_id ORDER BY updated_date DESC).",
+                "Zwei Joins auf quantity_unit: eine über den Bestand, eine über den Artikelstamm. WHERE rn = 1 AND die alias-Werte ungleich.",
             ],
+            require=["ROW_NUMBER"],
             solution="WITH ranked AS (SELECT sq.*, ROW_NUMBER() OVER (PARTITION BY sq.handling_unit_position_id ORDER BY sq.updated_date DESC) AS rn FROM instance_1.flowapp_demo_stock_quant sq) SELECT r.handling_unit_position_id, qu_stock.alias AS bestand_einheit, qu_item.alias AS artikel_einheit FROM ranked r JOIN instance_1.flowapp_demo_handling_unit_position hup ON hup.id = r.handling_unit_position_id JOIN instance_1.flowapp_demo_item_master im ON im.id = hup.item_master_id JOIN instance_1.flowapp_demo_quantity_unit qu_stock ON qu_stock.id = r.quantity_unit_id JOIN instance_1.flowapp_demo_quantity_unit qu_item ON qu_item.id = im.quantity_unit_id WHERE r.rn = 1 AND qu_stock.alias <> qu_item.alias;",
         ),
         EX(
@@ -1114,7 +1213,7 @@ Stammdaten filtert man über sprechende `alias`-Spalten statt über UUIDs — De
             starter="SELECT\n  code,\n  \nFROM instance_1.flowapp_demo_client c;\n",
             hints=[
                 "Zweite Spalte: MD5(to_jsonb(c)::text) AS fingerprint",
-                "SELECT code, MD5(to_jsonb(c)::text) AS fingerprint FROM instance_1.flowapp_demo_client c;",
+                "c ist der Alias im FROM. to_jsonb macht die ganze Zeile zum JSON, MD5 daraus ist der Fingerprint.",
             ],
             solution="SELECT code, MD5(to_jsonb(c)::text) AS fingerprint FROM instance_1.flowapp_demo_client c;",
         ),
@@ -1338,7 +1437,7 @@ Nicht jede bestehende Abfrage folgt schon dem Alias-Prinzip. In älteren Queries
             starter="SELECT\n  alias,\n  \nFROM instance_1.flowapp_demo_address_category;\n",
             hints=[
                 "Zweite Spalte: name->>'de' AS bezeichnung — kein JOIN nötig.",
-                "SELECT alias, name->>'de' AS bezeichnung FROM instance_1.flowapp_demo_address_category;",
+                "name ist JSONB. ->>'de' holt den deutschen Text, ohne zweite Tabelle.",
             ],
             solution="SELECT alias, name->>'de' AS bezeichnung FROM instance_1.flowapp_demo_address_category;",
         ),
@@ -1400,7 +1499,22 @@ Unbekannte Alias-Werte fallen auf den Rohwert zurück (`ELSE`) — ein Hinweis, 
                 "CASE bu.alias WHEN 'palette-typ-a' THEN 'Typ A' WHEN 'palette-typ-b' THEN 'Typ B' ELSE bu.alias END AS hu_typ",
             ],
             solution="SELECT im.designation_a->>'de' AS bezeichnung, CASE bu.alias WHEN 'palette-typ-a' THEN 'Typ A' WHEN 'palette-typ-b' THEN 'Typ B' ELSE bu.alias END AS hu_typ FROM instance_1.flowapp_demo_item_master im JOIN instance_1.flowapp_demo_packaging_structure ps ON ps.parent_id = im.id JOIN instance_1.flowapp_demo_packaging_structure_pos psp ON psp.packaging_structure_id = ps.id JOIN instance_1.flowapp_demo_bundling_unit bu ON bu.id = psp.bundling_unit_id WHERE psp.packaging_level = 3;",
-        )
+        ),
+        EX(
+            "n-ex2",
+            why="Die Basisverpackung (Ebene 0) hat Nettogewicht — ohne CASE, nur die Zahl.",
+            task="Zeig deutsche Artikelbezeichnung und Nettogewicht in Gramm der Verpackungsebene 0.",
+            look=[
+                "packaging_level = 0 ist die kleinste Ebene. Nettogewicht: net_weight_g.",
+                "Struktur hängt am Artikel: packaging_structure.parent_id = item_master.id.",
+            ],
+            starter="-- Ebene 0, Nettogewicht.\n\n",
+            hints=[
+                "Joins: item_master → packaging_structure → packaging_structure_pos.",
+                "WHERE psp.packaging_level = 0. Spalte net_weight_g.",
+            ],
+            solution="SELECT im.designation_a->>'de' AS bezeichnung, psp.net_weight_g FROM instance_1.flowapp_demo_item_master im JOIN instance_1.flowapp_demo_packaging_structure ps ON ps.parent_id = im.id JOIN instance_1.flowapp_demo_packaging_structure_pos psp ON psp.packaging_structure_id = ps.id WHERE psp.packaging_level = 0;",
+        ),
     ],
     quiz=[
         {"q": "Was bedeutet packaging_level = 0?", "options": ["Palette", "Basis-/Einzelverpackung", "Sendung", "Zollverfahren"], "correct": 1, "explain": "0 ist die kleinste Ebene. Höhere Werte sind größere Gebinde (Karton, Lage, Palette)."},
@@ -1451,14 +1565,16 @@ In älteren Abfragen wird statt des Alias die übersetzte Bezeichnung verglichen
             why="Zoll will je Bestand Tarifnummer, Ursprungsland und Zollstatus — immer die aktuelle Bestandszeile.",
             task="Zeig deutsche Bezeichnung, TARIC, ISO-Ursprungsland und Zollstatus. Nur die neueste Zeile je Position.",
             look=[
-                "SELECT und JOINs stehen. Es fehlt der Filter auf die neueste Bestandszeile.",
-                "Nach WHERE r.rn = die Zahl 1 eintragen.",
+                "Bezeichnung: item_master.designation_a->>'de'. TARIC am Stamm.",
+                "Ursprung: stock_quant.country_of_origin_id → country_code.iso_code. Zollstatus: customs_status_profile.alias.",
+                "Wie in Teil A: ROW_NUMBER je handling_unit_position_id, rn = 1.",
             ],
-            starter="WITH ranked AS (\n  SELECT sq.*,\n         ROW_NUMBER() OVER (\n           PARTITION BY sq.handling_unit_position_id\n           ORDER BY sq.updated_date DESC\n         ) AS rn\n  FROM instance_1.flowapp_demo_stock_quant sq\n)\nSELECT\n  im.designation_a->>'de' AS bezeichnung,\n  im.customs_tariff_number_taric AS taric,\n  cc.iso_code AS ursprungsland,\n  csp.alias AS zollstatus\nFROM ranked r\nJOIN instance_1.flowapp_demo_handling_unit_position hup ON hup.id = r.handling_unit_position_id\nJOIN instance_1.flowapp_demo_item_master im ON im.id = hup.item_master_id\nJOIN instance_1.flowapp_demo_country_code cc ON cc.id = r.country_of_origin_id\nJOIN instance_1.flowapp_demo_customs_status_profile csp ON csp.id = r.customs_status_id\nWHERE r.rn =\n",
+            starter="-- Neueste stock_quant-Zeile je Position, dann Artikel, Land, Zollstatus joinen.\n\n",
             hints=[
-                "Wie in Teil A: rn = 1 ist die neueste Zeile je Position.",
-                "WHERE r.rn = 1",
+                "CTE mit ROW_NUMBER wie in Teil A, außen WHERE rn = 1.",
+                "Joins: handling_unit_position, item_master, country_code, customs_status_profile.",
             ],
+            require=["ROW_NUMBER"],
             solution="WITH ranked AS (SELECT sq.*, ROW_NUMBER() OVER (PARTITION BY sq.handling_unit_position_id ORDER BY sq.updated_date DESC) AS rn FROM instance_1.flowapp_demo_stock_quant sq) SELECT im.designation_a->>'de' AS bezeichnung, im.customs_tariff_number_taric AS taric, cc.iso_code AS ursprungsland, csp.alias AS zollstatus FROM ranked r JOIN instance_1.flowapp_demo_handling_unit_position hup ON hup.id = r.handling_unit_position_id JOIN instance_1.flowapp_demo_item_master im ON im.id = hup.item_master_id JOIN instance_1.flowapp_demo_country_code cc ON cc.id = r.country_of_origin_id JOIN instance_1.flowapp_demo_customs_status_profile csp ON csp.id = r.customs_status_id WHERE r.rn = 1;",
         ),
         EX(

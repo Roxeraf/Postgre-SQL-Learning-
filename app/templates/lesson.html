@@ -137,7 +137,6 @@
 
   {% if lesson.quiz %}
   <section class="tab-panel" data-panel="quiz">
-    <p class="phase-hint">Eine Antwort tippen — danach kommt die Erklärung. Falsch ist ok.</p>
     <div class="quiz-score muted" id="quiz-score"></div>
     {% for q in lesson.quiz %}
     <div class="quiz-question" data-correct="{{ q.correct }}" data-explain='{{ (q.explain or "")|tojson }}'>

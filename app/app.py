@@ -47,7 +47,7 @@ def tables_used(*sql_parts):
             continue
         seen.add(key)
         short = match.split(".")[-1]
-        for prefix in ("flowapp_demo_", "flowapp_13d663_"):
+        for prefix in ("flowapp_demo_",):
             if short.lower().startswith(prefix):
                 short = short[len(prefix):]
                 break
@@ -85,8 +85,8 @@ for lesson in LESSONS:
 TRACKS = [
     {
         "id": "einstieg",
-        "label": "Einstieg · SQL, A–J",
-        "blurb": "Zuerst SELECT und JOINs, dann Grundlagen, Umgebung, Datenmodell und Arbeitsregeln aus der Einarbeitung.",
+        "label": "Einstieg · WMX, A–J",
+        "blurb": "SQL sitzt aus der Akademie. Hier dieselben Befehle auf den Lager-Tabellen, dann Umgebung, Datenmodell und Arbeitsregeln.",
         "lessons": [l for l in LESSONS if l.get("track") == "einstieg"],
     },
     {
@@ -649,7 +649,8 @@ def index():
         academy_concepts=ACADEMY["concepts"],
         current_lesson_id=None,
         exercise_count=sum(len(l.get("exercises") or []) for l in LESSONS),
-        quiz_count=sum(len(l.get("quiz") or []) for l in LESSONS),
+        quiz_count=sum(len(l.get("quiz") or []) for l in LESSONS)
+        + sum(len(l.get("quiz") or []) for l in ACADEMY["lessons"]),
         card_count=len(FLASHCARDS),
         academy_step_count=sum(len(l.get("steps") or []) for l in ACADEMY["lessons"]),
     )
@@ -1023,7 +1024,7 @@ def api_schema():
         key = f"{row['table_schema']}.{row['table_name']}"
         if key not in tables:
             short = row["table_name"]
-            for prefix in ("flowapp_demo_", "flowapp_13d663_"):
+            for prefix in ("flowapp_demo_",):
                 if short.lower().startswith(prefix):
                     short = short[len(prefix):]
                     break

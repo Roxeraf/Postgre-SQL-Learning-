@@ -124,12 +124,42 @@ function initAcademy() {
     return { xp, delta };
   }
 
+  function quizCount() {
+    return Number(root.dataset.quizCount || 0);
+  }
+
+  function quizFinished(a) {
+    const n = quizCount();
+    if (!n) return true;
+    return Object.keys(a.quiz || {}).length >= n;
+  }
+
+  function markComplete(a) {
+    a.complete = steps.every((_, i) => a.steps[i]) && quizFinished(a);
+  }
+
+  function switchAcademyTab(name) {
+    document.querySelectorAll(".academy .tab").forEach((t) => {
+      t.classList.toggle("active", t.dataset.tab === name);
+    });
+    document.querySelectorAll(".academy .tab-panel").forEach((p) => {
+      p.classList.toggle("active", p.dataset.panel === name);
+    });
+    const hint = document.getElementById("phase-hint");
+    if (hint) {
+      hint.textContent = name === "quiz"
+        ? "Eine Antwort tippen — danach kommt die Erklärung. Falsch ist ok."
+        : "Kurze Schritte: anschauen, vorhersagen, selbst schreiben.";
+    }
+  }
+
   function markStepDone() {
     const s = ui().loadStore();
     const a = ui().academyState(s, lesson.id);
+    if (!a.quiz) a.quiz = {};
     a.steps[index] = true;
     a.current = Math.min(index + 1, steps.length);
-    a.complete = steps.every((_, i) => a.steps[i]);
+    markComplete(a);
     s.lastAcademy = lesson.id;
     saveQuiet(s);
   }
@@ -182,19 +212,14 @@ function initAcademy() {
     if (!hints.length) return "";
     const shown = hints.slice(0, local.hintLevel);
     if (!shown.length) return "";
-    const last = local.hintLevel >= hints.length;
-    return `<div class="hint-box"><strong>${last ? "Lösung" : `Hinweis ${local.hintLevel} / ${hints.length}`}</strong><p>${rich(shown[shown.length - 1])}</p></div>`;
+    return `<div class="hint-box"><strong>Hinweis ${Math.min(local.hintLevel, hints.length)} / ${hints.length}</strong><p>${rich(shown[shown.length - 1])}</p></div>`;
   }
 
   function footerHtml(extra = {}) {
     const hints = step().hints || [];
     const buttons = [];
     if (hints.length) {
-      const label = local.hintLevel >= hints.length - 1 && local.hintLevel < hints.length
-        ? "Lösung zeigen"
-        : local.hintLevel >= hints.length
-          ? "Hinweise"
-          : "Hinweis";
+      const label = local.hintLevel >= hints.length ? "Hinweise" : "Hinweis";
       buttons.push(`<button class="btn ghost" type="button" data-act="hint">${label}</button>`);
     }
     if (extra.check) buttons.push(`<button class="btn btn-check" type="button" data-act="check">${extra.check}</button>`);
@@ -213,11 +238,21 @@ function initAcademy() {
     const chips = concepts.map((c) => `<span>${ui().esc(c)} Mastery +${gain.delta}%</span>`).join(" · ");
     const next = index < steps.length - 1;
     const nextLesson = root.dataset.nextId;
+    let advance = "";
+    if (next) {
+      advance = `<button class="btn btn-primary" type="button" data-act="next">Weiter</button>`;
+    } else if (quizCount()) {
+      advance = `<button class="btn btn-primary" type="button" data-act="goto-quiz">Weiter zum Kurzcheck</button>`;
+    } else if (nextLesson) {
+      advance = `<a class="btn btn-primary" href="/learn/${nextLesson}">Nächstes Kapitel</a>`;
+    } else {
+      advance = `<a class="btn btn-primary" href="/">Zur Übersicht</a>`;
+    }
     return `<div class="success-card">
       <p class="verdict verdict-ok">Richtig</p>
       <p>${rich(note || step().feedback_ok || "Das sitzt.")}</p>
       <p class="xp-line">+${gain.xp} XP${chips ? ` · ${chips}` : ""}</p>
-      ${next ? `<button class="btn btn-primary" type="button" data-act="next">Weiter</button>` : nextLesson ? `<a class="btn btn-primary" href="/learn/${nextLesson}">Nächstes Kapitel</a>` : `<a class="btn btn-primary" href="/">Zur Übersicht</a>`}
+      ${advance}
     </div>`;
   }
 
@@ -580,12 +615,20 @@ function initAcademy() {
     const btn = e.target.closest("[data-act]");
     if (!btn || btn.disabled) return;
     const act = btn.dataset.act;
+    if (act === "goto-quiz") {
+      switchAcademyTab("quiz");
+      document.querySelector(".academy [data-panel=quiz]")?.scrollIntoView({ block: "start", behavior: "smooth" });
+      return;
+    }
     if (act === "next") {
       if (step().type === "look" || step().type === "explain") markStepDone();
       if (index < steps.length - 1) {
         index += 1;
         resetLocal();
         renderStep();
+      } else if (quizCount()) {
+        markStepDone();
+        switchAcademyTab("quiz");
       } else {
         markStepDone();
         window.location.href = root.dataset.nextId ? `/learn/${root.dataset.nextId}` : "/";
@@ -632,6 +675,57 @@ function initAcademy() {
       onRun();
     }
   });
+
+  document.querySelectorAll(".academy .tab").forEach((tab) => {
+    tab.addEventListener("click", () => switchAcademyTab(tab.dataset.tab));
+  });
+
+  (function initAcademyQuiz() {
+    const scoreEl = document.getElementById("quiz-score");
+    const questions = [...document.querySelectorAll(".academy .quiz-question")];
+    if (!questions.length) return;
+    const updateScore = () => {
+      const answered = questions.filter((q) => q.dataset.answered === "1").length;
+      const correct = questions.filter((q) => q.dataset.wasCorrect === "1").length;
+      if (scoreEl) scoreEl.textContent = answered ? `${correct} / ${questions.length} richtig` : "";
+    };
+    questions.forEach((q, qi) => {
+      const correctIndex = parseInt(q.getAttribute("data-correct"), 10);
+      let explain = q.getAttribute("data-explain") || "";
+      try {
+        explain = JSON.parse(explain);
+      } catch {
+        /* plain string */
+      }
+      const feedback = q.querySelector(".quiz-feedback");
+      const options = q.querySelectorAll(".quiz-option");
+      options.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          if (q.dataset.answered === "1") return;
+          const chosen = parseInt(btn.getAttribute("data-index"), 10);
+          const ok = chosen === correctIndex;
+          q.dataset.answered = "1";
+          q.dataset.wasCorrect = ok ? "1" : "0";
+          options.forEach((b, i) => {
+            b.disabled = true;
+            if (i === correctIndex) b.classList.add("correct");
+          });
+          if (!ok) btn.classList.add("wrong");
+          feedback.innerHTML = ok
+            ? `<p class="verdict verdict-ok">Richtig.</p><p class="muted">${explain || ""}</p>`
+            : `<p class="verdict verdict-fail">Nicht ganz.</p><p class="muted">${explain || "Schau nochmal in den Schritt oben."}</p>`;
+          const s = ui().loadStore();
+          const a = ui().academyState(s, lesson.id);
+          if (!a.quiz) a.quiz = {};
+          a.quiz[qi] = ok;
+          markComplete(a);
+          s.lastAcademy = lesson.id;
+          saveQuiet(s);
+          updateScore();
+        });
+      });
+    });
+  })();
 
   resetLocal();
   renderStep();
