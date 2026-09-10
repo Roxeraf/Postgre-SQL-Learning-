@@ -210,11 +210,7 @@ function initAcademy() {
 
   function successCard(gain, note) {
     const concepts = step().concepts || lesson.concepts || [];
-    const chips = concepts.map((c) => {
-      const s = ui().loadStore();
-      const v = s.mastery[c] || 0;
-      return `<span>${ui().esc(c)} Mastery ${v}%</span>`;
-    }).join("");
+    const chips = concepts.map((c) => `<span>${ui().esc(c)} Mastery +${gain.delta}%</span>`).join("");
     const next = index < steps.length - 1;
     const nextLesson = root.dataset.nextId;
     return `<div class="success-card">
@@ -488,12 +484,12 @@ function initAcademy() {
     const data = await runSql(sql);
     const box = document.getElementById("step-result");
     const html = data.ok ? ui().renderSqlResult(data) : resultHtml(data);
-    if (box) box.innerHTML = html;
-    else showFeedback(html);
     if (s.type === "demo" && data.ok) {
       const gain = bumpMastery(s.concepts || lesson.concepts, 0);
       markStepDone();
-      showFeedback(`<div class="success-card"><p class="verdict verdict-ok">Ausgeführt</p><p>Vergleiche Tabelle und Ergebnis. ${s.visualize === "where" ? "Nicht passende Zeilen gehören nicht ins Ergebnis." : ""}</p><p class="xp-line">+${gain.xp} XP</p><button class="btn btn-primary" type="button" data-act="next">Weiter</button></div>` + html);
+      const card = `<div class="success-card"><p class="verdict verdict-ok">Ausgeführt</p><p>Vergleiche Tabelle und Ergebnis. ${s.visualize === "where" ? "Nicht passende Zeilen gehören nicht ins Ergebnis." : ""}</p><p class="xp-line">+${gain.xp} XP</p><button class="btn btn-primary" type="button" data-act="next">Weiter</button></div>`;
+      showFeedback(card);
+      if (box) box.innerHTML = html;
       if (s.visualize === "where" && s.table) {
         const dimmed = new Set();
         (s.table.rows || []).forEach((row) => {
@@ -501,8 +497,6 @@ function initAcademy() {
             dimmed.add(rowId(row, s.id_field));
           }
         });
-        const tableHost = document.querySelector("#step-root .table-wrap")?.parentElement;
-        // re-render table with dimmed rows — simplest: add classes
         document.querySelectorAll("#step-root tr[data-row-id]").forEach((tr) => {
           if (dimmed.has(tr.dataset.rowId)) tr.classList.add("is-out");
         });
@@ -513,8 +507,12 @@ function initAcademy() {
           if (!keep.has(el.dataset.col)) el.classList.add("is-fade");
         });
       }
+      document.querySelector(".success-card")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
       renderMeter();
+      return;
     }
+    if (box) box.innerHTML = html;
+    else showFeedback(html);
   }
 
   document.getElementById("step-meter").addEventListener("click", (e) => {
