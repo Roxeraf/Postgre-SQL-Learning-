@@ -1,19 +1,11 @@
-# PostgreSQL & FlowApp/WMX — Interaktive Einarbeitung
+# plx.learnSQL — PostgreSQL interaktiv lernen
 
-Zwei Lernpfade in einer App:
+Ein Lernpfad in der App: von der ersten Tabelle bis zu JOIN, Gruppen, Änderungen und den Konzepten hinter PostgreSQL.
 
-1. **SQL Grundlagen** — interaktiver Trainer für komplette Anfänger
-   (verstehen → vorhersagen → schreiben → Kurzcheck), inkl. NULL, GROUP BY, JOIN
-2. **WMX Datenmodell** — Transfer auf die Lager-Tabellen, danach Teile A–P plus Glossar
-
-Die Datei `PostgreSQL_FlowApp_Einarbeitung.docx` bleibt die Wissensbasis für den WMX-Pfad.
-
-- **SQL-Akademie:** Kapitel 0–10 plus zwei Challenges, mit Explain / Predict / Write und Kurzcheck
-- **WMX-Lektionen:** Transfer-Lektion auf dem Demo-Schema, Einstieg A–J, Vertiefung K–P
-- **SQL-Übungen im Browser** gegen isoliertes Schema `learn` (nur SELECT) und gegen `instance_1` (WMX)
-- **Kurz-Quiz** in der Akademie und in den WMX-Lektionen; Karteikarten (WMX)
-- **Durchsuchbare Wissensbasis** (`/wissen`)
-- **Playground** mit Training- und WMX-Tabellen, plus „Erkläre diese Query“
+- Interaktive Akademie (verstehen → vorhersagen → bauen → schreiben → anwenden)
+- Kurz-Quiz nach jedem Kapitel
+- SQL-Playground gegen Schema `learn`
+- Wissensbasis und Karteikarten aus denselben Konzepten
 
 Trainingsdaten setzt du bei Bedarf über **Datenbank zurücksetzen** zurück.
 
@@ -42,7 +34,7 @@ docker compose up --build
 Danach:
 
 - **Lern-App:** http://localhost:8080
-- **SQL-Pfad:** http://localhost:8080/learn/ch0
+- **Pfad:** http://localhost:8080/learn/ch0
 - **Wissensbasis:** http://localhost:8080/wissen
 
 Zum Stoppen: `Ctrl+C`, danach `docker compose down` (mit `-v` werden auch die DB-Daten gelöscht,
@@ -58,21 +50,17 @@ docker compose up --build
 ## Projektstruktur
 
 ```
-flowapp-learn/
 ├── docker-compose.yml
-├── db/
-│   └── init/01_schema_and_data.sql   # WMX-Schema + Anfänger-Schema learn
+├── db/init/01_schema_and_data.sql   # Schema learn
 └── app/
-    ├── app.py                        # Flask-Backend
-    ├── sql_coach.py                  # Lernfeedback statt Roh-Postgres-Fehler
-    ├── lessons/academy_data.py       # SQL-Grundlagen (interaktive Schritte)
-    ├── lessons/lessons.json          # WMX-Einarbeitung A–P
+    ├── app.py                       # Flask-Backend
+    ├── sql_coach.py                 # Lernfeedback statt Roh-Postgres-Fehler
+    ├── lessons/academy_data.py      # Kapitel 0–7 plus Erweiterung
     └── templates/
 ```
 
 ## Hinweise
 
-- Anfänger-Sandbox (`learn`): nur `SELECT` / `WITH` / `EXPLAIN`. Tabellen: `orders`, `clients`, `stock`.
-- WMX-Sandbox: SELECT, INSERT, UPDATE und DELETE (plus BEGIN/COMMIT). Schema-Änderungen sind gesperrt.
+- Sandbox `learn`: SELECT, WITH, EXPLAIN, plus INSERT/UPDATE/DELETE und BEGIN/COMMIT/ROLLBACK. Schema-Änderungen sind gesperrt.
 - SQL-Aufgaben werden über das **Abfrageergebnis** bewertet, nicht über einen exakten Musterstring.
-- WMX-Inhalte kommen aus der Einarbeitungs-Dokumentation. Anfänger-Tabellen sind isolierte Trainingsdaten und **kein** Abbild des echten WMX-Schemas.
+- Tabellen: `orders`, `clients`, `stock`, `order_items`.

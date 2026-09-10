@@ -1,1 +1,1 @@
-# Lesson packages (WMX JSON + SQL academy).
+# PostgreSQL academy lesson package.

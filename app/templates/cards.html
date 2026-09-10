@@ -4,16 +4,16 @@
 <header class="page-header">
   <p class="eyebrow">Aktiver Abruf</p>
   <h1>Karteikarten</h1>
-  <p class="lede">{{ card_count }} Karten aus Quiz, Glossar und Fallstricken. Umdrehen, bewerten, wiederholen.</p>
+  <p class="lede">{{ card_count }} Karten aus Konzepten und Kurzchecks. Umdrehen, bewerten, wiederholen.</p>
 </header>
 
 <section class="card cards-wrap">
   <div class="cards-toolbar">
     <label class="muted">Filter
       <select id="card-filter">
-        <option value="">Alle Lektionen</option>
-        {% for l in lessons %}
-        <option value="{{ l.id }}">Teil {{ l.letter or l.id|upper }} — {{ l.title }}</option>
+        <option value="">Alle Kapitel</option>
+        {% for l in academy_lessons %}
+        <option value="{{ l.id }}">Kapitel {{ l.chapter }} — {{ l.title }}</option>
         {% endfor %}
       </select>
     </label>

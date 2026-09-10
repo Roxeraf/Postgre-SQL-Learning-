@@ -1,4 +1,4 @@
-"""Create a small FlowApp Learn .ico (32x32) without extra dependencies."""
+"""Create a small plx.learnSQL .ico (32x32) without extra dependencies."""
 from __future__ import annotations
 
 import struct

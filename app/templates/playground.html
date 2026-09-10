@@ -4,21 +4,17 @@
 <header class="page-header">
   <p class="eyebrow">Freies Üben</p>
   <h1>SQL-Playground</h1>
-  <p class="lede" id="pg-lede">Dieselbe Trainingsdatenbank wie in den SQL-Kapiteln. Nur lesen: SELECT, WITH, EXPLAIN. WMX-Tabellen separat umschaltbar.</p>
+  <p class="lede" id="pg-lede">Dieselbe Trainingsdatenbank wie in den Kapiteln: orders, clients, stock, order_items. SELECT, INSERT, UPDATE, DELETE, BEGIN/COMMIT. Schema ändern ist gesperrt.</p>
 </header>
 
 <section class="pg-shell">
   <aside class="pg-schema">
-    <div class="pg-tabs" role="tablist">
-      <button type="button" class="pg-tab active" data-sandbox="learn">Training</button>
-      <button type="button" class="pg-tab" data-sandbox="wmx">WMX</button>
-    </div>
     <p class="muted pg-schema-hint" id="pg-schema-hint">Tabelle aufklappen, Spalte anklicken — der Name landet im Editor.</p>
     <div class="schema-list" id="pg-tables"></div>
   </aside>
   <div class="pg-main">
     <div class="playground-toolbar">
-      <span class="muted" id="pg-mode-label">SELECT · EXPLAIN · max. 200 Zeilen</span>
+      <span class="muted" id="pg-mode-label">SELECT · INSERT · UPDATE · DELETE · EXPLAIN · max. 200 Zeilen</span>
       <div class="exercise-actions">
         <button class="btn btn-primary" type="button" id="pg-run">Ausführen <kbd>Ctrl</kbd>+<kbd>Enter</kbd></button>
         <button class="btn" type="button" id="pg-explain">Erkläre diese Query</button>

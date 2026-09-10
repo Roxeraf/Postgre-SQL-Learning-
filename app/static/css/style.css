@@ -1158,7 +1158,21 @@ kbd { color: var(--text); font-size: 11px; }
   background: var(--accent-dim);
   border-radius: 0 12px 12px 0;
 }
-.split-tables { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.glossary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+.gloss-card {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  background: var(--panel-2);
+}
+.gloss-card h3 { margin: 0 0 8px; font-size: 16px; }
+.gloss-card p { margin: 0 0 12px; color: var(--muted); font-size: 14px; }
+.gloss-card .sql-pre { font-size: 12px; margin-bottom: 12px; }
 .token-line {
   min-height: 52px;
   border: 1px dashed var(--border-strong);

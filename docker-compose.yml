@@ -1,10 +1,10 @@
 services:
   db:
     image: postgres:16
-    container_name: flowapp_learn_db
+    container_name: learnsql_db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: flowapp_learn
+      POSTGRES_DB: learnsql
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
@@ -13,19 +13,19 @@ services:
       - db_data:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d flowapp_learn"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d learnsql"]
       interval: 5s
       timeout: 5s
       retries: 10
 
   app:
     build: ./app
-    container_name: flowapp_learn_app
+    container_name: learnsql_app
     restart: unless-stopped
     environment:
       DB_HOST: db
       DB_PORT: 5432
-      DB_NAME: flowapp_learn
+      DB_NAME: learnsql
       DB_USER: lernuser
       DB_PASSWORD: lernuser
       DB_ADMIN_USER: postgres

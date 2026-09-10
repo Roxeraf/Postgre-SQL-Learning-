@@ -20,8 +20,11 @@ const MODEL = [
   { key: "JOIN", q: "Welche Infos extra?" },
   { key: "ON", q: "Wie gehören sie zusammen?" },
   { key: "GROUP BY", q: "Nach was zusammenfassen?" },
+  { key: "HAVING", q: "Welche Gruppen?" },
   { key: "ORDER BY", q: "Wie sortieren?" },
   { key: "LIMIT", q: "Wie viele Zeilen?" },
+  { key: "INSERT", q: "Welche neue Zeile?" },
+  { key: "UPDATE", q: "Was soll sich ändern?" },
 ];
 
 function ui() {
@@ -71,6 +74,38 @@ function renderDataTable(table, opts = {}) {
   if (table.label || table.name) {
     html = `<p class="table-kicker">${esc(table.label || table.name)}</p>` + html;
   }
+  return html;
+}
+
+function stepTables(s) {
+  if (Array.isArray(s.tables) && s.tables.length) return s.tables;
+  return s.table ? [s.table] : [];
+}
+
+function joinDimmed(table, s) {
+  const dimmed = new Set();
+  if (s.visualize === "where" && s.match_column) {
+    (table.rows || []).forEach((row) => {
+      if (!sameValue(row[s.match_column], s.match_value)) dimmed.add(rowId(row, s.id_field));
+    });
+    return dimmed;
+  }
+  if (s.visualize === "inner" && table.name === "orders") {
+    (table.rows || []).forEach((row) => {
+      if (row.client_id == null || row.client == null) dimmed.add(rowId(row, s.id_field || "id"));
+    });
+  }
+  return dimmed;
+}
+
+function renderStepTables(s, opts = {}) {
+  const tables = stepTables(s);
+  if (!tables.length) return "";
+  const html = tables.map((t) => {
+    const dimmed = opts.dimmedIds || joinDimmed(t, s);
+    return renderDataTable(t, { ...opts, dimmedIds: dimmed, idField: s.id_field || "id" });
+  }).join("");
+  if (tables.length > 1) return `<div class="split-tables">${html}</div>`;
   return html;
 }
 
@@ -309,7 +344,7 @@ function initAcademy() {
       ${s.question ? `<p class="quiz-q">${rich(s.question)}</p>` : ""}`;
 
     if (s.type === "look") {
-      host.innerHTML = title + (s.table ? renderDataTable(s.table) : "") + (s.note ? `<p class="coach">${rich(s.note)}</p>` : "");
+      host.innerHTML = title + renderStepTables(s) + (s.note ? `<p class="coach">${rich(s.note)}</p>` : "");
       foot.innerHTML = footerHtml({ next: s.cta || "Weiter" });
       return;
     }
@@ -359,17 +394,9 @@ function initAcademy() {
     }
 
     if (s.type === "predict" || s.type === "demo") {
-      const dimmed = new Set();
-      if (s.visualize === "where" && s.match_column) {
-        (s.table.rows || []).forEach((row) => {
-          if (!sameValue(row[s.match_column], s.match_value)) dimmed.add(rowId(row, s.id_field));
-        });
-      }
-      host.innerHTML = title + (s.sql ? sqlBlock(s.sql) : "") + renderDataTable(s.table, {
-        idField: s.id_field || "id",
+      host.innerHTML = title + (s.sql ? sqlBlock(s.sql) : "") + renderStepTables(s, {
         selectedIds: local.selectedIds,
         clickRows: s.type === "predict",
-        dimmedIds: s.type === "demo" ? new Set() : new Set(),
         keepColumns: s.keep_columns,
       }) + `<div id="step-result"></div>`;
       if (s.type === "demo") foot.innerHTML = footerHtml({ run: "Ausführen" });
@@ -433,7 +460,10 @@ function initAcademy() {
   }
 
   async function runSql(sql) {
-    const data = await ui().postJson("/api/run", { sql, sandbox: "learn" });
+    const data = await ui().postJson("/api/run", {
+      sql,
+      allow_write: Boolean(step().allow_write),
+    });
     return data;
   }
 

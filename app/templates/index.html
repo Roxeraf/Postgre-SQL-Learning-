@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
 <header class="hero hero-start" id="hero-start">
-  <p class="eyebrow">SQL lernen</p>
+  <p class="eyebrow">PostgreSQL lernen</p>
   <h1>Lerne, Daten selbst zu verstehen.</h1>
-  <p class="lede">In wenigen Minuten schreibst du deine erste Datenbankabfrage. Keine SQL-Erfahrung notwendig.</p>
+  <p class="lede">Ein Pfad: von der ersten Tabelle bis zu JOIN, Gruppen, Änderungen und den Konzepten hinter PostgreSQL.</p>
   <div class="hero-actions">
     <a class="btn btn-primary" id="start-btn" href="/learn/ch0">Lernen starten</a>
     <a class="btn" href="/playground">Selbst ausprobieren</a>
@@ -44,7 +44,7 @@
 <section class="stat-row" id="stat-row">
   <div class="stat-card">
     <div class="stat-value" id="stat-sql">0/{{ academy_lessons|length }}</div>
-    <div class="stat-label">SQL-Kapitel</div>
+    <div class="stat-label">Kapitel</div>
   </div>
   <div class="stat-card">
     <div class="stat-value" id="stat-xp">0</div>
@@ -58,8 +58,8 @@
 
 <section>
   <div class="section-head">
-    <h2>SQL Grundlagen</h2>
-    <p class="muted">Verstehen → Schreiben → Kurzcheck. Inklusive NULL, GROUP BY und JOIN.</p>
+    <h2>PostgreSQL Grundlagen</h2>
+    <p class="muted">Verstehen → Vorhersagen → Bauen → Schreiben → Anwenden</p>
   </div>
   <div class="path path-academy">
     {% for l in academy_lessons %}
@@ -72,72 +72,11 @@
       <p class="path-goals">{{ l.goal }}</p>
       <div class="path-meta">
         <span>{{ l.steps|length }} Schritte</span>
-        {% if l.quiz %}<span>{{ l.quiz|length }} Quiz</span>{% endif %}
         {% if l.challenge %}<span>Challenge</span>{% endif %}
         <span class="path-state">Offen</span>
       </div>
     </a>
     {% endfor %}
   </div>
-</section>
-
-<section id="wmx-home">
-  <div class="section-head">
-    <h2>WMX Datenmodell</h2>
-    <p class="muted">Zweiter Skill-Tree: dieselben SQL-Befehle auf den Lager-Tabellen, danach Teile A–P. Die Akademie oben bringt JOIN und Filter schon mit.</p>
-  </div>
-  <section class="card howto">
-    <h2>So arbeitest du in den WMX-Lektionen</h2>
-    <ol class="howto-steps howto-flow">
-      <li>
-        <span class="howto-num">1</span>
-        <div>
-          <strong>Verstehen</strong>
-          <p>Jede Lektion startet mit kurzen Abschnitten. Nicht scrollen und überfliegen — unten auf Weiter, dann die nächste Idee.</p>
-        </div>
-      </li>
-      <li>
-        <span class="howto-num">2</span>
-        <div>
-          <strong>SQL-Aufgaben</strong>
-          <p>Erst geführt (FROM steht), dann selbst schreiben. Rechts Tabelle aufklappen, Ausführen, „Stimmt das?“.</p>
-        </div>
-      </li>
-      <li>
-        <span class="howto-num">3</span>
-        <div>
-          <strong>Kurzcheck</strong>
-          <p>Ein paar Fragen sichern den Abschnitt. Danach die nächste Lektion — oder in der Wissensbasis nachschlagen.</p>
-        </div>
-      </li>
-    </ol>
-    <p class="howto-foot muted">UPDATE/DELETE verdrehen die Beispieldaten. Dann in der Seitenleiste „Datenbank zurücksetzen“. Freies Rumspielen: SQL-Playground.</p>
-  </section>
-  {% for track in tracks %}
-  <div class="section-head">
-    <h3>{{ track.label }}</h3>
-    <p class="muted">{{ track.blurb }}</p>
-  </div>
-  <div class="path">
-    {% for l in track.lessons %}
-    <a class="path-card" href="/lesson/{{ l.id }}" data-lesson-id="{{ l.id }}">
-      <div class="path-top">
-        <span class="path-letter">{{ l.letter or l.id|upper }}</span>
-        <span class="path-mins">{{ l.minutes or 8 }} Min</span>
-      </div>
-      <h3>{{ l.title }}</h3>
-      <p class="path-goals">
-        {% if l.goals %}{{ l.goals[0] }}{% endif %}
-      </p>
-      <div class="path-meta">
-        {% if l.exercises %}<span>{{ l.exercises|length }} Übung{{ 'en' if l.exercises|length != 1 else '' }}</span>{% endif %}
-        {% if l.quiz %}<span>{{ l.quiz|length }} Quiz</span>{% endif %}
-        {% if not l.exercises and not l.quiz %}<span>Lesen + Checkliste</span>{% endif %}
-        <span class="path-state">Offen</span>
-      </div>
-    </a>
-    {% endfor %}
-  </div>
-  {% endfor %}
 </section>
 {% endblock %}
