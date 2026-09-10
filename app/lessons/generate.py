@@ -27,6 +27,197 @@ def EX(id, why, task, look, starter, hints, solution, **extra):
 
 # ---------------------------------------------------------------------------
 L(
+    id="sql",
+    letter="SQL",
+    track="einstieg",
+    title="SQL-Grundlagen: SELECT und JOINs",
+    minutes=14,
+    goals=[
+        "SELECT, FROM und WHERE als Gerüst einer Abfrage nutzen",
+        "INNER JOIN und LEFT JOIN unterscheiden",
+        "NULL nach einem JOIN als fehlenden Treffer lesen",
+    ],
+    content="""## Was ist eine Abfrage?
+
+Eine SQL-Abfrage fragt Tabellen. Drei Bausteine reichen für den Start:
+
+- **SELECT** — welche Spalten willst du sehen?
+- **FROM** — aus welcher Tabelle?
+- **WHERE** — welche Zeilen behalten? (ohne WHERE kommen alle Zeilen)
+
+```sql
+SELECT order_number, task_status
+FROM instance_1.flowapp_demo_order_head
+WHERE order_number = '100504_A';
+```
+
+In dieser App stehen die Tabellen immer voll qualifiziert: `instance_1.flowapp_demo_…`. Rechts im Übungsteil siehst du den deutschen Namen (**Auftrag**) und darunter den technischen (`order_head`).
+
+## INNER JOIN
+
+Ein **INNER JOIN** behält nur Zeilen, die **in beiden Tabellen** einen Treffer haben.
+
+Auftrag ohne Position? Fliegt raus. Position ohne Auftrag? Fliegt raus.
+
+```sql
+SELECT oh.order_number, op.quantity
+FROM instance_1.flowapp_demo_order_head oh
+INNER JOIN instance_1.flowapp_demo_order_position op
+  ON op.order_head_id = oh.id;
+```
+
+`ON` sagt, *worüber* die Tabellen zusammengehören. Hier: die Position hängt am Auftrag (`order_head_id` = `oh.id`).
+
+In der Übungs-DB haben nur drei Aufträge Positionen — INNER JOIN liefert also drei Zeilen. `JOIN` ohne Wort davor ist dasselbe wie `INNER JOIN`.
+
+## LEFT JOIN
+
+**LEFT JOIN** (ausgeschrieben **LEFT OUTER JOIN**) behält **alle Zeilen der linken Tabelle**. Fehlt rechts ein Treffer, stehen dort **NULL**.
+
+```sql
+SELECT oh.order_number, op.quantity
+FROM instance_1.flowapp_demo_order_head oh
+LEFT JOIN instance_1.flowapp_demo_order_position op
+  ON op.order_head_id = oh.id;
+```
+
+Dieselbe Verknüpfung wie eben — aber jetzt bleiben Aufträge ohne Position in der Liste, `quantity` ist dann leer. In der Übungs-DB: sieben Aufträge, vier davon ohne Position.
+
+Im Lageralltag: Auftragsliste mit Mandant, auch wenn `client_id` fehlt. Deshalb steht bei uns fast immer **LEFT JOIN**.
+
+## RIGHT und FULL JOIN
+
+**RIGHT OUTER JOIN** ist LEFT JOIN mit vertauschten Tabellen: alle Zeilen **rechts** bleiben. Bei uns liegt der Auftrag üblicherweise links — dann schreibst du LEFT JOIN, nicht RIGHT.
+
+**FULL OUTER JOIN** behält Zeilen **beider** Seiten, auch ohne Treffer. Mandant `DEMO` hat in der Übungs-DB keinen Auftrag: ein FULL JOIN Auftrag/Mandant würde ihn trotzdem zeigen. Im Shop selten nötig; wenn, dann für Abgleiche („was hängt nirgends?“).
+
+## Welchen JOIN wann?
+
+Sprache aus dem Lager: **Auftrag**, **Mandant**, **Position**.
+
+| Ziel | JOIN |
+|---|---|
+| Nur Aufträge, die wirklich Positionen haben | **INNER JOIN** |
+| Alle Aufträge, Lücken sichtbar lassen | **LEFT JOIN** Auftrag → Position |
+| Auftrag plus Mandant, Auftrag darf nicht verschwinden | **LEFT JOIN** Auftrag → Mandant |
+| Zwei Listen vollständig gegeneinander halten | **FULL OUTER JOIN** (selten) |
+
+Faustregel: Was darf nicht verloren gehen? Das gehört **nach links**, dann LEFT JOIN.
+
+## NULL nach dem JOIN
+
+NULL heißt hier: **kein Treffer**, nicht die Zahl 0.
+
+- `quantity IS NULL` — dieser Auftrag hat keine Position.
+- `quantity = 0` — findet diese Lücken **nicht** (NULL ist nicht 0).
+- `c.code IS NULL` — dieser Auftrag hat keinen Mandanten.
+
+Die Zeile links existiert. Rechts ist die Zelle leer. Genau das willst du sehen, wenn du mit LEFT JOIN nach fehlenden Daten suchst.
+
+JOIN-Arten sitzen jetzt. Teil A nimmt Postgres-Eigenheiten (Schema, UUID, Window Functions).""",
+    exercises=[
+        EX(
+            "sql-ex1",
+            why="Bevor Joins kommen: eine Zeile gezielt finden.",
+            task="Gib Auftragsnummer und Status für den Auftrag 100504_A aus.",
+            look=[
+                "Rechts „Auftrag“ (order_head) öffnen.",
+                "SELECT: order_number und task_status.",
+                "WHERE filtert auf genau diese Auftragsnummer.",
+            ],
+            starter="-- Eine Zeile: Auftrag 100504_A.\n-- Rechts: Tabelle „Auftrag“.\n\nSELECT\n  -- Spalten einsetzen\n  \nFROM instance_1.flowapp_demo_order_head\nWHERE\n",
+            hints=[
+                "SELECT order_number, task_status — beide Spalten stehen rechts bei Auftrag.",
+                "WHERE order_number = '100504_A' — Text in einfachen Anführungszeichen.",
+            ],
+            solution="SELECT order_number, task_status FROM instance_1.flowapp_demo_order_head WHERE order_number = '100504_A';",
+        ),
+        EX(
+            "sql-ex2",
+            why="Nur Aufträge, die wirklich Positionen haben — der Rest soll nicht in der Liste stehen.",
+            task="Verknüpfe Auftrag und Position per INNER JOIN. Gib Auftragsnummer und Menge aus.",
+            look=[
+                "SELECT: oh.order_number und op.quantity.",
+                "ON op.order_head_id = oh.id — die Position hängt am Auftrag.",
+            ],
+            starter="-- Nur Treffer in beiden Tabellen.\n-- Rechts: „Auftrag“ und „Position“ (hängt am Auftrag).\n\nSELECT\n  \nFROM instance_1.flowapp_demo_order_head oh\nINNER JOIN instance_1.flowapp_demo_order_position op\n  ON \n",
+            hints=[
+                "SELECT oh.order_number, op.quantity — Alias oh und op stehen schon im FROM.",
+                "ON op.order_head_id = oh.id — nicht order_id (integer) mit id (UUID) mischen.",
+            ],
+            solution="SELECT oh.order_number, op.quantity FROM instance_1.flowapp_demo_order_head oh INNER JOIN instance_1.flowapp_demo_order_position op ON op.order_head_id = oh.id;",
+        ),
+        EX(
+            "sql-ex3",
+            why="Dieselbe Liste, aber Aufträge ohne Position sollen bleiben — Menge dann leer (NULL).",
+            task="Verknüpfe Auftrag und Position per LEFT JOIN. Gib Auftragsnummer und Menge aus.",
+            look=[
+                "Gleicher SELECT wie eben: oh.order_number, op.quantity.",
+                "ON bleibt op.order_head_id = oh.id. LEFT statt INNER hält Aufträge ohne Position.",
+            ],
+            starter="-- Alle Aufträge, auch ohne Position.\n-- Rechts: „Auftrag“ und „Position“.\n\nSELECT\n  \nFROM instance_1.flowapp_demo_order_head oh\nLEFT JOIN instance_1.flowapp_demo_order_position op\n  ON \n",
+            hints=[
+                "SELECT oh.order_number, op.quantity",
+                "ON op.order_head_id = oh.id — wer LEFT durch INNER ersetzt, verliert die Aufträge ohne Position.",
+            ],
+            solution="SELECT oh.order_number, op.quantity FROM instance_1.flowapp_demo_order_head oh LEFT JOIN instance_1.flowapp_demo_order_position op ON op.order_head_id = oh.id;",
+        ),
+    ],
+    quiz=[
+        {
+            "q": "Was bleibt bei einem INNER JOIN Auftrag → Position übrig?",
+            "options": [
+                "Alle Aufträge, Positionen ohne Treffer als NULL",
+                "Nur Aufträge, die mindestens eine Position haben",
+                "Alle Positionen, auch ohne Auftrag",
+                "Immer genau eine Zeile",
+            ],
+            "correct": 1,
+            "explain": "INNER JOIN behält nur Zeilen mit Treffer in beiden Tabellen. Auftrag ohne Position fliegt raus.",
+        },
+        {
+            "q": "Was bedeutet NULL in der Spalte der rechten Tabelle nach einem LEFT JOIN?",
+            "options": [
+                "Die Menge ist 0",
+                "Die Zeile ist gelöscht",
+                "Links gab es keine passende Zeile rechts",
+                "Der JOIN ist fehlgeschlagen und muss wiederholt werden",
+            ],
+            "correct": 2,
+            "explain": "Die linke Zeile bleibt. Rechts war kein Treffer — die Zelle ist leer (NULL), nicht 0.",
+        },
+        {
+            "q": "Du willst alle Aufträge sehen, auch ohne Mandant. Welcher JOIN?",
+            "options": [
+                "INNER JOIN",
+                "LEFT JOIN, Auftrag links",
+                "RIGHT JOIN, Mandant links",
+                "FULL JOIN ist die einzige Möglichkeit",
+            ],
+            "correct": 1,
+            "explain": "Was nicht verloren gehen darf, gehört nach links: LEFT JOIN Auftrag → Mandant. So bleibt der Auftrag, Mandanten-Spalten werden NULL.",
+        },
+        {
+            "q": "Warum schreiben wir im Shop selten RIGHT JOIN?",
+            "options": [
+                "Postgres kennt kein RIGHT JOIN",
+                "RIGHT JOIN liefert immer 0 Zeilen",
+                "Wir legen die führende Tabelle nach links und schreiben LEFT JOIN",
+                "RIGHT JOIN ignoriert die ON-Bedingung",
+            ],
+            "correct": 2,
+            "explain": "RIGHT JOIN ist LEFT JOIN mit vertauschten Seiten. Üblich: Auftrag links, dann LEFT JOIN.",
+        },
+    ],
+    flashcards=[
+        {"id": "sql-fc1", "front": "SELECT / FROM / WHERE?", "back": "SELECT = Spalten, FROM = Tabelle, WHERE = Filter. Ohne WHERE kommen alle Zeilen."},
+        {"id": "sql-fc2", "front": "INNER JOIN", "back": "Nur Zeilen mit Treffer in beiden Tabellen. JOIN ohne Zusatzwort ist INNER JOIN."},
+        {"id": "sql-fc3", "front": "LEFT JOIN", "back": "Alle Zeilen links bleiben. Kein Treffer rechts → NULL. Bei uns die übliche Form (Auftrag links)."},
+        {"id": "sql-fc4", "front": "NULL nach einem JOIN", "back": "Kein Treffer, nicht die Zahl 0. Suchen mit IS NULL, nicht mit = 0."},
+    ],
+)
+
+L(
     id="a",
     letter="A",
     track="einstieg",
@@ -34,7 +225,7 @@ L(
     minutes=12,
     goals=[
         "Schema vs. Tabelle vs. vollqualifizierter Name unterscheiden",
-        "INNER JOIN vs. LEFT JOIN und UUID-vs-Integer-Fallen kennen",
+        "UUID- vs. Integer-Schlüssel nicht durcheinander joinen",
         "Window Functions und CTEs als Standardwerkzeuge nutzen",
     ],
     content="""## A.1 Was ist PostgreSQL?
@@ -72,15 +263,13 @@ FROM instance_1.flowapp_demo_order_head;
 | jsonb | binäres JSON, indexierbar | z. B. `name->>'de'` |
 | boolean | Wahr/Falsch | — |
 
-## A.4 JOINs
+## A.4 JOINs in dieser Datenbank
 
-- **INNER JOIN**: nur Zeilen mit Treffer in beiden Tabellen.
-- **LEFT JOIN**: alle Zeilen der linken Tabelle, plus Treffer rechts (sonst NULL).
-- Ein JOIN braucht eine Verknüpfungsbedingung (`ON ... = ...`) — bei uns oft über UUID-Spalten (`id`) oder fachliche Referenzfelder (Teil D.4).
+JOIN-Arten (INNER, LEFT, RIGHT, FULL) und NULL bei fehlendem Treffer stehen in den [SQL-Grundlagen](/lesson/sql). Hier die FlowApp-Falle:
 
-**Achtung:** Datentypen müssen zusammenpassen. `integer = uuid` führt zum Laufzeitfehler — ein häufiger Anfängerfehler, da manche Referenzfelder integer (z. B. `order_id`) und andere UUID (z. B. `order_head.id`) sind.
+**Datentypen müssen zusammenpassen.** `integer = uuid` führt zum Laufzeitfehler — häufig, weil manche Felder integer sind (z. B. `order_id`) und der Primärschlüssel UUID (`order_head.id`). Die Verknüpfung geht über `ON … = …`, oft UUID (`id`) oder fachliche Referenzfelder (Teil D.4).
 
-Komplettes Beispiel: Auftrag mit Mandant (LEFT JOIN, damit Aufträge ohne Mandant bleiben):
+Auftrag mit Mandant — LEFT JOIN, damit der Auftrag bleibt, falls `client_id` fehlt (in der Übungs-DB hat jeder Auftrag einen Mandanten, INNER und LEFT sind hier gleich):
 
 ```sql
 SELECT oh.order_number, c.code
@@ -146,6 +335,7 @@ Eine View ist eine gespeicherte SELECT-Abfrage. Views übernehmen **nicht automa
             why="Dieselbe Liste, aber der Kollege will auch den Mandanten sehen.",
             task="Verknüpfe Auftrag mit Mandant und gib Auftragsnummer plus Mandanten-Code aus.",
             look=[
+                "JOIN-Arten wie in den SQL-Grundlagen. Hier: LEFT JOIN Auftrag → Mandant.",
                 "SELECT: oh.order_number und c.code.",
                 "ON c.id = oh.client_id — der JOIN fehlt noch.",
             ],

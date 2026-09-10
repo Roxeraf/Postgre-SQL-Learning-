@@ -303,9 +303,10 @@ h3 { margin: 0 0 8px; font-size: 17px; }
 .path-card:hover { transform: translateY(-2px); border-color: var(--border-strong); }
 .path-top { display: flex; justify-content: space-between; margin-bottom: 10px; }
 .path-letter {
-  width: 32px; height: 32px; border-radius: 10px;
+  min-width: 32px; width: auto; height: 32px; padding: 0 8px; border-radius: 10px;
   display: grid; place-items: center;
   background: var(--accent-dim); color: var(--accent); font-weight: 700;
+  font-size: 12px;
 }
 .path-mins { color: var(--muted); font-size: 12px; }
 .path-goals { color: var(--muted); font-size: 13.5px; min-height: 42px; margin: 0 0 12px; }

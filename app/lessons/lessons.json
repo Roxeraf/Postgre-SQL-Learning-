@@ -1,5 +1,137 @@
 [
   {
+    "id": "sql",
+    "letter": "SQL",
+    "track": "einstieg",
+    "title": "SQL-Grundlagen: SELECT und JOINs",
+    "minutes": 14,
+    "goals": [
+      "SELECT, FROM und WHERE als Gerüst einer Abfrage nutzen",
+      "INNER JOIN und LEFT JOIN unterscheiden",
+      "NULL nach einem JOIN als fehlenden Treffer lesen"
+    ],
+    "content": "## Was ist eine Abfrage?\n\nEine SQL-Abfrage fragt Tabellen. Drei Bausteine reichen für den Start:\n\n- **SELECT** — welche Spalten willst du sehen?\n- **FROM** — aus welcher Tabelle?\n- **WHERE** — welche Zeilen behalten? (ohne WHERE kommen alle Zeilen)\n\n```sql\nSELECT order_number, task_status\nFROM instance_1.flowapp_demo_order_head\nWHERE order_number = '100504_A';\n```\n\nIn dieser App stehen die Tabellen immer voll qualifiziert: `instance_1.flowapp_demo_…`. Rechts im Übungsteil siehst du den deutschen Namen (**Auftrag**) und darunter den technischen (`order_head`).\n\n## INNER JOIN\n\nEin **INNER JOIN** behält nur Zeilen, die **in beiden Tabellen** einen Treffer haben.\n\nAuftrag ohne Position? Fliegt raus. Position ohne Auftrag? Fliegt raus.\n\n```sql\nSELECT oh.order_number, op.quantity\nFROM instance_1.flowapp_demo_order_head oh\nINNER JOIN instance_1.flowapp_demo_order_position op\n  ON op.order_head_id = oh.id;\n```\n\n`ON` sagt, *worüber* die Tabellen zusammengehören. Hier: die Position hängt am Auftrag (`order_head_id` = `oh.id`).\n\nIn der Übungs-DB haben nur drei Aufträge Positionen — INNER JOIN liefert also drei Zeilen. `JOIN` ohne Wort davor ist dasselbe wie `INNER JOIN`.\n\n## LEFT JOIN\n\n**LEFT JOIN** (ausgeschrieben **LEFT OUTER JOIN**) behält **alle Zeilen der linken Tabelle**. Fehlt rechts ein Treffer, stehen dort **NULL**.\n\n```sql\nSELECT oh.order_number, op.quantity\nFROM instance_1.flowapp_demo_order_head oh\nLEFT JOIN instance_1.flowapp_demo_order_position op\n  ON op.order_head_id = oh.id;\n```\n\nDieselbe Verknüpfung wie eben — aber jetzt bleiben Aufträge ohne Position in der Liste, `quantity` ist dann leer. In der Übungs-DB: sieben Aufträge, vier davon ohne Position.\n\nIm Lageralltag: Auftragsliste mit Mandant, auch wenn `client_id` fehlt. Deshalb steht bei uns fast immer **LEFT JOIN**.\n\n## RIGHT und FULL JOIN\n\n**RIGHT OUTER JOIN** ist LEFT JOIN mit vertauschten Tabellen: alle Zeilen **rechts** bleiben. Bei uns liegt der Auftrag üblicherweise links — dann schreibst du LEFT JOIN, nicht RIGHT.\n\n**FULL OUTER JOIN** behält Zeilen **beider** Seiten, auch ohne Treffer. Mandant `DEMO` hat in der Übungs-DB keinen Auftrag: ein FULL JOIN Auftrag/Mandant würde ihn trotzdem zeigen. Im Shop selten nötig; wenn, dann für Abgleiche („was hängt nirgends?“).\n\n## Welchen JOIN wann?\n\nSprache aus dem Lager: **Auftrag**, **Mandant**, **Position**.\n\n| Ziel | JOIN |\n|---|---|\n| Nur Aufträge, die wirklich Positionen haben | **INNER JOIN** |\n| Alle Aufträge, Lücken sichtbar lassen | **LEFT JOIN** Auftrag → Position |\n| Auftrag plus Mandant, Auftrag darf nicht verschwinden | **LEFT JOIN** Auftrag → Mandant |\n| Zwei Listen vollständig gegeneinander halten | **FULL OUTER JOIN** (selten) |\n\nFaustregel: Was darf nicht verloren gehen? Das gehört **nach links**, dann LEFT JOIN.\n\n## NULL nach dem JOIN\n\nNULL heißt hier: **kein Treffer**, nicht die Zahl 0.\n\n- `quantity IS NULL` — dieser Auftrag hat keine Position.\n- `quantity = 0` — findet diese Lücken **nicht** (NULL ist nicht 0).\n- `c.code IS NULL` — dieser Auftrag hat keinen Mandanten.\n\nDie Zeile links existiert. Rechts ist die Zelle leer. Genau das willst du sehen, wenn du mit LEFT JOIN nach fehlenden Daten suchst.\n\nJOIN-Arten sitzen jetzt. Teil A nimmt Postgres-Eigenheiten (Schema, UUID, Window Functions).",
+    "exercises": [
+      {
+        "id": "sql-ex1",
+        "why": "Bevor Joins kommen: eine Zeile gezielt finden.",
+        "task": "Gib Auftragsnummer und Status für den Auftrag 100504_A aus.",
+        "look": [
+          "Rechts „Auftrag“ (order_head) öffnen.",
+          "SELECT: order_number und task_status.",
+          "WHERE filtert auf genau diese Auftragsnummer."
+        ],
+        "prompt": "Gib Auftragsnummer und Status für den Auftrag 100504_A aus.",
+        "starter": "-- Eine Zeile: Auftrag 100504_A.\n-- Rechts: Tabelle „Auftrag“.\n\nSELECT\n  -- Spalten einsetzen\n  \nFROM instance_1.flowapp_demo_order_head\nWHERE\n",
+        "hints": [
+          "SELECT order_number, task_status — beide Spalten stehen rechts bei Auftrag.",
+          "WHERE order_number = '100504_A' — Text in einfachen Anführungszeichen."
+        ],
+        "solution": "SELECT order_number, task_status FROM instance_1.flowapp_demo_order_head WHERE order_number = '100504_A';"
+      },
+      {
+        "id": "sql-ex2",
+        "why": "Nur Aufträge, die wirklich Positionen haben — der Rest soll nicht in der Liste stehen.",
+        "task": "Verknüpfe Auftrag und Position per INNER JOIN. Gib Auftragsnummer und Menge aus.",
+        "look": [
+          "SELECT: oh.order_number und op.quantity.",
+          "ON op.order_head_id = oh.id — die Position hängt am Auftrag."
+        ],
+        "prompt": "Verknüpfe Auftrag und Position per INNER JOIN. Gib Auftragsnummer und Menge aus.",
+        "starter": "-- Nur Treffer in beiden Tabellen.\n-- Rechts: „Auftrag“ und „Position“ (hängt am Auftrag).\n\nSELECT\n  \nFROM instance_1.flowapp_demo_order_head oh\nINNER JOIN instance_1.flowapp_demo_order_position op\n  ON \n",
+        "hints": [
+          "SELECT oh.order_number, op.quantity — Alias oh und op stehen schon im FROM.",
+          "ON op.order_head_id = oh.id — nicht order_id (integer) mit id (UUID) mischen."
+        ],
+        "solution": "SELECT oh.order_number, op.quantity FROM instance_1.flowapp_demo_order_head oh INNER JOIN instance_1.flowapp_demo_order_position op ON op.order_head_id = oh.id;"
+      },
+      {
+        "id": "sql-ex3",
+        "why": "Dieselbe Liste, aber Aufträge ohne Position sollen bleiben — Menge dann leer (NULL).",
+        "task": "Verknüpfe Auftrag und Position per LEFT JOIN. Gib Auftragsnummer und Menge aus.",
+        "look": [
+          "Gleicher SELECT wie eben: oh.order_number, op.quantity.",
+          "ON bleibt op.order_head_id = oh.id. LEFT statt INNER hält Aufträge ohne Position."
+        ],
+        "prompt": "Verknüpfe Auftrag und Position per LEFT JOIN. Gib Auftragsnummer und Menge aus.",
+        "starter": "-- Alle Aufträge, auch ohne Position.\n-- Rechts: „Auftrag“ und „Position“.\n\nSELECT\n  \nFROM instance_1.flowapp_demo_order_head oh\nLEFT JOIN instance_1.flowapp_demo_order_position op\n  ON \n",
+        "hints": [
+          "SELECT oh.order_number, op.quantity",
+          "ON op.order_head_id = oh.id — wer LEFT durch INNER ersetzt, verliert die Aufträge ohne Position."
+        ],
+        "solution": "SELECT oh.order_number, op.quantity FROM instance_1.flowapp_demo_order_head oh LEFT JOIN instance_1.flowapp_demo_order_position op ON op.order_head_id = oh.id;"
+      }
+    ],
+    "quiz": [
+      {
+        "q": "Was bleibt bei einem INNER JOIN Auftrag → Position übrig?",
+        "options": [
+          "Alle Aufträge, Positionen ohne Treffer als NULL",
+          "Nur Aufträge, die mindestens eine Position haben",
+          "Alle Positionen, auch ohne Auftrag",
+          "Immer genau eine Zeile"
+        ],
+        "correct": 1,
+        "explain": "INNER JOIN behält nur Zeilen mit Treffer in beiden Tabellen. Auftrag ohne Position fliegt raus."
+      },
+      {
+        "q": "Was bedeutet NULL in der Spalte der rechten Tabelle nach einem LEFT JOIN?",
+        "options": [
+          "Die Menge ist 0",
+          "Die Zeile ist gelöscht",
+          "Links gab es keine passende Zeile rechts",
+          "Der JOIN ist fehlgeschlagen und muss wiederholt werden"
+        ],
+        "correct": 2,
+        "explain": "Die linke Zeile bleibt. Rechts war kein Treffer — die Zelle ist leer (NULL), nicht 0."
+      },
+      {
+        "q": "Du willst alle Aufträge sehen, auch ohne Mandant. Welcher JOIN?",
+        "options": [
+          "INNER JOIN",
+          "LEFT JOIN, Auftrag links",
+          "RIGHT JOIN, Mandant links",
+          "FULL JOIN ist die einzige Möglichkeit"
+        ],
+        "correct": 1,
+        "explain": "Was nicht verloren gehen darf, gehört nach links: LEFT JOIN Auftrag → Mandant. So bleibt der Auftrag, Mandanten-Spalten werden NULL."
+      },
+      {
+        "q": "Warum schreiben wir im Shop selten RIGHT JOIN?",
+        "options": [
+          "Postgres kennt kein RIGHT JOIN",
+          "RIGHT JOIN liefert immer 0 Zeilen",
+          "Wir legen die führende Tabelle nach links und schreiben LEFT JOIN",
+          "RIGHT JOIN ignoriert die ON-Bedingung"
+        ],
+        "correct": 2,
+        "explain": "RIGHT JOIN ist LEFT JOIN mit vertauschten Seiten. Üblich: Auftrag links, dann LEFT JOIN."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "sql-fc1",
+        "front": "SELECT / FROM / WHERE?",
+        "back": "SELECT = Spalten, FROM = Tabelle, WHERE = Filter. Ohne WHERE kommen alle Zeilen."
+      },
+      {
+        "id": "sql-fc2",
+        "front": "INNER JOIN",
+        "back": "Nur Zeilen mit Treffer in beiden Tabellen. JOIN ohne Zusatzwort ist INNER JOIN."
+      },
+      {
+        "id": "sql-fc3",
+        "front": "LEFT JOIN",
+        "back": "Alle Zeilen links bleiben. Kein Treffer rechts → NULL. Bei uns die übliche Form (Auftrag links)."
+      },
+      {
+        "id": "sql-fc4",
+        "front": "NULL nach einem JOIN",
+        "back": "Kein Treffer, nicht die Zahl 0. Suchen mit IS NULL, nicht mit = 0."
+      }
+    ]
+  },
+  {
     "id": "a",
     "letter": "A",
     "track": "einstieg",
@@ -7,10 +139,10 @@
     "minutes": 12,
     "goals": [
       "Schema vs. Tabelle vs. vollqualifizierter Name unterscheiden",
-      "INNER JOIN vs. LEFT JOIN und UUID-vs-Integer-Fallen kennen",
+      "UUID- vs. Integer-Schlüssel nicht durcheinander joinen",
       "Window Functions und CTEs als Standardwerkzeuge nutzen"
     ],
-    "content": "## A.1 Was ist PostgreSQL?\n\nPostgreSQL (\"Postgres\") ist ein relationales Datenbanksystem (RDBMS). Daten stehen in Tabellen mit fest definierten Spalten. Tabellen werden über Primary Keys / Foreign Keys verknüpft, abgefragt wird mit SQL (Structured Query Language).\n\nWichtig für uns: Postgres kann zusätzlich **JSON/JSONB**, **Window Functions** und **CTEs (WITH)** — das nutzen wir in FlowApp intensiv.\n\n## A.2 Datenbank, Schema, Tabelle\n\n- Eine Instanz kann mehrere Datenbanken enthalten.\n- Eine Datenbank enthält mehrere Schemas (Namensräume) — bei uns z. B. das Schema der Instanz (`instance_1`) und ein separates Schema `subscription` für Print-Subscriptions.\n- Ein Schema enthält die eigentlichen Tabellen.\n\nTabellen werden bei uns **immer voll qualifiziert** angesprochen: `instance_1.flowapp_demo_<tabellenname>` (siehe Teil B).\n\n> **Merke:** Ohne `instance_1.` sucht Postgres im falschen Schema und findet die Tabelle nicht. Im Übungsteil siehst du den deutschen Namen (**Auftrag**) und darunter den technischen (`order_head`).\n\nKomplette Beispielabfrage — so sieht eine erste Liste aus:\n\n```sql\nSELECT order_number, task_status\nFROM instance_1.flowapp_demo_order_head;\n```\n\n## A.3 Wichtige Datentypen\n\n| Datentyp | Bedeutung | Hinweis |\n|---|---|---|\n| integer / bigint | Ganzzahl | z. B. lesbare Order-Nummer `order_id` |\n| uuid | Universally Unique Identifier | Primärschlüssel vieler Tabellen (`id`) |\n| varchar / text | Zeichenketten | z. B. Statuscodes wie `task_state` |\n| timestamptz | Zeitstempel MIT Zeitzone (i. d. R. UTC) | braucht Konvertierung, siehe Teil E |\n| timestamp (ohne tz) | Zeitstempel OHNE Zeitzone | bei uns bereits lokale Zeit |\n| jsonb | binäres JSON, indexierbar | z. B. `name->>'de'` |\n| boolean | Wahr/Falsch | — |\n\n## A.4 JOINs\n\n- **INNER JOIN**: nur Zeilen mit Treffer in beiden Tabellen.\n- **LEFT JOIN**: alle Zeilen der linken Tabelle, plus Treffer rechts (sonst NULL).\n- Ein JOIN braucht eine Verknüpfungsbedingung (`ON ... = ...`) — bei uns oft über UUID-Spalten (`id`) oder fachliche Referenzfelder (Teil D.4).\n\n**Achtung:** Datentypen müssen zusammenpassen. `integer = uuid` führt zum Laufzeitfehler — ein häufiger Anfängerfehler, da manche Referenzfelder integer (z. B. `order_id`) und andere UUID (z. B. `order_head.id`) sind.\n\nKomplettes Beispiel: Auftrag mit Mandant (LEFT JOIN, damit Aufträge ohne Mandant bleiben):\n\n```sql\nSELECT oh.order_number, c.code\nFROM instance_1.flowapp_demo_order_head oh\nLEFT JOIN instance_1.flowapp_demo_client c\n  ON c.id = oh.client_id;\n```\n\n## A.5 Primary Keys & Foreign Keys\n\nPK: eindeutiger Schlüssel pro Zeile (meist `id` als UUID). FK: Verweis auf den PK einer anderen Tabelle.\n\n**Besonderheit bei uns:** FK-Constraints sind größtenteils **NICHT** technisch erzwungen. Referentielle Integrität wird nicht automatisch garantiert — vor jeder Änderung selbst prüfen, welche Kind-Tabellen abhängig sind.\n\n## A.6 Window Functions\n\nBerechnen Werte über eine Gruppe von Zeilen, ohne sie wie bei `GROUP BY` zusammenzufassen. Wir nutzen das oft zur Deduplizierung:\n\n```sql\nROW_NUMBER() OVER (PARTITION BY <schlüssel_spalte> ORDER BY <datum_spalte> DESC) AS rn\n-- anschließend: WHERE rn = 1\n```\n\nDamit holt man z. B. pro Handling Unit immer nur den neuesten Qualifikations-Datensatz.\n\n## A.7 CTEs — WITH-Klausel\n\n```sql\nWITH basis AS (\n  SELECT ...\n)\nSELECT * FROM basis WHERE ...;\n```\n\nIn Metabase werden einmal referenzierte CTEs automatisch inline eingebaut. Bei Performance-Problemen: `WITH basis AS MATERIALIZED (...)`.\n\n## A.8 Transaktionen\n\n`BEGIN` / `COMMIT` / `ROLLBACK` fassen mehrere Anweisungen zu einer Einheit zusammen. Pflicht bei jeder datenverändernden Aktion — siehe das Sicherheitsmuster in Teil G.\n\n## A.9 Views\n\nEine View ist eine gespeicherte SELECT-Abfrage. Views übernehmen **nicht automatisch** neue Spalten der Basistabelle — nach Erweiterung muss die View per `CREATE OR REPLACE VIEW ...` angepasst werden.",
+    "content": "## A.1 Was ist PostgreSQL?\n\nPostgreSQL (\"Postgres\") ist ein relationales Datenbanksystem (RDBMS). Daten stehen in Tabellen mit fest definierten Spalten. Tabellen werden über Primary Keys / Foreign Keys verknüpft, abgefragt wird mit SQL (Structured Query Language).\n\nWichtig für uns: Postgres kann zusätzlich **JSON/JSONB**, **Window Functions** und **CTEs (WITH)** — das nutzen wir in FlowApp intensiv.\n\n## A.2 Datenbank, Schema, Tabelle\n\n- Eine Instanz kann mehrere Datenbanken enthalten.\n- Eine Datenbank enthält mehrere Schemas (Namensräume) — bei uns z. B. das Schema der Instanz (`instance_1`) und ein separates Schema `subscription` für Print-Subscriptions.\n- Ein Schema enthält die eigentlichen Tabellen.\n\nTabellen werden bei uns **immer voll qualifiziert** angesprochen: `instance_1.flowapp_demo_<tabellenname>` (siehe Teil B).\n\n> **Merke:** Ohne `instance_1.` sucht Postgres im falschen Schema und findet die Tabelle nicht. Im Übungsteil siehst du den deutschen Namen (**Auftrag**) und darunter den technischen (`order_head`).\n\nKomplette Beispielabfrage — so sieht eine erste Liste aus:\n\n```sql\nSELECT order_number, task_status\nFROM instance_1.flowapp_demo_order_head;\n```\n\n## A.3 Wichtige Datentypen\n\n| Datentyp | Bedeutung | Hinweis |\n|---|---|---|\n| integer / bigint | Ganzzahl | z. B. lesbare Order-Nummer `order_id` |\n| uuid | Universally Unique Identifier | Primärschlüssel vieler Tabellen (`id`) |\n| varchar / text | Zeichenketten | z. B. Statuscodes wie `task_state` |\n| timestamptz | Zeitstempel MIT Zeitzone (i. d. R. UTC) | braucht Konvertierung, siehe Teil E |\n| timestamp (ohne tz) | Zeitstempel OHNE Zeitzone | bei uns bereits lokale Zeit |\n| jsonb | binäres JSON, indexierbar | z. B. `name->>'de'` |\n| boolean | Wahr/Falsch | — |\n\n## A.4 JOINs in dieser Datenbank\n\nJOIN-Arten (INNER, LEFT, RIGHT, FULL) und NULL bei fehlendem Treffer stehen in den [SQL-Grundlagen](/lesson/sql). Hier die FlowApp-Falle:\n\n**Datentypen müssen zusammenpassen.** `integer = uuid` führt zum Laufzeitfehler — häufig, weil manche Felder integer sind (z. B. `order_id`) und der Primärschlüssel UUID (`order_head.id`). Die Verknüpfung geht über `ON … = …`, oft UUID (`id`) oder fachliche Referenzfelder (Teil D.4).\n\nAuftrag mit Mandant — LEFT JOIN, damit der Auftrag bleibt, falls `client_id` fehlt (in der Übungs-DB hat jeder Auftrag einen Mandanten, INNER und LEFT sind hier gleich):\n\n```sql\nSELECT oh.order_number, c.code\nFROM instance_1.flowapp_demo_order_head oh\nLEFT JOIN instance_1.flowapp_demo_client c\n  ON c.id = oh.client_id;\n```\n\n## A.5 Primary Keys & Foreign Keys\n\nPK: eindeutiger Schlüssel pro Zeile (meist `id` als UUID). FK: Verweis auf den PK einer anderen Tabelle.\n\n**Besonderheit bei uns:** FK-Constraints sind größtenteils **NICHT** technisch erzwungen. Referentielle Integrität wird nicht automatisch garantiert — vor jeder Änderung selbst prüfen, welche Kind-Tabellen abhängig sind.\n\n## A.6 Window Functions\n\nBerechnen Werte über eine Gruppe von Zeilen, ohne sie wie bei `GROUP BY` zusammenzufassen. Wir nutzen das oft zur Deduplizierung:\n\n```sql\nROW_NUMBER() OVER (PARTITION BY <schlüssel_spalte> ORDER BY <datum_spalte> DESC) AS rn\n-- anschließend: WHERE rn = 1\n```\n\nDamit holt man z. B. pro Handling Unit immer nur den neuesten Qualifikations-Datensatz.\n\n## A.7 CTEs — WITH-Klausel\n\n```sql\nWITH basis AS (\n  SELECT ...\n)\nSELECT * FROM basis WHERE ...;\n```\n\nIn Metabase werden einmal referenzierte CTEs automatisch inline eingebaut. Bei Performance-Problemen: `WITH basis AS MATERIALIZED (...)`.\n\n## A.8 Transaktionen\n\n`BEGIN` / `COMMIT` / `ROLLBACK` fassen mehrere Anweisungen zu einer Einheit zusammen. Pflicht bei jeder datenverändernden Aktion — siehe das Sicherheitsmuster in Teil G.\n\n## A.9 Views\n\nEine View ist eine gespeicherte SELECT-Abfrage. Views übernehmen **nicht automatisch** neue Spalten der Basistabelle — nach Erweiterung muss die View per `CREATE OR REPLACE VIEW ...` angepasst werden.",
     "exercises": [
       {
         "id": "a-ex1",
@@ -34,6 +166,7 @@
         "why": "Dieselbe Liste, aber der Kollege will auch den Mandanten sehen.",
         "task": "Verknüpfe Auftrag mit Mandant und gib Auftragsnummer plus Mandanten-Code aus.",
         "look": [
+          "JOIN-Arten wie in den SQL-Grundlagen. Hier: LEFT JOIN Auftrag → Mandant.",
           "SELECT: oh.order_number und c.code.",
           "ON c.id = oh.client_id — der JOIN fehlt noch."
         ],

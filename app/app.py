@@ -76,8 +76,8 @@ for lesson in LESSONS:
 TRACKS = [
     {
         "id": "einstieg",
-        "label": "Einstieg A–J",
-        "blurb": "Grundlagen, Umgebung, Datenmodell und Arbeitsregeln aus der Einarbeitung.",
+        "label": "Einstieg · SQL, A–J",
+        "blurb": "Zuerst SELECT und JOINs, dann Grundlagen, Umgebung, Datenmodell und Arbeitsregeln aus der Einarbeitung.",
         "lessons": [l for l in LESSONS if l.get("track") == "einstieg"],
     },
     {

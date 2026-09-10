@@ -79,9 +79,11 @@ function refreshChrome() {
         ? "Nochmal von vorn"
         : lessonStarted(store.lessons[next])
           ? `Weiter mit Teil ${next.toUpperCase()}`
-          : next === "a"
-            ? "Mit Teil A beginnen"
-            : `Teil ${next.toUpperCase()} öffnen`;
+          : next === "sql"
+            ? "Mit SQL-Grundlagen beginnen"
+            : next === "a"
+              ? "Mit Teil A beginnen"
+              : `Teil ${next.toUpperCase()} öffnen`;
     }
   }
   return store;
