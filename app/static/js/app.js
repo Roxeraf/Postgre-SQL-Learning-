@@ -183,6 +183,105 @@ function flashEditor(editor) {
   window.setTimeout(() => editor.classList.remove("just-inserted"), 800);
 }
 
+function isSqlIdent(text) {
+  return /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)*$/.test(text);
+}
+
+function isInsideSqlCommentOrString(sql, index) {
+  let i = 0;
+  let inSingle = false;
+  while (i < index) {
+    const ch = sql[i];
+    if (!inSingle && ch === "-" && sql[i + 1] === "-") {
+      const nl = sql.indexOf("\n", i);
+      if (nl < 0 || nl >= index) return true;
+      i = nl + 1;
+      continue;
+    }
+    if (ch === "'") {
+      if (inSingle && sql[i + 1] === "'") {
+        i += 2;
+        continue;
+      }
+      inSingle = !inSingle;
+    }
+    i += 1;
+  }
+  return inSingle;
+}
+
+function sqlKeywordSpans(sql, keyword) {
+  const re = new RegExp(`\\b${keyword}\\b`, "gi");
+  const spans = [];
+  let match;
+  while ((match = re.exec(sql))) {
+    if (isInsideSqlCommentOrString(sql, match.index)) continue;
+    spans.push({ index: match.index, length: match[0].length });
+  }
+  return spans;
+}
+
+function selectListIsEmpty(text) {
+  return !String(text || "").replace(/--[^\n]*/g, "").replace(/\s+/g, "");
+}
+
+function selectLists(sql) {
+  const selects = sqlKeywordSpans(sql, "SELECT");
+  const froms = sqlKeywordSpans(sql, "FROM");
+  const lists = [];
+  selects.forEach((sel) => {
+    const from = froms.find((item) => item.index > sel.index);
+    if (!from) return;
+    let start = sel.index + sel.length;
+    const after = sql.slice(start, from.index);
+    const distinct = after.match(/^\s*(DISTINCT|ALL)\b/i);
+    if (distinct) start += distinct[0].length;
+    lists.push({
+      start,
+      end: from.index,
+      text: sql.slice(start, from.index),
+    });
+  });
+  return lists;
+}
+
+function namesInSelectList(text) {
+  return String(text || "")
+    .replace(/--[^\n]*/g, " ")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function insertIntoSelectList(editor, list, col) {
+  const names = namesInSelectList(list.text);
+  if (names.includes(String(col).toLowerCase())) {
+    editor.focus();
+    flashEditor(editor);
+    return;
+  }
+  let body = list.text.replace(/\s+$/, "");
+  if (names.length) {
+    const codeTail = body.replace(/--[^\n]*$/, "").replace(/\s+$/, "");
+    if (!/,\s*$/.test(codeTail)) body += ",";
+  }
+  const newList = `${body}\n  ${col}\n`;
+  editor.value = editor.value.slice(0, list.start) + newList + editor.value.slice(list.end);
+  const pos = list.start + newList.length;
+  lastEditor = editor;
+  editor.focus();
+  editor.selectionStart = editor.selectionEnd = pos;
+  flashEditor(editor);
+}
+
+function placeCaretInEmptySelect(editor) {
+  if (!editor) return;
+  const empty = selectLists(editor.value).find((list) => selectListIsEmpty(list.text));
+  if (!empty) return;
+  const pos = empty.start + empty.text.replace(/\s+$/, "").length;
+  editor.selectionStart = editor.selectionEnd = pos;
+}
+
 function insertAtCursor(text, editorEl) {
   const editor = activeSqlEditor(editorEl);
   if (!editor) {
@@ -190,11 +289,39 @@ function insertAtCursor(text, editorEl) {
     return;
   }
   lastEditor = editor;
-  const start = editor.selectionStart ?? editor.value.length;
-  const end = editor.selectionEnd ?? start;
-  editor.value = editor.value.slice(0, start) + text + editor.value.slice(end);
+  const lists = selectLists(editor.value);
+  let start = editor.selectionStart ?? 0;
+  let end = editor.selectionEnd ?? start;
+  const focused = document.activeElement === editor;
+  const caretParked = start === 0 && end === 0;
+  const useDefaultSlot = !focused || caretParked;
+  const ident = isSqlIdent(text);
+
+  if (ident && lists.length) {
+    const inList = lists.find((list) => start >= list.start && start <= list.end);
+    if (inList) {
+      insertIntoSelectList(editor, inList, text);
+      return;
+    }
+    const empty = lists.find((list) => selectListIsEmpty(list.text));
+    if (empty && useDefaultSlot) {
+      insertIntoSelectList(editor, empty, text);
+      return;
+    }
+  }
+
+  if (useDefaultSlot) {
+    start = end = editor.value.length;
+  }
+
+  let insert = String(text);
+  const before = editor.value.slice(0, start);
+  if (ident && /[A-Za-z0-9_]$/.test(before.replace(/\s+$/, "")) && !/,\s*$/.test(before)) {
+    insert = `, ${text}`;
+  }
+  editor.value = editor.value.slice(0, start) + insert + editor.value.slice(end);
   editor.focus();
-  editor.selectionStart = editor.selectionEnd = start + text.length;
+  editor.selectionStart = editor.selectionEnd = start + insert.length;
   flashEditor(editor);
 }
 
@@ -549,6 +676,13 @@ function showExercise(idx, opts = {}) {
         return `<button type="button" class="ex-dot${current ? " current" : ""}${done ? " done" : ""}" data-ex-index="${i}">Aufgabe ${i + 1}</button>`;
       })
       .join("");
+  }
+  if (opts.focus) {
+    const editor = all[practiceIndex].querySelector(".sql-editor");
+    if (editor) {
+      editor.focus();
+      placeCaretInEmptySelect(editor);
+    }
   }
 }
 

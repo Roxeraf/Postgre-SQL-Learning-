@@ -366,10 +366,16 @@ def friendly_sql_error(err: str, sql: str) -> str:
     elif "syntax error at end of input" in low:
         hints.append("Die Abfrage ist unvollständig. Prüfe SELECT-Liste, FROM und schließende Klammern.")
     elif "does not exist" in low:
-        hints.append(
-            "Tabellen immer voll qualifiziert: instance_1.flowapp_demo_<name>. "
-            "Rechts im Schema den deutschen Namen suchen und die Tabelle anklicken."
-        )
+        if "column" in low:
+            hints.append(
+                "Diese Spalte gibt es so nicht. Namen rechts im Schema prüfen — "
+                "zwischen zwei Spalten gehört ein Komma (order_number, task_status)."
+            )
+        else:
+            hints.append(
+                "Tabellen immer voll qualifiziert: instance_1.flowapp_demo_<name>. "
+                "Rechts im Schema den deutschen Namen suchen und die Tabelle anklicken."
+            )
     elif "statement timeout" in low or "canceling statement" in low:
         hints.append("Die Abfrage lief zu lange und wurde abgebrochen. Prüfe JOINs ohne ON-Bedingung.")
     if hints:
@@ -383,7 +389,7 @@ def run_sql(sql: str):
     if not raw:
         return {"ok": False, "error": "Bitte gib eine SQL-Abfrage ein.", "columns": None, "rows": None}
 
-    if FORBIDDEN_KEYWORDS.search(raw):
+    if FORBIDDEN_KEYWORDS.search(strip_sql_line_comments(raw)):
         return {
             "ok": False,
             "error": (
