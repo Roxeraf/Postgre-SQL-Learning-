@@ -141,6 +141,7 @@ ADMIN_CONFIG = dict(
     user=os.environ.get("DB_ADMIN_USER", "postgres"),
     password=os.environ.get("DB_ADMIN_PASSWORD", "postgres"),
 )
+MAINTENANCE_DB = os.environ.get("DB_MAINTENANCE_NAME", "postgres")
 
 FORBIDDEN_KEYWORDS = re.compile(
     r"\b(drop|alter|truncate|grant|revoke|create|copy|vacuum|comment|"
@@ -171,9 +172,66 @@ def _init_sql_path():
     return None
 
 
+def _is_missing_database_error(exc, dbname):
+    """True, wenn Postgres erreichbar ist, die Zieldatenbank aber fehlt."""
+    msg = str(exc).lower()
+    name = str(dbname).lower()
+    if name not in msg:
+        return False
+    return (
+        "does not exist" in msg
+        or "existiert nicht" in msg
+        or "n'existe pas" in msg
+    )
+
+
+def _admin_connect(dbname):
+    cfg = dict(ADMIN_CONFIG, dbname=dbname)
+    conn = psycopg2.connect(**cfg)
+    conn.autocommit = True
+    return conn
+
+
+def ensure_app_database():
+    """Legt die Übungsdatenbank an, wenn der Server läuft, die DB aber fehlt."""
+    target = str(DB_CONFIG["dbname"])
+    if not SAFE_IDENT.match(target):
+        return False, f"Ungültiger Datenbankname: {target}"
+    try:
+        conn = _admin_connect(target)
+        conn.close()
+        return True, None
+    except Exception as exc:  # noqa: BLE001
+        if not _is_missing_database_error(exc, target):
+            return False, str(exc)
+    try:
+        conn = _admin_connect(MAINTENANCE_DB)
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (target,))
+                if cur.fetchone() is None:
+                    cur.execute(f'CREATE DATABASE "{target}"')
+        finally:
+            conn.close()
+    except Exception as exc:  # noqa: BLE001
+        msg = str(exc)
+        if "already exists" in msg.lower() or "existiert bereits" in msg.lower():
+            return True, None
+        return False, msg
+    return True, None
+
+
 def get_connection(admin=False):
     cfg = dict(ADMIN_CONFIG if admin else DB_CONFIG)
-    conn = psycopg2.connect(**cfg)
+    try:
+        conn = psycopg2.connect(**cfg)
+    except Exception as exc:  # noqa: BLE001
+        if not _is_missing_database_error(exc, cfg["dbname"]):
+            raise
+        ok, err = ensure_app_database()
+        if not ok:
+            raise ConnectionError(err or str(exc)) from exc
+        conn = psycopg2.connect(**cfg)
     conn.autocommit = True
     with conn.cursor() as cur:
         cur.execute("SET search_path TO learn, public")
@@ -385,6 +443,9 @@ def restore_learn_schema():
     sql_path = _init_sql_path()
     if not sql_path:
         return False, "Init-SQL nicht gefunden. Bitte die App neu installieren bzw. den Container mit db/init starten."
+    ok, err = ensure_app_database()
+    if not ok:
+        return False, err
     script = sql_path.read_text(encoding="utf-8")
     try:
         with get_connection(admin=True) as conn:
@@ -411,6 +472,9 @@ def reset_learning_db():
 
 def ensure_learn_schema():
     try:
+        ok, _err = ensure_app_database()
+        if not ok:
+            return
         with get_connection(admin=True) as conn:
             with conn.cursor() as cur:
                 cur.execute(

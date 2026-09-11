@@ -236,6 +236,78 @@ class AcademyCheckRestoreTests(unittest.TestCase):
         self.assertIn("boom", data["error"])
 
 
+class EnsureAppDatabaseTests(unittest.TestCase):
+    def test_missing_database_error_en_and_de(self):
+        import app as flask_app
+
+        en = flask_app.psycopg2.OperationalError(
+            'connection to server at "db" (172.20.0.2), port 5432 failed: '
+            'FATAL: database "learnsql" does not exist'
+        )
+        de = flask_app.psycopg2.OperationalError(
+            'FATAL: Datenbank »learnsql« existiert nicht'
+        )
+        other = flask_app.psycopg2.OperationalError("password authentication failed")
+        self.assertTrue(flask_app._is_missing_database_error(en, "learnsql"))
+        self.assertTrue(flask_app._is_missing_database_error(de, "learnsql"))
+        self.assertFalse(flask_app._is_missing_database_error(other, "learnsql"))
+
+    def test_ensure_creates_database_when_missing(self):
+        import app as flask_app
+
+        created = []
+
+        class Cur:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_a):
+                return False
+
+            def execute(self, sql, params=None):
+                self.sql = sql
+                if "CREATE DATABASE" in sql:
+                    created.append(sql)
+
+            def fetchone(self):
+                if "pg_database" in getattr(self, "sql", ""):
+                    return None
+                return (1,)
+
+        class Conn:
+            def cursor(self):
+                return Cur()
+
+            def close(self):
+                pass
+
+        def fake_connect(**cfg):
+            if cfg["dbname"] == "learnsql":
+                raise flask_app.psycopg2.OperationalError(
+                    'connection to server at "db" (172.20.0.2), port 5432 failed: '
+                    'FATAL: database "learnsql" does not exist'
+                )
+            return Conn()
+
+        with patch.object(flask_app.psycopg2, "connect", side_effect=fake_connect):
+            ok, err = flask_app.ensure_app_database()
+        self.assertTrue(ok)
+        self.assertIsNone(err)
+        self.assertTrue(any("learnsql" in sql for sql in created))
+
+    def test_restore_reports_other_connection_errors(self):
+        import app as flask_app
+
+        with patch.object(
+            flask_app,
+            "ensure_app_database",
+            return_value=(False, 'FATAL: database "learnsql" does not exist'),
+        ):
+            ok, message = flask_app.restore_learn_schema()
+        self.assertFalse(ok)
+        self.assertIn("learnsql", message)
+
+
 class NoCustomerNamesTests(unittest.TestCase):
     def test_repo_has_no_wmx_or_customer_names(self):
         roots = [
