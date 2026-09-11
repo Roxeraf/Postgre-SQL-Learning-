@@ -13,6 +13,8 @@ const PHASE = {
   mcq: "Check",
 };
 
+const RESULT_OK = "Die Abfrage gibt die erwarteten Daten zurück.";
+
 const MODEL = [
   { key: "SELECT", q: "Was möchte ich sehen?" },
   { key: "FROM", q: "Woher kommen die Daten?" },
@@ -270,7 +272,7 @@ function initAcademy() {
     }
     const why = note
       || step().feedback_ok
-      || "Die Query liefert das erwartete Ergebnis — nicht weil der Text identisch ist, sondern weil das Ergebnis stimmt.";
+      || RESULT_OK;
     return `<div class="success-card">
       <p class="verdict verdict-ok">Richtig</p>
       <p>${rich(why)}</p>
@@ -517,8 +519,7 @@ function initAcademy() {
     const { data } = await checkSql();
     if (data.correct) {
       markStepDone();
-      const why = s.feedback_ok
-        || "Die Query liefert das erwartete Ergebnis — nicht weil der Text identisch ist, sondern weil das Ergebnis stimmt.";
+      const why = s.feedback_ok || RESULT_OK;
       showFeedback(successCard(why) + ui().renderSqlResult(data));
       renderMeter();
       return;
