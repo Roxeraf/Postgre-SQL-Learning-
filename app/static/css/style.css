@@ -1101,7 +1101,16 @@ kbd { color: var(--text); font-size: 11px; }
   font-weight: 700;
 }
 .data-table th.is-click, .data-table td.is-click, .data-table tr.is-click td { cursor: pointer; }
-.data-table th.is-on, .data-table tr.is-on td {
+.data-table tr.is-click td { user-select: none; }
+.table-select-hint { margin: 8px 0 0; font-size: 13px; }
+.table-select-hint kbd {
+  font: 600 12px var(--mono);
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #0c1424;
+}
+.data-table th.is-on, .data-table tr.is-on td, .data-table td.is-on {
   background: var(--accent-dim);
   outline: 1px solid var(--border-strong);
 }

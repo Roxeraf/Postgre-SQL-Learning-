@@ -141,6 +141,7 @@ function initAcademy() {
     numberValue: "",
     fillValues: [],
     sqlDraft: "",
+    lastRowId: "",
   };
 
   function saveQuiet(s) {
@@ -201,6 +202,7 @@ function initAcademy() {
     local.numberValue = "";
     local.fillValues = [];
     local.pool = null;
+    local.lastRowId = "";
     if (!keepDraft) local.sqlDraft = step().starter || "";
   }
 
@@ -386,11 +388,14 @@ function initAcademy() {
     }
 
     if (s.type === "predict" || s.type === "demo") {
+      const multiHint = (s.type === "predict" && !s.single)
+        ? `<p class="muted table-select-hint">Klick wählt eine Zeile. Mit <kbd>Strg</kbd> weitere dazunehmen, mit <kbd>Umschalt</kbd> einen Bereich von oben nach unten.</p>`
+        : "";
       host.innerHTML = title + (s.sql ? sqlBlock(s.sql) : "") + renderStepTables(s, {
         selectedIds: local.selectedIds,
         clickRows: s.type === "predict",
         keepColumns: s.keep_columns,
-      }) + `<div id="step-result"></div>`;
+      }) + multiHint + `<div id="step-result"></div>`;
       if (s.type === "demo") foot.innerHTML = footerHtml({ run: "Ausführen" });
       else foot.innerHTML = footerHtml({ check: s.single ? "Diese Zeile?" : "Prüfen" });
       return;
@@ -568,6 +573,37 @@ function initAcademy() {
     else showFeedback(html);
   }
 
+  function paintRowSelection() {
+    document.querySelectorAll("#step-root tr[data-row-id]").forEach((tr) => {
+      tr.classList.toggle("is-on", local.selectedIds.has(tr.dataset.rowId));
+    });
+  }
+
+  function paintColSelection() {
+    document.querySelectorAll("#step-root th[data-col]").forEach((th) => {
+      const col = th.dataset.col;
+      th.classList.toggle("is-on", local.selectedCols.has(col) || local.selectedCols.has(col.toLowerCase()));
+    });
+  }
+
+  function rowIdsInTable(table) {
+    return [...table.querySelectorAll("tr[data-row-id]")].map((tr) => tr.dataset.rowId);
+  }
+
+  function rowRange(ids, fromId, toId) {
+    const a = ids.indexOf(fromId);
+    const b = ids.indexOf(toId);
+    if (a < 0 || b < 0) return [toId];
+    const lo = Math.min(a, b);
+    const hi = Math.max(a, b);
+    return ids.slice(lo, hi + 1);
+  }
+
+  document.getElementById("step-card").addEventListener("mousedown", (e) => {
+    if (!e.shiftKey) return;
+    if (e.target.closest("tr[data-row-id], th[data-col]")) e.preventDefault();
+  });
+
   document.getElementById("step-meter").addEventListener("click", (e) => {
     const btn = e.target.closest("[data-go]");
     if (!btn) return;
@@ -587,25 +623,43 @@ function initAcademy() {
     const th = e.target.closest("th[data-col]");
     if (th && (s.interaction === "click_column" || s.type === "predict-cols")) {
       const col = th.dataset.col;
-      if (local.selectedCols.has(col)) local.selectedCols.delete(col);
-      else local.selectedCols.add(col);
-      renderStep();
+      if (e.ctrlKey || e.metaKey) {
+        if (local.selectedCols.has(col)) local.selectedCols.delete(col);
+        else local.selectedCols.add(col);
+      } else {
+        local.selectedCols = new Set([col]);
+      }
+      paintColSelection();
       return;
     }
     const td = e.target.closest("td[data-col]");
     if (td && s.interaction === "click_cell") {
       local.selectedCols = new Set([`${td.dataset.col}::${td.dataset.value}`]);
-      renderStep();
+      td.closest("table")?.querySelectorAll("td.is-on").forEach((cell) => cell.classList.remove("is-on"));
+      td.classList.add("is-on");
       return;
     }
     const tr = e.target.closest("tr[data-row-id]");
     if (tr && (s.interaction === "click_row" || s.type === "predict")) {
       const id = tr.dataset.rowId;
-      if (s.single || s.interaction === "click_row") {
+      const table = tr.closest("table");
+      const multi = s.type === "predict" && !s.single && s.interaction !== "click_row";
+      if (!multi) {
         local.selectedIds = new Set([id]);
-      } else if (local.selectedIds.has(id)) local.selectedIds.delete(id);
-      else local.selectedIds.add(id);
-      renderStep();
+        local.lastRowId = id;
+      } else if (e.shiftKey && local.lastRowId) {
+        const range = rowRange(rowIdsInTable(table), local.lastRowId, id);
+        if (e.ctrlKey || e.metaKey) range.forEach((rid) => local.selectedIds.add(rid));
+        else local.selectedIds = new Set(range);
+      } else if (e.ctrlKey || e.metaKey) {
+        if (local.selectedIds.has(id)) local.selectedIds.delete(id);
+        else local.selectedIds.add(id);
+        local.lastRowId = id;
+      } else {
+        local.selectedIds = new Set([id]);
+        local.lastRowId = id;
+      }
+      paintRowSelection();
       return;
     }
     const push = e.target.closest("[data-push]");
