@@ -12,8 +12,9 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d:ro
+      - ./db/ensure-learnsql.sh:/ensure-learnsql.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d learnsql"]
+      test: ["CMD-SHELL", "sh /ensure-learnsql.sh"]
       interval: 5s
       timeout: 5s
       retries: 10
