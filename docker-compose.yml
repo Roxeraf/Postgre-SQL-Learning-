@@ -32,12 +32,14 @@ services:
       DB_ADMIN_USER: postgres
       DB_ADMIN_PASSWORD: postgres
       SQL_INIT_PATH: /app/db/01_schema_and_data.sql
+      WORKSHOP_DIR: /data/workshop
       FLASK_DEBUG: "1"
     ports:
       - "8080:8080"
     volumes:
       - ./app:/app
       - ./db/init/01_schema_and_data.sql:/app/db/01_schema_and_data.sql:ro
+      - ./data/workshop:/data/workshop
     depends_on:
       db:
         condition: service_healthy

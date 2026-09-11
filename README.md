@@ -3,9 +3,12 @@
 Ein Lernpfad in der App: von der ersten Tabelle bis zu JOIN, Gruppen, Änderungen und den Konzepten hinter PostgreSQL.
 
 - Interaktive Akademie (verstehen → vorhersagen → bauen → schreiben → anwenden)
+- Zusatz-Kapitel zu Aggregaten, Positionen, CASE und Unterabfragen
 - Kurz-Quiz nach jedem Kapitel
 - SQL-Playground gegen Schema `learn`
-- Wissensbasis und Karteikarten aus denselben Konzepten
+- PostgreSQL-Bibel unter `/wissen` (eigene Artikel, nicht das alte Mini-Glossar)
+- Karteikarten mit Leitner (Nochmal / Schwer / Sitzt) in localStorage
+- Werkstatt für dynamische Übungen plus MCP für Claude Code
 
 Trainingsdaten setzt du bei Bedarf über **Datenbank zurücksetzen** zurück.
 
@@ -36,6 +39,8 @@ Danach:
 - **Lern-App:** http://localhost:8080
 - **Pfad:** http://localhost:8080/learn/ch0
 - **Wissensbasis:** http://localhost:8080/wissen
+- **Karten:** http://localhost:8080/cards
+- **Werkstatt:** http://localhost:8080/werkstatt
 
 Zum Stoppen: `Ctrl+C`, danach `docker compose down` (mit `-v` werden auch die DB-Daten gelöscht,
 damit die Datenbank beim nächsten Start wieder mit den Ausgangsdaten neu initialisiert wird).
@@ -52,12 +57,28 @@ docker compose up --build
 ```
 ├── docker-compose.yml
 ├── db/init/01_schema_and_data.sql   # Schema learn
+├── data/workshop/                   # Dynamische Übungen (MCP), nicht der offizielle Pfad
+├── mcp/learnsql_mcp.py              # MCP für Claude Code / Cursor
 └── app/
     ├── app.py                       # Flask-Backend
     ├── sql_coach.py                 # Lernfeedback statt Roh-Postgres-Fehler
-    ├── lessons/academy_data.py      # Kapitel 0–7 plus Erweiterung
+    ├── lessons/academy_data.py      # Offizieller Pfad
+    ├── lessons/path_more.py         # Zusatz-Kapitel
+    ├── lessons/knowledge/           # Bibel-Artikel und Karten
     └── templates/
 ```
+
+### MCP (Claude Code / Cursor)
+
+Die App ruft kein LLM auf. Claude Code hängt als Client am MCP und legt Übungen in `data/workshop/` ab.
+
+Beispiel-Config: `mcp/cursor.mcp.example.json`. Docker hängt `data/workshop` nach `/data/workshop` (`WORKSHOP_DIR`).
+
+```bash
+python mcp/learnsql_mcp.py
+```
+
+Werkzeuge: Schema, Beispieldaten, SELECT, Bibel-Suche, Artikel, Lesson-Schema, Übung entwerfen, in die Werkstatt speichern.
 
 ## Hinweise
 

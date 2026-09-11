@@ -15,6 +15,7 @@ from lessons.knowledge import (
     related_articles,
     sections as knowledge_sections,
 )
+from lessons.workshop import workshop_by_id, workshop_lessons
 from sql_coach import (
     diagnose_structure,
     explain_sql as explain_sql_query,
@@ -621,8 +622,13 @@ def compare_query_result(user_cols, user_rows, sol_cols, sol_rows, ordered=False
     return False, missing, extra, user_n, sol_n
 
 
+def find_lesson(lesson_id):
+    return academy_lesson_by_id(lesson_id) or workshop_by_id(lesson_id)
+
+
 def academy_nav(lesson_id):
-    ids = [l["id"] for l in ACADEMY["lessons"]]
+    lesson = workshop_by_id(lesson_id)
+    ids = [l["id"] for l in (workshop_lessons() if lesson else ACADEMY["lessons"])]
     if lesson_id not in ids:
         return None, None
     idx = ids.index(lesson_id)
@@ -652,7 +658,7 @@ def index():
 
 @app.route("/learn/<lesson_id>")
 def academy_lesson(lesson_id):
-    lesson_obj = academy_lesson_by_id(lesson_id)
+    lesson_obj = find_lesson(lesson_id)
     if not lesson_obj:
         return "Lektion nicht gefunden", 404
     prev_id, next_id = academy_nav(lesson_id)
@@ -668,6 +674,30 @@ def academy_lesson(lesson_id):
 @app.route("/playground")
 def playground():
     return render_template("playground.html", active_tool="playground")
+
+
+@app.route("/werkstatt")
+def werkstatt():
+    return render_template(
+        "werkstatt.html",
+        active_tool="werkstatt",
+        practices=workshop_lessons(),
+    )
+
+
+@app.route("/werkstatt/<lesson_id>")
+def werkstatt_lesson(lesson_id):
+    lesson_obj = workshop_by_id(lesson_id)
+    if not lesson_obj:
+        return "Übung nicht gefunden", 404
+    prev_id, next_id = academy_nav(lesson_id)
+    return render_template(
+        "academy.html",
+        lesson=lesson_obj,
+        prev_id=prev_id,
+        next_id=next_id,
+        current_academy_id=lesson_id,
+    )
 
 
 @app.route("/cards")
@@ -844,7 +874,7 @@ def academy_write_check(user_sql, step):
 @app.route("/api/academy/check", methods=["POST"])
 def api_academy_check():
     data = request.get_json(force=True) or {}
-    lesson_obj = academy_lesson_by_id(data.get("lesson_id"))
+    lesson_obj = find_lesson(data.get("lesson_id"))
     if not lesson_obj:
         return jsonify({"ok": False, "error": "Unbekannte Lektion."})
     try:

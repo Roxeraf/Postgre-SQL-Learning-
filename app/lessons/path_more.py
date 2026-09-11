@@ -18,7 +18,7 @@ def extra_path_lessons():
     return [
         {
             "id": "ch-agg",
-            "chapter": 0,
+            "chapter": 9,
             "title": "Summen und Mittelwerte",
             "minutes": 12,
             "goal": "Du rechnest mit SUM, AVG, MIN und MAX — eine Zahl pro Gruppe, nicht nur zählen.",
@@ -109,7 +109,7 @@ def extra_path_lessons():
         },
         {
             "id": "ch-items",
-            "chapter": 0,
+            "chapter": 13,
             "title": "Auftrag und Positionen",
             "minutes": 12,
             "goal": "Du verbindest Aufträge mit ihren Zeilen in order_items — eins-zu-viele, zum Schreiben.",
@@ -205,7 +205,7 @@ def extra_path_lessons():
         },
         {
             "id": "ch-case",
-            "chapter": 0,
+            "chapter": 14,
             "title": "CASE und COALESCE",
             "minutes": 12,
             "goal": "Du formst Werte um: Labels mit CASE, Lücken mit COALESCE — die Zeile bleibt.",
@@ -308,7 +308,7 @@ def extra_path_lessons():
         },
         {
             "id": "ch-subq",
-            "chapter": 0,
+            "chapter": 15,
             "title": "Unterabfragen",
             "minutes": 12,
             "goal": "Du stellst eine Frage in der anderen: IN, EXISTS — und findest Lücken ohne zweiten JOIN-Satz.",
@@ -410,7 +410,7 @@ def extra_path_lessons():
         },
         {
             "id": "challenge-4",
-            "chapter": 0,
+            "chapter": 20,
             "title": "Challenge: SKUs in offenen Aufträgen",
             "minutes": 10,
             "goal": "Du verbindest Positionen mit Aufträgen, filterst, summierst und sortierst — ohne Syntax-Liste.",

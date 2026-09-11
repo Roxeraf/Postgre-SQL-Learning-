@@ -4,3 +4,5 @@ installer/staging/
 installer/flowapp.ico
 __pycache__/
 *.pyc
+.venv/
+data/workshop/*.json

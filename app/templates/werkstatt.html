@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Werkstatt — plx.learnSQL{% endblock %}
+{% block content %}
+<header class="page-header">
+  <p class="eyebrow">Neben dem Pfad</p>
+  <h1>Werkstatt</h1>
+  <p class="lede">Hier landen Übungen, die Claude Code über das MCP schreibt. Der offizielle Lernpfad bleibt unverändert.</p>
+</header>
+
+{% if practices %}
+<section class="wissen-grid">
+  {% for p in practices %}
+  <a class="wissen-card" href="/werkstatt/{{ p.id }}">
+    <p class="wissen-kicker">Werkstatt · {{ p.steps|length }} Schritte</p>
+    <h3>{{ p.title }}</h3>
+    <p class="muted">{{ p.goal }}</p>
+  </a>
+  {% endfor %}
+</section>
+{% else %}
+<section class="card">
+  <h2>Noch keine Übungen</h2>
+  <p class="muted">Hänge das MCP <code>mcp/learnsql_mcp.py</code> in Claude Code ein und lass dir Übungen bauen. Sie erscheinen als JSON unter <code>data/workshop/</code>.</p>
+  <pre class="sql-pre">{
+  "mcpServers": {
+    "learnsql": {
+      "command": "python",
+      "args": ["mcp/learnsql_mcp.py"],
+      "env": { "DB_HOST": "127.0.0.1" }
+    }
+  }
+}</pre>
+</section>
+{% endif %}
+{% endblock %}

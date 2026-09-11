@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "learnsql": {
+      "command": "python3",
+      "args": ["mcp/learnsql_mcp.py"],
+      "env": {
+        "DB_HOST": "127.0.0.1",
+        "DB_NAME": "learnsql",
+        "DB_USER": "lernuser",
+        "DB_PASSWORD": "lernuser",
+        "WORKSHOP_DIR": "data/workshop"
+      }
+    }
+  }
+}

@@ -1332,13 +1332,13 @@ function initWissen() {
   const render = (data, query) => {
     if (!query || query.length < 2) {
       resultsEl.innerHTML = "";
-      if (meta) meta.textContent = "Mindestens zwei Zeichen — Suche läuft über alle Kapitel.";
+      if (meta) meta.textContent = "Mindestens zwei Zeichen — Artikel zuerst, dann Kapitel.";
       return;
     }
     const rows = data.results || [];
     if (meta) {
       meta.textContent = rows.length
-        ? `${rows.length} Treffer im Lernpfad`
+        ? `${rows.length} Treffer — Artikel und Kapitel`
         : "Kein Treffer — anderen Begriff versuchen (SELECT, JOIN, NULL, Transaktion).";
     }
     resultsEl.innerHTML = rows
