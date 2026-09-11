@@ -236,6 +236,41 @@ class AcademyCheckRestoreTests(unittest.TestCase):
         self.assertIn("boom", data["error"])
 
 
+class ResultValidationTests(unittest.TestCase):
+    def test_star_select_is_not_strict_by_default(self):
+        import app as flask_app
+
+        self.assertFalse(flask_app._wants_strict_columns({"solution": "SELECT * FROM orders;"}))
+        self.assertTrue(flask_app._wants_strict_columns({"solution": "SELECT client, status FROM orders;"}))
+        self.assertFalse(flask_app._wants_strict_columns({
+            "solution": "SELECT client FROM orders;",
+            "strict_columns": False,
+        }))
+
+    def test_column_lesson_rejects_star_shaped_result(self):
+        import app as flask_app
+
+        user_cols = ["id", "order_number", "client", "status"]
+        user_rows = [{"id": 1, "order_number": 4711, "client": "Helio", "status": "offen"}]
+        sol_cols = ["client", "status"]
+        sol_rows = [{"client": "Helio", "status": "offen"}]
+        ok, _missing, extra, *_rest = flask_app.compare_query_result(
+            user_cols, user_rows, sol_cols, sol_rows, strict_columns=True
+        )
+        self.assertFalse(ok)
+        self.assertTrue(extra)
+
+    def test_matching_projection_still_passes(self):
+        import app as flask_app
+
+        cols = ["client", "status"]
+        rows = [{"client": "Helio", "status": "offen"}]
+        ok, *_rest = flask_app.compare_query_result(
+            cols, rows, cols, rows, strict_columns=True
+        )
+        self.assertTrue(ok)
+
+
 class EnsureAppDatabaseTests(unittest.TestCase):
     def test_missing_database_error_en_and_de(self):
         import app as flask_app

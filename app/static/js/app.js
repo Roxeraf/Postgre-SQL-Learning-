@@ -2,23 +2,6 @@ const STORE_KEY = "learnsql-v3";
 const STORE_KEY_V1 = "flowapp-learn-v1";
 const STORE_KEY_V2 = "flowapp-learn-v2";
 
-const ACADEMY_CONCEPTS = [
-  ["TABLE", "Tabellen"],
-  ["SELECT", "SELECT"],
-  ["FROM", "FROM"],
-  ["WHERE", "WHERE"],
-  ["COMPARE", "Vergleiche"],
-  ["AND", "AND / OR"],
-  ["ORDER BY", "ORDER BY"],
-  ["LIMIT", "LIMIT"],
-  ["NULL", "NULL"],
-  ["GROUP BY", "GROUP BY"],
-  ["JOIN", "JOIN"],
-  ["HAVING", "HAVING"],
-  ["DML", "Ändern"],
-  ["TX", "Transaktionen"],
-];
-
 function emptyStore() {
   return {
     version: 3,
@@ -139,8 +122,12 @@ function refreshChrome() {
 
   const statSql = document.getElementById("stat-sql");
   if (statSql) statSql.textContent = `${sqlDone}/${academyIds.length || document.querySelectorAll(".path-academy [data-academy-id]").length}`;
-  const statXp = document.getElementById("stat-xp");
-  if (statXp) statXp.textContent = String(store.xp || 0);
+  let doneStepsAll = 0;
+  Object.values(store.academy?.lessons || {}).forEach((lesson) => {
+    doneStepsAll += Object.keys(lesson.steps || {}).length;
+  });
+  const statSteps = document.getElementById("stat-steps");
+  if (statSteps) statSteps.textContent = String(doneStepsAll);
 
   const cont = document.getElementById("continue-btn");
   const nextAcademy = nextAcademyLesson(store, academyIds);
@@ -169,7 +156,7 @@ function initDashboard() {
   const next = nextAcademyLesson(store, ids);
   const nextCard = document.querySelector(`.path-card[data-academy-id="${next}"]`);
   const nextTitle = nextCard?.querySelector("h3")?.textContent || "SQL Grundlagen";
-  const started = Boolean(store.onboarded || store.xp || Object.keys(store.academy?.lessons || {}).length);
+  const started = Boolean(store.onboarded || Object.keys(store.academy?.lessons || {}).length);
   document.getElementById("hero-back").hidden = !started;
   startHero.hidden = started;
   document.getElementById("continue-title").textContent = nextTitle;
@@ -193,29 +180,16 @@ function initDashboard() {
     }
   }
 
-  const list = document.getElementById("mastery-list");
-  if (list) {
-    list.innerHTML = ACADEMY_CONCEPTS.map(([id, label]) => {
-      const v = Math.round(store.mastery[id] || 0);
-      return `<div class="mastery-row"><span>${esc(label)}</span><span class="skill-bar"><i style="width:${v}%"></i></span><span>${v}%</span></div>`;
-    }).join("");
+  const standTitle = document.getElementById("path-stand-title");
+  if (standTitle) {
+    const doneChapters = ids.filter((id) => store.academy?.lessons?.[id]?.complete).length;
+    standTitle.textContent = doneChapters
+      ? `${doneChapters} von ${ids.length} Kapitel fertig`
+      : "Noch nicht gestartet";
   }
 
-  let recId = next;
-  let recWhy = "Der nächste Schritt im Lernpfad.";
-  const weak = ACADEMY_CONCEPTS
-    .map(([id, label]) => ({ id, label, v: store.mastery[id] || 0 }))
-    .filter((c) => c.v > 0 && c.v < 70)
-    .sort((a, b) => a.v - b.v)[0];
-  if (weak && started) {
-    recWhy = `${weak.label} liegt bei ${Math.round(weak.v)}%. Kurz wiederholen, dann fühlt sich das nächste Kapitel leichter an.`;
-    const map = {
-      TABLE: "ch0", SELECT: "ch2", FROM: "ch1", WHERE: "ch3", COMPARE: "ch4",
-      AND: "ch5", "ORDER BY": "ch6", LIMIT: "ch6", NULL: "ch7", "GROUP BY": "ch8",
-      JOIN: "ch9", HAVING: "ch-having", DML: "ch-dml", TX: "ch-tx",
-    };
-    recId = map[weak.id] || next;
-  }
+  const recId = next;
+  const recWhy = nextCard?.querySelector(".path-goals")?.textContent || "Der nächste Schritt im Lernpfad.";
   const recCard = document.querySelector(`.path-card[data-academy-id="${recId}"]`);
   document.getElementById("rec-title").textContent = recCard?.querySelector("h3")?.textContent || "Nächstes Kapitel";
   document.getElementById("rec-copy").textContent = recWhy;

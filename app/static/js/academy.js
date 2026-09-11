@@ -146,19 +146,6 @@ function initAcademy() {
     ui().refreshChrome();
   }
 
-  function bumpMastery(concepts, hintsUsed) {
-    const s = ui().loadStore();
-    const delta = hintsUsed >= 3 ? 4 : hintsUsed === 2 ? 8 : hintsUsed === 1 ? 12 : 18;
-    const xp = hintsUsed >= 3 ? 8 : hintsUsed === 2 ? 12 : hintsUsed === 1 ? 16 : 22;
-    (concepts || []).forEach((c) => {
-      s.mastery[c] = Math.min(100, (s.mastery[c] || 0) + delta);
-    });
-    s.xp = (s.xp || 0) + xp;
-    s.lastActivity = new Date().toISOString().slice(0, 10);
-    ui().saveStore(s);
-    return { xp, delta };
-  }
-
   function quizCount() {
     return Number(root.dataset.quizCount || 0);
   }
@@ -268,9 +255,7 @@ function initAcademy() {
     if (el) el.innerHTML = html;
   }
 
-  function successCard(gain, note) {
-    const concepts = step().concepts || lesson.concepts || [];
-    const chips = concepts.map((c) => `<span>${ui().esc(c)} Mastery +${gain.delta}%</span>`).join(" · ");
+  function successCard(note) {
     const next = index < steps.length - 1;
     const nextLesson = root.dataset.nextId;
     let advance = "";
@@ -283,18 +268,19 @@ function initAcademy() {
     } else {
       advance = `<a class="btn btn-primary" href="/">Zur Übersicht</a>`;
     }
+    const why = note
+      || step().feedback_ok
+      || "Die Query liefert das erwartete Ergebnis — nicht weil der Text identisch ist, sondern weil das Ergebnis stimmt.";
     return `<div class="success-card">
       <p class="verdict verdict-ok">Richtig</p>
-      <p>${rich(note || step().feedback_ok || "Das sitzt.")}</p>
-      <p class="xp-line">+${gain.xp} XP${chips ? ` · ${chips}` : ""}</p>
+      <p>${rich(why)}</p>
       ${advance}
     </div>`;
   }
 
   function completeInteractive(note) {
-    const gain = bumpMastery(step().concepts || lesson.concepts, local.hintLevel);
     markStepDone();
-    showFeedback(successCard(gain, note));
+    showFeedback(successCard(note));
     renderMeter();
   }
 
@@ -530,12 +516,10 @@ function initAcademy() {
     showFeedback('<p class="muted">Prüfe die Abfrage…</p>');
     const { data } = await checkSql();
     if (data.correct) {
-      const gain = bumpMastery(s.concepts || lesson.concepts, local.hintLevel);
       markStepDone();
-      const why = s.type === "apply" || s.type === "challenge"
-        ? "Du hast eine fachliche Frage in eine Abfrage übersetzt."
-        : s.feedback_ok || "Die Query liefert das erwartete Ergebnis — nicht weil der Text identisch ist, sondern weil das Ergebnis stimmt.";
-      showFeedback(successCard(gain, why) + ui().renderSqlResult(data));
+      const why = s.feedback_ok
+        || "Die Query liefert das erwartete Ergebnis — nicht weil der Text identisch ist, sondern weil das Ergebnis stimmt.";
+      showFeedback(successCard(why) + ui().renderSqlResult(data));
       renderMeter();
       return;
     }
@@ -550,9 +534,8 @@ function initAcademy() {
     const box = document.getElementById("step-result");
     const html = data.ok ? ui().renderSqlResult(data) : resultHtml(data);
     if (s.type === "demo" && data.ok) {
-      const gain = bumpMastery(s.concepts || lesson.concepts, 0);
       markStepDone();
-      const card = `<div class="success-card"><p class="verdict verdict-ok">Ausgeführt</p><p>Vergleiche Tabelle und Ergebnis. ${s.visualize === "where" ? "Nicht passende Zeilen gehören nicht ins Ergebnis." : ""}</p><p class="xp-line">+${gain.xp} XP</p><button class="btn btn-primary" type="button" data-act="next">Weiter</button></div>`;
+      const card = `<div class="success-card"><p class="verdict verdict-ok">Ausgeführt</p><p>Vergleiche Tabelle und Ergebnis. ${s.visualize === "where" ? "Nicht passende Zeilen gehören nicht ins Ergebnis." : ""}</p><button class="btn btn-primary" type="button" data-act="next">Weiter</button></div>`;
       showFeedback(card);
       if (box) box.innerHTML = html;
       if (s.visualize === "where" && s.table) {

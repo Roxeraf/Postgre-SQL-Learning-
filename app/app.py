@@ -693,9 +693,17 @@ def sql_requirement_coach(sql: str, exercise: dict):
     return None
 
 
+def _wants_strict_columns(step):
+    """Spaltenlektionen prüfen das Ergebnis streng — außer die Musterlösung ist SELECT *."""
+    if "strict_columns" in step:
+        return bool(step.get("strict_columns"))
+    sol = strip_sql_line_comments(step.get("solution") or "")
+    return not re.search(r"(?is)\bselect\s+(?:distinct\s+)?\*", sol)
+
+
 def academy_sql_feedback(user_sql, step, user, solution):
     ordered = bool(step.get("ordered"))
-    strict = bool(step.get("strict_columns"))
+    strict = _wants_strict_columns(step)
     user_cols, user_rows = user["columns"] or [], user["rows"] or []
     sol_cols, sol_rows = solution["columns"] or [], solution["rows"] or []
     correct, missing, extra, user_n, sol_n = compare_query_result(
