@@ -1198,13 +1198,23 @@ kbd { color: var(--text); font-size: 11px; }
   font-family: var(--mono);
   font-size: 13.5px;
 }
-.success-card {
+.success-card, .fail-card {
   margin-top: 12px;
   padding: 14px;
   border-radius: 14px;
+}
+.success-card {
   border: 1px solid rgba(94, 224, 154, 0.4);
   background: var(--ok-dim);
 }
+.fail-card {
+  border: 1px solid rgba(255, 120, 120, 0.35);
+  background: var(--fail-dim);
+}
+.fail-card p, .success-card p { margin: 0 0 8px; }
+.fail-card p:last-child, .success-card p:last-child { margin-bottom: 0; }
+.fail-card .verdict, .success-card .verdict { margin-bottom: 6px; }
+.success-card .btn { margin-top: 10px; }
 .xp-line { color: var(--ok); font-weight: 650; }
 .pg-error { margin-top: 8px; color: var(--muted); font-size: 13px; }
 .pg-error pre { white-space: pre-wrap; font-family: var(--mono); font-size: 12px; }

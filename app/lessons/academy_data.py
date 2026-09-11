@@ -191,7 +191,7 @@ ACADEMY = {
                     "answer": "client",
                     "concepts": ["TABLE"],
                     "feedback_ok": "Genau. Die Spalte `client` speichert, zu wem der Auftrag gehört.",
-                    "feedback_bad": "Schau, in welcher Spalte Namen wie Helio und Alpin stehen.",
+                    "feedback_bad": "In der Spalte `client` stehen Namen wie Helio und Alpin. Tippe auf diese Überschrift.",
                 },
                 {
                     "type": "inspect",
@@ -202,7 +202,7 @@ ACADEMY = {
                     "answer": N_ORDERS,
                     "concepts": ["TABLE"],
                     "feedback_ok": f"Richtig — {N_ORDERS} Zeilen, also {N_ORDERS} Aufträge.",
-                    "feedback_bad": "Zähle die Zeilen unter der Überschrift. Jede Zeile ist ein Auftrag.",
+                    "feedback_bad": "Zähle die Zeilen unter der Überschrift — jede Zeile ist ein Auftrag, die Überschrift nicht.",
                 },
                 {
                     "type": "inspect",
@@ -213,7 +213,7 @@ ACADEMY = {
                     "answer": {"column": "status", "value": "fertig"},
                     "concepts": ["TABLE"],
                     "feedback_ok": "Auftrag 4712 ist `fertig` — abgeschlossen.",
-                    "feedback_bad": "Gehe in der Spalte `order_number` zu 4712, dann nach rechts zur Spalte `status`.",
+                    "feedback_bad": "Finde in `order_number` die 4712. In derselben Zeile steht rechts der Status — den Wert antippen.",
                 },
                 {
                     "type": "inspect",
@@ -225,7 +225,7 @@ ACADEMY = {
                     "answer": 4713,
                     "concepts": ["TABLE"],
                     "feedback_ok": "Das ist ein Datensatz: id 3, Nummer 4713, Kunde Helio, Status offen.",
-                    "feedback_bad": "Suche die Zeile, in der `order_number` 4713 ist, und klicke sie an.",
+                    "feedback_bad": "Eine ganze Zeile markieren: irgendwo in die Zeile mit `order_number` 4713 klicken.",
                 },
                 {
                     "type": "look",
@@ -313,7 +313,7 @@ ACADEMY = {
                     "execute": True,
                     "concepts": ["SELECT", "FROM"],
                     "feedback_ok": f"Richtig: ohne WHERE kommen alle {N_ORDERS} Aufträge zurück.",
-                    "feedback_bad": "`SELECT *` ohne `WHERE` bedeutet: alle Zeilen, alle Spalten.",
+                    "feedback_bad": "Ohne `WHERE` filtert die Query nicht. Markiere deshalb jeden Auftrag.",
                 },
                 {
                     "type": "build",
@@ -389,7 +389,7 @@ ACADEMY = {
                     "expected_columns": ["order_number", "status"],
                     "concepts": ["SELECT"],
                     "feedback_ok": "Ja: nur `order_number` und `status`. Die Zeilen bleiben alle.",
-                    "feedback_bad": "Nach SELECT stehen genau die Spalten, die du sehen willst.",
+                    "feedback_bad": "Nach `SELECT` stehen nur `order_number` und `status`. Genau diese beiden Überschriften markieren.",
                 },
                 {
                     "type": "demo",
@@ -505,7 +505,7 @@ ACADEMY = {
                     "visualize": "where",
                     "concepts": ["WHERE"],
                     "feedback_ok": "Nur Zeilen mit status = offen. fertig und storniert bleiben draußen.",
-                    "feedback_bad": "Schau in die Spalte `status`. Nur `offen` zählt — `fertig` und `storniert` nicht.",
+                    "feedback_bad": "Nur Zeilen mit `status` = `offen`. `fertig` und `storniert` nicht markieren.",
                 },
                 {
                     "type": "build",
@@ -597,7 +597,7 @@ ACADEMY = {
                     "execute": True,
                     "concepts": ["COMPARE"],
                     "feedback_ok": "`>` bedeutet echt größer als 10. NULL-Mengen zählen nicht — unbekannt ist nicht wahr.",
-                    "feedback_bad": "`>` ist echt größer. 10 selbst würde nicht zählen. Leere quantity-Zellen auch nicht.",
+                    "feedback_bad": "`>` heißt echt größer als 10. Die 10 selbst und leere `quantity`-Zellen zählen nicht.",
                 },
                 {
                     "type": "predict",
@@ -610,7 +610,7 @@ ACADEMY = {
                     "execute": True,
                     "concepts": ["COMPARE"],
                     "feedback_ok": "`!=` schließt nur `fertig` aus. Offen und storniert bleiben.",
-                    "feedback_bad": "Ungleich `fertig` sind offen **und** storniert.",
+                    "feedback_bad": "`!= 'fertig'` lässt `offen` und `storniert` drin. Beide markieren.",
                 },
                 {
                     "type": "predict",
@@ -623,7 +623,7 @@ ACADEMY = {
                     "execute": True,
                     "concepts": ["COMPARE"],
                     "feedback_ok": "`>=` nimmt 100 mit. Palette A (120) und Palette D (100).",
-                    "feedback_bad": "`>=` bedeutet mindestens 100 — die 100 zählt mit.",
+                    "feedback_bad": "`>= 100` nimmt 100 mit. Palette A (120) und Palette D (100).",
                 },
                 {
                     "type": "write",
@@ -720,7 +720,7 @@ ACADEMY = {
                     "execute": True,
                     "concepts": ["AND"],
                     "feedback_ok": "Helio allein reicht nicht. Status muss zusätzlich offen sein — fertige Helio-Aufträge fallen weg.",
-                    "feedback_bad": "Beide Seiten von AND müssen wahr sein. Helio + fertig zählt nicht.",
+                    "feedback_bad": "`AND` braucht beides: Kunde Helio **und** Status offen. Helio + fertig fällt raus.",
                 },
                 {
                     "type": "predict",
@@ -733,7 +733,7 @@ ACADEMY = {
                     "execute": True,
                     "concepts": ["AND"],
                     "feedback_ok": "OR ist größer als AND: jeder Helio-Auftrag **und** jeder offene Auftrag.",
-                    "feedback_bad": "Eine der beiden Seiten reicht. Fertiges Helio ist dabei, offenes Alpin auch.",
+                    "feedback_bad": "`OR` reicht eine Seite: jeder Helio-Auftrag oder jeder offene Auftrag — beides markieren.",
                 },
                 {
                     "type": "write",
@@ -838,7 +838,7 @@ ACADEMY = {
                     "execute": True,
                     "concepts": ["ORDER BY"],
                     "feedback_ok": "4734 ist die höchste Nummer — die kommt bei DESC zuerst.",
-                    "feedback_bad": "DESC = die größte `order_number` zuerst. Schau nach 4734.",
+                    "feedback_bad": "`DESC` stellt die größte Nummer nach oben. Das ist Auftrag 4734 — weiter unten in der Liste.",
                 },
                 {
                     "type": "explain",
@@ -947,7 +947,7 @@ ACADEMY = {
                     "execute": True,
                     "concepts": ["NULL"],
                     "feedback_ok": "Nur die Zeilen ohne Menge. 0 wäre ein Wert — NULL ist keiner.",
-                    "feedback_bad": "Schau nach leeren quantity-Zellen, nicht nach der Zahl 0.",
+                    "feedback_bad": "Leere `quantity`-Zellen markieren. Die Zahl 0 ist ein Wert, kein fehlender.",
                 },
                 {
                     "type": "write",
@@ -1132,7 +1132,7 @@ ACADEMY = {
                 {
                     "type": "predict",
                     "title": "Welche Aufträge überleben den INNER JOIN?",
-                    "text": "Markiere die Aufträge, die nach `JOIN clients ON clients.id = orders.client_id` noch da sind.",
+                    "text": "Markiere die Aufträge, die nach `JOIN clients ON clients.id = orders.client_id` noch da sind.\n\nAuftrag **4730** hat eine leere Kundenspalte — weiter unten in der Tabelle.",
                     "sql": "SELECT * FROM orders JOIN clients ON clients.id = orders.client_id;",
                     "table": orders_table("id", "order_number", "client", "status"),
                     "expected_ids": HAS_CLIENT,
@@ -1141,7 +1141,7 @@ ACADEMY = {
                     "visualize": "inner",
                     "concepts": ["JOIN"],
                     "feedback_ok": "Auftrag 4730 hat keine client_id — INNER JOIN lässt ihn weg. Westfeld erscheint hier sowieso nicht, der steht nur in clients.",
-                    "feedback_bad": "Schau, bei welchem Auftrag die Kundenspalte leer ist. Der hat keinen Partner in clients.",
+                    "feedback_bad": "INNER JOIN behält nur Aufträge mit Kunden. 4730 hat eine leere Kundenspalte (weiter unten) — den nicht markieren.",
                 },
                 {
                     "type": "build",
@@ -1236,7 +1236,7 @@ ACADEMY = {
                 {
                     "type": "predict",
                     "title": "Welche Aufträge bleiben beim LEFT JOIN?",
-                    "text": "Markiere die Aufträge, die `FROM orders LEFT JOIN clients` noch enthält.",
+                    "text": "Markiere die Aufträge, die `FROM orders LEFT JOIN clients` noch enthält.\n\nAuftrag **4730** hat eine leere Kundenspalte — weiter unten in der Tabelle.",
                     "sql": "SELECT * FROM orders o LEFT JOIN clients c ON c.id = o.client_id;",
                     "table": orders_table("id", "order_number", "client", "status"),
                     "expected_ids": ids(lambda r: True),
@@ -1244,7 +1244,7 @@ ACADEMY = {
                     "execute": True,
                     "concepts": ["JOIN"],
                     "feedback_ok": "Alle Aufträge — inklusive 4730 ohne Kunde. Genau das ist LEFT JOIN.",
-                    "feedback_bad": "LEFT JOIN verwirft die linke Tabelle nicht. Auch der Auftrag ohne Kunde bleibt.",
+                    "feedback_bad": "LEFT JOIN behält jede Zeile der linken Tabelle. Markiere alle Aufträge, auch 4730 mit leerer Kundenspalte (weiter unten).",
                 },
                 {
                     "type": "write",

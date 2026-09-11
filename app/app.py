@@ -686,10 +686,10 @@ def sql_requirement_coach(sql: str, exercise: dict):
     low = blob.lower()
     for needle in exercise.get("require") or []:
         if needle.lower() not in low:
-            return f"In der Abfrage fehlt noch: {needle}."
+            return f"Für diese Aufgabe braucht die Abfrage noch `{needle}`."
     for needle in exercise.get("forbid") or []:
         if needle.lower() in low:
-            return f"Bitte {needle} nicht verwenden — siehe Aufgabe."
+            return f"`{needle}` soll in dieser Aufgabe nicht vorkommen."
     return None
 
 
@@ -725,17 +725,17 @@ def academy_sql_feedback(user_sql, step, user, solution):
             coach = (
                 "Im Ergebnis fehlen noch Spalten: "
                 + ", ".join(missing)
-                + ". SELECT sagt, was du sehen möchtest."
+                + ". Nach `SELECT` stehen die gewünschten Spalten."
             )
         elif ordered and user_n == sol_n:
             coach = "Die Zeilen stimmen, die Reihenfolge noch nicht. Prüfe `ORDER BY` und `ASC`/`DESC`."
         elif user_n != sol_n:
             coach = (
-                f"Zeilenanzahl stimmt nicht: du hast {user_n}, erwartet werden {sol_n}. "
-                "Prüfe `WHERE`, `AND`/`OR`, `JOIN` und `LIMIT`."
+                f"Es kommen {user_n} Zeilen zurück, erwartet sind {sol_n}. "
+                "Prüfe Filter (`WHERE`) und ob ein JOIN Zeilen weglässt."
             )
         else:
-            coach = "Das Ergebnis weicht noch ab. Vergleiche Filter, Spalten und Werte mit der Aufgabenstellung."
+            coach = "Die zurückgegebenen Zeilen passen noch nicht zur Aufgabe. Vergleiche Filter und Werte."
     elif correct:
         coach = None
     elif req_coach:
