@@ -1184,36 +1184,108 @@ function initPlayground() {
   });
 }
 
+const CARD_STORE = "learnsql-cards-v1";
+const CARD_BOX_MS = { 1: 0, 2: 24 * 60 * 60 * 1000, 3: 4 * 24 * 60 * 60 * 1000 };
+
+function loadCardState() {
+  try {
+    return JSON.parse(localStorage.getItem(CARD_STORE) || "{}") || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveCardState(state) {
+  localStorage.setItem(CARD_STORE, JSON.stringify(state));
+}
+
+function cardMeta(state, id) {
+  const row = state[id] || {};
+  return { box: Number(row.box) || 1, due: Number(row.due) || 0 };
+}
+
 function initCards() {
   const cardEl = document.getElementById("flashcard");
   if (!cardEl) return;
   const frontEl = document.getElementById("card-front");
   const backEl = document.getElementById("card-back");
+  const sqlEl = document.getElementById("card-sql");
   const kickerEl = document.getElementById("card-kicker");
   const progressEl = document.getElementById("card-progress");
+  const boxEl = document.getElementById("card-box-meta");
   const filterEl = document.getElementById("card-filter");
+  const topicEl = document.getElementById("card-topic");
+  const dueEl = document.getElementById("card-due");
   let all = [];
   let deck = [];
   let i = 0;
+  const state = loadCardState();
+  const params = new URLSearchParams(window.location.search);
+  if (topicEl && params.get("topic")) topicEl.value = params.get("topic");
+
+  const current = () => (deck.length ? deck[i % deck.length] : null);
 
   const show = () => {
     cardEl.classList.remove("flipped");
+    if (sqlEl) {
+      sqlEl.hidden = true;
+      sqlEl.textContent = "";
+    }
     if (!deck.length) {
       frontEl.textContent = "Keine Karten in diesem Filter.";
       backEl.textContent = "";
       progressEl.textContent = "0 / 0";
+      if (boxEl) boxEl.textContent = dueEl?.checked
+        ? "Nichts Fälliges — Filter lösen oder später wiederkommen."
+        : "";
       return;
     }
-    const card = deck[i % deck.length];
-    kickerEl.textContent = card.lesson || "Karteikarte";
+    const card = current();
+    const meta = cardMeta(state, card.id);
+    kickerEl.textContent = [card.topic_label || card.lesson, card.kind].filter(Boolean).join(" · ");
     frontEl.textContent = card.front;
     backEl.textContent = card.back;
+    if (sqlEl && card.sql) {
+      sqlEl.hidden = false;
+      sqlEl.textContent = card.sql;
+    }
     progressEl.textContent = `${(i % deck.length) + 1} / ${deck.length}`;
+    if (boxEl) boxEl.textContent = `Fach ${meta.box} von 3`;
   };
+
   const rebuild = () => {
-    const f = filterEl.value;
-    deck = all.filter((c) => !f || c.lesson_id === f);
+    const lesson = filterEl?.value || "";
+    const topic = topicEl?.value || "";
+    const onlyDue = Boolean(dueEl?.checked);
+    const now = Date.now();
+    deck = all.filter((c) => {
+      if (lesson && c.lesson_id !== lesson) return false;
+      if (topic === "quiz" && c.source !== "quiz") return false;
+      if (topic && topic !== "quiz" && c.topic !== topic) return false;
+      if (onlyDue) {
+        const meta = cardMeta(state, c.id);
+        if (meta.due && meta.due > now) return false;
+      }
+      return true;
+    });
     i = 0;
+    show();
+  };
+
+  const rate = (action) => {
+    const card = current();
+    if (!card) return;
+    const prev = cardMeta(state, card.id);
+    let box = prev.box;
+    if (action === "again") box = 1;
+    else if (action === "hard") box = 1;
+    else box = Math.min(3, box + 1);
+    const wait = CARD_BOX_MS[box] || 0;
+    state[card.id] = { box, due: Date.now() + wait };
+    saveCardState(state);
+    deck.splice(i % deck.length, 1);
+    if (action !== "got" && wait === 0) deck.push(card);
+    if (i >= deck.length) i = 0;
     show();
   };
 
@@ -1224,26 +1296,22 @@ function initCards() {
       rebuild();
     });
 
-  cardEl.addEventListener("click", () => cardEl.classList.toggle("flipped"));
+  cardEl.addEventListener("click", (e) => {
+    if (e.target.closest("pre")) return;
+    cardEl.classList.toggle("flipped");
+  });
   document.addEventListener("keydown", (e) => {
     if (e.code === "Space" && document.activeElement === cardEl) {
       e.preventDefault();
       cardEl.classList.toggle("flipped");
     }
   });
-  document.getElementById("card-again")?.addEventListener("click", () => {
-    if (!deck.length) return;
-    const [card] = deck.splice(i % deck.length, 1);
-    deck.push(card);
-    show();
-  });
-  document.getElementById("card-got-it")?.addEventListener("click", () => {
-    if (!deck.length) return;
-    deck.splice(i % deck.length, 1);
-    if (i >= deck.length) i = 0;
-    show();
-  });
+  document.getElementById("card-again")?.addEventListener("click", () => rate("again"));
+  document.getElementById("card-hard")?.addEventListener("click", () => rate("hard"));
+  document.getElementById("card-got-it")?.addEventListener("click", () => rate("got"));
   filterEl?.addEventListener("change", rebuild);
+  topicEl?.addEventListener("change", rebuild);
+  dueEl?.addEventListener("change", rebuild);
 }
 
 function initWissen() {
@@ -1258,6 +1326,7 @@ function initWissen() {
     karte: "Karte",
     check: "Kurzcheck",
     konzept: "Konzept",
+    artikel: "Artikel",
   };
 
   const render = (data, query) => {

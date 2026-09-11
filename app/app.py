@@ -8,6 +8,13 @@ import psycopg2.extras
 from flask import Flask, jsonify, render_template, request
 
 from lessons.academy_data import ACADEMY, lesson_by_id as academy_lesson_by_id
+from lessons.knowledge import (
+    ARTICLES,
+    article_by_slug,
+    knowledge_cards,
+    related_articles,
+    sections as knowledge_sections,
+)
 from sql_coach import (
     diagnose_structure,
     explain_sql as explain_sql_query,
@@ -61,7 +68,7 @@ def _step_text(step: dict) -> str:
     return " ".join(parts)
 
 
-FLASHCARDS = list(ACADEMY.get("flashcards") or [])
+FLASHCARDS = knowledge_cards()
 for lesson in ACADEMY["lessons"]:
     for i, q in enumerate(lesson.get("quiz") or [], start=1):
         options = q.get("options") or []
@@ -70,8 +77,14 @@ for lesson in ACADEMY["lessons"]:
             "id": f"{lesson['id']}-quiz-{i}",
             "front": q["q"],
             "back": correct + ((" — " + q["explain"]) if q.get("explain") else ""),
+            "sql": "",
+            "kind": "check",
             "lesson_id": lesson["id"],
             "lesson": lesson["title"],
+            "topic": "",
+            "topic_label": "Kurzcheck",
+            "slug": "",
+            "source": "quiz",
         })
 
 SEARCH_INDEX = []
@@ -121,6 +134,23 @@ for item in ACADEMY.get("glossary") or []:
         "url": f"/learn/{item['lesson_id']}" if item.get("lesson_id") else "/wissen",
         "text": _plain(item["label"] + " " + item.get("text") + " " + (item.get("sql") or "")),
         "preview": item.get("text") or "",
+    })
+
+for art in ARTICLES:
+    SEARCH_INDEX.append({
+        "type": "artikel",
+        "lesson_id": art.get("lesson_id") or "",
+        "letter": art.get("section_label") or "SQL",
+        "title": art["title"],
+        "url": f"/wissen/{art['slug']}",
+        "text": _plain(" ".join([
+            art["title"],
+            art.get("summary") or "",
+            art.get("body") or "",
+            " ".join(art.get("sql") or []),
+            " ".join(art.get("pitfalls") or []),
+        ])),
+        "preview": art.get("summary") or "",
     })
 
 DB_CONFIG = dict(
@@ -647,6 +677,7 @@ def cards():
         active_tool="cards",
         card_count=len(FLASHCARDS),
         academy_lessons=ACADEMY["lessons"],
+        card_topics=knowledge_sections(),
     )
 
 
@@ -655,8 +686,22 @@ def wissen():
     return render_template(
         "wissen.html",
         active_tool="wissen",
-        index_count=len(SEARCH_INDEX),
+        index_count=len(ARTICLES),
+        sections=knowledge_sections(),
         glossary=ACADEMY.get("glossary") or [],
+    )
+
+
+@app.route("/wissen/<slug>")
+def wissen_article(slug):
+    art = article_by_slug(slug)
+    if not art:
+        return "Artikel nicht gefunden", 404
+    return render_template(
+        "wissen_article.html",
+        active_tool="wissen",
+        article=art,
+        related=related_articles(art),
     )
 
 
@@ -961,8 +1006,10 @@ def api_search():
             if t in title_l:
                 score += 8
             score += hay.count(t)
-        if item["type"] in {"lektion", "konzept"}:
+        if item["type"] in {"lektion", "konzept", "artikel"}:
             score += 3
+        if item["type"] == "artikel":
+            score += 4
         scored.append((score, item))
     scored.sort(key=lambda x: (-x[0], x[1]["letter"], x[1]["title"]))
     results = []

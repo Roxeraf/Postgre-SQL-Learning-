@@ -181,6 +181,24 @@ class AcademyContentTests(unittest.TestCase):
         for needed in ("NULL", "JOIN", "HAVING", "TX", "INDEX"):
             self.assertIn(needed, labels)
 
+    def test_knowledge_bible_is_complete(self):
+        from lessons.knowledge import ARTICLES, ARTICLES_BY_SLUG, knowledge_cards, sections
+
+        self.assertGreaterEqual(len(ARTICLES), 40)
+        self.assertEqual(len(ARTICLES_BY_SLUG), len(ARTICLES))
+        self.assertGreaterEqual(len(sections()), 6)
+        cards = knowledge_cards()
+        self.assertGreaterEqual(len(cards), 120)
+        for art in ARTICLES:
+            self.assertTrue(art["slug"], art["title"])
+            self.assertTrue(art["section"], art["slug"])
+            self.assertTrue(art["summary"], art["slug"])
+            self.assertTrue(art["body"], art["slug"])
+            self.assertTrue(art.get("sql"), art["slug"])
+            self.assertGreaterEqual(len(art.get("cards") or []), 3, art["slug"])
+            for c in art["cards"]:
+                self.assertTrue(c["front"] and c["back"], c.get("id"))
+
     def test_dml_steps_are_verified(self):
         dml = lesson_by_id("ch-dml")
         writes = [s for s in dml["steps"] if s.get("allow_write")]

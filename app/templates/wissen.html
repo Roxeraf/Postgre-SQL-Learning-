@@ -3,14 +3,14 @@
 {% block content %}
 <header class="page-header">
   <p class="eyebrow">Nachschlagen</p>
-  <h1>Wissensbasis</h1>
-  <p class="lede">{{ index_count }} Einträge aus dem Lernpfad: Kapitel, Schritte, Kurzchecks und Konzepte. Tippe einen Begriff wie <em>LEFT JOIN</em>, <em>NULL</em> oder <em>HAVING</em>.</p>
+  <h1>PostgreSQL-Bibel</h1>
+  <p class="lede">{{ index_count }} Artikel zum Nachlesen — Syntax, Lagerbeispiele, typische Fehler. Der Lernpfad bleibt der Übungsort, hier steht die ausführliche Erklärung.</p>
 </header>
 
 <section class="card">
   <label class="sr-only" for="wissen-q">Suche</label>
-  <input class="search-input wissen-input" id="wissen-q" type="search" placeholder="Begriff, Klausel, Konzept…" autocomplete="off">
-  <p class="muted" id="wissen-meta">Mindestens zwei Zeichen — Suche läuft über alle Kapitel.</p>
+  <input class="search-input wissen-input" id="wissen-q" type="search" placeholder="Begriff, Klausel, Fehler…" autocomplete="off">
+  <p class="muted" id="wissen-meta">Mindestens zwei Zeichen — Artikel zuerst, dann Kapitel.</p>
   <div class="chip-row" id="wissen-chips">
     <button type="button" class="section-chip" data-q="SELECT">SELECT</button>
     <button type="button" class="section-chip" data-q="WHERE">WHERE</button>
@@ -18,26 +18,28 @@
     <button type="button" class="section-chip" data-q="JOIN">JOIN</button>
     <button type="button" class="section-chip" data-q="GROUP BY">GROUP BY</button>
     <button type="button" class="section-chip" data-q="HAVING">HAVING</button>
+    <button type="button" class="section-chip" data-q="CASE">CASE</button>
+    <button type="button" class="section-chip" data-q="EXISTS">EXISTS</button>
     <button type="button" class="section-chip" data-q="Transaktion">Transaktion</button>
-    <button type="button" class="section-chip" data-q="Index">Index</button>
   </div>
   <div id="wissen-results"></div>
 </section>
 
-{% if glossary %}
-<section class="card" style="margin-top:20px">
-  <h2>Konzepte</h2>
-  <p class="muted">Kurz erklärt — Details stehen in den Kapiteln.</p>
-  <div class="glossary-grid">
-    {% for g in glossary %}
-    <article class="gloss-card">
-      <h3>{{ g.label }}</h3>
-      <p>{{ g.text }}</p>
-      {% if g.sql %}<pre class="sql-pre">{{ g.sql }}</pre>{% endif %}
-      {% if g.lesson_id %}<a class="btn" href="/learn/{{ g.lesson_id }}">Zum Kapitel</a>{% endif %}
-    </article>
+{% for sec in sections %}
+<section class="wissen-section">
+  <div class="section-head">
+    <h2>{{ sec.label }}</h2>
+    <p class="muted">{{ sec.articles|length }} Artikel{% if sec.id == 'nachbar' %} · nur Nachschlagen{% endif %}</p>
+  </div>
+  <div class="wissen-grid">
+    {% for a in sec.articles %}
+    <a class="wissen-card" href="/wissen/{{ a.slug }}">
+      <p class="wissen-kicker">{{ sec.label }}{% if a.lookup_only %} · Nachschlagen{% endif %}</p>
+      <h3>{{ a.title }}</h3>
+      <p class="muted">{{ a.summary }}</p>
+    </a>
     {% endfor %}
   </div>
 </section>
-{% endif %}
+{% endfor %}
 {% endblock %}
