@@ -185,6 +185,20 @@ def _is_missing_database_error(exc, dbname):
     )
 
 
+def _format_restore_error(err):
+    text = str(err or "")
+    if _is_missing_database_error(text, DB_CONFIG["dbname"]):
+        return (
+            "Die Übungsdatenbank learnsql fehlt im Postgres-Container. "
+            "Im Projektordner ausführen: "
+            'docker compose exec db psql -U postgres -c "CREATE DATABASE learnsql;" '
+            "Danach in der App erneut prüfen. "
+            "Alternativ mit frischem Volume: docker compose down -v && docker compose up --build. "
+            f"({text})"
+        )
+    return text
+
+
 def _admin_connect(dbname):
     cfg = dict(ADMIN_CONFIG, dbname=dbname)
     conn = psycopg2.connect(**cfg)
@@ -445,14 +459,14 @@ def restore_learn_schema():
         return False, "Init-SQL nicht gefunden. Bitte die App neu installieren bzw. den Container mit db/init starten."
     ok, err = ensure_app_database()
     if not ok:
-        return False, err
+        return False, _format_restore_error(err)
     script = sql_path.read_text(encoding="utf-8")
     try:
         with get_connection(admin=True) as conn:
             with conn.cursor() as cur:
                 cur.execute(script)
     except Exception as e:  # noqa: BLE001
-        return False, str(e)
+        return False, _format_restore_error(e)
     return True, "Lern-Datenbank ist wieder im Ausgangszustand."
 
 
