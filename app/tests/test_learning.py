@@ -144,6 +144,21 @@ class AcademyContentTests(unittest.TestCase):
                         msg=f"{lesson['id']} step {i} last hint is the full solution",
                     )
 
+    def test_interactive_steps_have_clear_feedback_bad(self):
+        banned = (
+            "verwirft die linke Tabelle",
+            "Versuch’s nochmal",
+            "So liest du den Fehler",
+        )
+        for lesson in ACADEMY["lessons"]:
+            for i, step in enumerate(lesson["steps"]):
+                if step["type"] not in {"inspect", "predict", "predict-cols"}:
+                    continue
+                bad = (step.get("feedback_bad") or "").strip()
+                self.assertTrue(bad, msg=f"{lesson['id']} step {i} needs feedback_bad")
+                for phrase in banned:
+                    self.assertNotIn(phrase, bad, msg=f"{lesson['id']} step {i}")
+
     def test_lookup(self):
         self.assertEqual(lesson_by_id("ch3")["title"], "WHERE")
         self.assertEqual(lesson_by_id("ch7")["title"], "NULL — fehlende Werte")

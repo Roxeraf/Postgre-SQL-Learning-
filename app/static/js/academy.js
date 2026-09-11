@@ -257,6 +257,10 @@ function initAcademy() {
     if (el) el.innerHTML = html;
   }
 
+  function failCard(body, extra = "") {
+    return `<div class="fail-card"><p class="verdict verdict-fail">Noch nicht</p><p>${rich(body)}</p>${extra}</div>`;
+  }
+
   function successCard(note) {
     const next = index < steps.length - 1;
     const nextLesson = root.dataset.nextId;
@@ -472,11 +476,11 @@ function initAcademy() {
 
   function resultHtml(data) {
     if (!data.ok && data.error) {
-      return `<div class="hint-box"><strong>So liest du den Fehler</strong><p>${rich(data.coach || data.error)}</p>${pgDetails(data)}</div>`;
+      return failCard(data.coach || data.error, pgDetails(data));
     }
     if (data.correct === false && (data.coach || data.error)) {
       const table = data.columns ? ui().renderSqlResult(data) : "";
-      return `<div class="hint-box"><strong>Noch nicht</strong><p>${rich(data.coach || data.error)}</p>${table}${pgDetails(data)}</div>`;
+      return failCard(data.coach || data.error, table + pgDetails(data));
     }
     return ui().renderSqlResult(data);
   }
@@ -485,7 +489,7 @@ function initAcademy() {
     const s = step();
     if (s.type === "inspect") {
       if (inspectCorrect(s)) completeInteractive();
-      else showFeedback(`<p class="verdict verdict-fail">Noch nicht.</p><p class="muted">${rich(s.feedback_bad || "Versuch’s nochmal an der Tabelle.")}</p>`);
+      else showFeedback(failCard(s.feedback_bad || "Schau noch einmal in die Tabelle: die richtige Spalte, Zeile oder Zelle."));
       return;
     }
     if (s.type === "predict") {
@@ -502,7 +506,7 @@ function initAcademy() {
           }
         }
       } else {
-        showFeedback(`<p class="verdict verdict-fail">Noch nicht.</p><p class="muted">${rich(s.feedback_bad || "Vergleiche die Bedingung mit jeder Zeile.")}</p>`);
+        showFeedback(failCard(s.feedback_bad || "Markiere genau die Zeilen, die zur Abfrage passen."));
       }
       return;
     }
@@ -511,7 +515,7 @@ function initAcademy() {
       const got = new Set([...local.selectedCols].map((c) => c.toLowerCase()));
       const ok = expected.size === got.size && [...expected].every((c) => got.has(c));
       if (ok) completeInteractive();
-      else showFeedback(`<p class="verdict verdict-fail">Noch nicht.</p><p class="muted">${rich(s.feedback_bad || "SELECT listet genau die Spalten nach dem Schlüsselwort.")}</p>`);
+      else showFeedback(failCard(s.feedback_bad || "Markiere genau die Spalten, die nach SELECT stehen."));
       return;
     }
 
@@ -679,7 +683,7 @@ function initAcademy() {
     });
     if (!ok) opt.classList.add("wrong");
     if (ok) completeInteractive(s.explain);
-    else showFeedback(`<p class="verdict verdict-fail">Nicht ganz.</p><p class="muted">${rich(s.explain || "")}</p>`);
+    else showFeedback(failCard(s.explain || "Vergleiche die Aussage mit dem, was die Query wirklich tut."));
   });
 
   document.addEventListener("keydown", (e) => {

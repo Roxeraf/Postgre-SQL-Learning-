@@ -234,7 +234,7 @@ def extra_lessons():
                     "execute": True,
                     "concepts": ["SELECT"],
                     "feedback_ok": "Helio, Alpin, Nordkai. Westfeld hat keinen Auftrag — der Name taucht in orders nicht auf.",
-                    "feedback_bad": "Schau in die Auftragstabelle: welche Namen stehen unter client? Westfeld nicht.",
+                    "feedback_bad": "Westfeld hat keinen Auftrag. Markiere nur Helio, Alpin und Nordkai.",
                 },
                 {
                     "type": "explain",
@@ -426,7 +426,7 @@ def extra_lessons():
                     "answer": "client_id",
                     "concepts": ["TABLE"],
                     "feedback_ok": "client_id ist der Fremdschlüssel: derselbe Wert wie clients.id.",
-                    "feedback_bad": "Nicht der Name — der Name kann sich wiederholen. Die Zahl `client_id` ist der Verweis.",
+                    "feedback_bad": "Nicht `client` — der Name kann sich wiederholen. Tippe auf `client_id`.",
                 },
                 {
                     "type": "look",
