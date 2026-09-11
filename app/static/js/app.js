@@ -984,7 +984,7 @@ function initExercises(lessonId, exerciseCount, quizCount) {
             return;
           }
           const verdict = data.correct
-            ? '<p class="verdict verdict-ok">Stimmt. Dein Ergebnis passt zur Musterlösung.</p>'
+            ? '<p class="verdict verdict-ok">Richtig. Die Abfrage gibt die erwarteten Daten zurück.</p>'
             : `<p class="verdict verdict-fail">Noch nicht. ${esc(data.coach || "")}</p>`;
           const hasTable = data.columns && data.columns.length;
           const hasMsg = data.messages && data.messages.length;
