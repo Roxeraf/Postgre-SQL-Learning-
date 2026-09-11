@@ -8,6 +8,14 @@ import psycopg2.extras
 from flask import Flask, jsonify, render_template, request
 
 from lessons.academy_data import ACADEMY, lesson_by_id as academy_lesson_by_id
+from lessons.knowledge import (
+    ARTICLES,
+    article_by_slug,
+    knowledge_cards,
+    related_articles,
+    sections as knowledge_sections,
+)
+from lessons.workshop import workshop_by_id, workshop_lessons
 from sql_coach import (
     diagnose_structure,
     explain_sql as explain_sql_query,
@@ -61,7 +69,7 @@ def _step_text(step: dict) -> str:
     return " ".join(parts)
 
 
-FLASHCARDS = list(ACADEMY.get("flashcards") or [])
+FLASHCARDS = knowledge_cards()
 for lesson in ACADEMY["lessons"]:
     for i, q in enumerate(lesson.get("quiz") or [], start=1):
         options = q.get("options") or []
@@ -70,8 +78,14 @@ for lesson in ACADEMY["lessons"]:
             "id": f"{lesson['id']}-quiz-{i}",
             "front": q["q"],
             "back": correct + ((" — " + q["explain"]) if q.get("explain") else ""),
+            "sql": "",
+            "kind": "check",
             "lesson_id": lesson["id"],
             "lesson": lesson["title"],
+            "topic": "",
+            "topic_label": "Kurzcheck",
+            "slug": "",
+            "source": "quiz",
         })
 
 SEARCH_INDEX = []
@@ -121,6 +135,23 @@ for item in ACADEMY.get("glossary") or []:
         "url": f"/learn/{item['lesson_id']}" if item.get("lesson_id") else "/wissen",
         "text": _plain(item["label"] + " " + item.get("text") + " " + (item.get("sql") or "")),
         "preview": item.get("text") or "",
+    })
+
+for art in ARTICLES:
+    SEARCH_INDEX.append({
+        "type": "artikel",
+        "lesson_id": art.get("lesson_id") or "",
+        "letter": art.get("section_label") or "SQL",
+        "title": art["title"],
+        "url": f"/wissen/{art['slug']}",
+        "text": _plain(" ".join([
+            art["title"],
+            art.get("summary") or "",
+            art.get("body") or "",
+            " ".join(art.get("sql") or []),
+            " ".join(art.get("pitfalls") or []),
+        ])),
+        "preview": art.get("summary") or "",
     })
 
 DB_CONFIG = dict(
@@ -591,8 +622,13 @@ def compare_query_result(user_cols, user_rows, sol_cols, sol_rows, ordered=False
     return False, missing, extra, user_n, sol_n
 
 
+def find_lesson(lesson_id):
+    return academy_lesson_by_id(lesson_id) or workshop_by_id(lesson_id)
+
+
 def academy_nav(lesson_id):
-    ids = [l["id"] for l in ACADEMY["lessons"]]
+    lesson = workshop_by_id(lesson_id)
+    ids = [l["id"] for l in (workshop_lessons() if lesson else ACADEMY["lessons"])]
     if lesson_id not in ids:
         return None, None
     idx = ids.index(lesson_id)
@@ -622,7 +658,7 @@ def index():
 
 @app.route("/learn/<lesson_id>")
 def academy_lesson(lesson_id):
-    lesson_obj = academy_lesson_by_id(lesson_id)
+    lesson_obj = find_lesson(lesson_id)
     if not lesson_obj:
         return "Lektion nicht gefunden", 404
     prev_id, next_id = academy_nav(lesson_id)
@@ -640,6 +676,30 @@ def playground():
     return render_template("playground.html", active_tool="playground")
 
 
+@app.route("/werkstatt")
+def werkstatt():
+    return render_template(
+        "werkstatt.html",
+        active_tool="werkstatt",
+        practices=workshop_lessons(),
+    )
+
+
+@app.route("/werkstatt/<lesson_id>")
+def werkstatt_lesson(lesson_id):
+    lesson_obj = workshop_by_id(lesson_id)
+    if not lesson_obj:
+        return "Übung nicht gefunden", 404
+    prev_id, next_id = academy_nav(lesson_id)
+    return render_template(
+        "academy.html",
+        lesson=lesson_obj,
+        prev_id=prev_id,
+        next_id=next_id,
+        current_academy_id=lesson_id,
+    )
+
+
 @app.route("/cards")
 def cards():
     return render_template(
@@ -647,6 +707,7 @@ def cards():
         active_tool="cards",
         card_count=len(FLASHCARDS),
         academy_lessons=ACADEMY["lessons"],
+        card_topics=knowledge_sections(),
     )
 
 
@@ -655,8 +716,22 @@ def wissen():
     return render_template(
         "wissen.html",
         active_tool="wissen",
-        index_count=len(SEARCH_INDEX),
+        index_count=len(ARTICLES),
+        sections=knowledge_sections(),
         glossary=ACADEMY.get("glossary") or [],
+    )
+
+
+@app.route("/wissen/<slug>")
+def wissen_article(slug):
+    art = article_by_slug(slug)
+    if not art:
+        return "Artikel nicht gefunden", 404
+    return render_template(
+        "wissen_article.html",
+        active_tool="wissen",
+        article=art,
+        related=related_articles(art),
     )
 
 
@@ -799,7 +874,7 @@ def academy_write_check(user_sql, step):
 @app.route("/api/academy/check", methods=["POST"])
 def api_academy_check():
     data = request.get_json(force=True) or {}
-    lesson_obj = academy_lesson_by_id(data.get("lesson_id"))
+    lesson_obj = find_lesson(data.get("lesson_id"))
     if not lesson_obj:
         return jsonify({"ok": False, "error": "Unbekannte Lektion."})
     try:
@@ -961,8 +1036,10 @@ def api_search():
             if t in title_l:
                 score += 8
             score += hay.count(t)
-        if item["type"] in {"lektion", "konzept"}:
+        if item["type"] in {"lektion", "konzept", "artikel"}:
             score += 3
+        if item["type"] == "artikel":
+            score += 4
         scored.append((score, item))
     scored.sort(key=lambda x: (-x[0], x[1]["letter"], x[1]["title"]))
     results = []

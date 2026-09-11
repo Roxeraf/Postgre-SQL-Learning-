@@ -198,11 +198,43 @@ GLOSSARY = [
         "text": "Ein Index ist wie ein Stichwortregister: Postgres findet passende Zeilen, ohne die ganze Tabelle zu lesen. "
         "EXPLAIN zeigt den Plan — noch kein Tuning, nur die Idee.",
     },
+    {
+        "id": "SUM",
+        "label": "SUM / AVG",
+        "lesson_id": "ch-agg",
+        "sql": "SELECT client, SUM(quantity) FROM orders GROUP BY client;",
+        "text": "SUM addiert Werte, AVG mittelt, MIN/MAX holen das Kleinste und Größte. "
+        "NULL zählt nicht mit. Mit GROUP BY gilt die Rechnung pro Gruppe.",
+    },
+    {
+        "id": "CASE",
+        "label": "CASE",
+        "lesson_id": "ch-case",
+        "sql": "SELECT CASE status WHEN 'offen' THEN 'läuft' ELSE status END FROM orders;",
+        "text": "CASE setzt je nach Bedingung einen anderen Wert. Die Zeile bleibt. "
+        "Ohne ELSE wird der Rest NULL.",
+    },
+    {
+        "id": "COALESCE",
+        "label": "COALESCE",
+        "lesson_id": "ch-case",
+        "sql": "SELECT COALESCE(c.name, 'ohne Kunde') FROM orders o LEFT JOIN clients c ON c.id = o.client_id;",
+        "text": "COALESCE nimmt den ersten Wert, der nicht NULL ist. So bleibt 4730 sichtbar, der Name wird lesbar.",
+    },
+    {
+        "id": "SUBQUERY",
+        "label": "Unterabfrage",
+        "lesson_id": "ch-subq",
+        "sql": "SELECT * FROM orders WHERE id IN (SELECT order_id FROM order_items);",
+        "text": "Eine Abfrage in der anderen. IN nimmt eine Werteliste. EXISTS prüft, ob mindestens eine Zeile passt.",
+    },
 ]
 
 
 def extra_lessons():
-    return [
+    from lessons.path_more import extra_path_lessons
+
+    return extra_path_lessons() + [
         {
             "id": "ch-alias",
             "chapter": 8,

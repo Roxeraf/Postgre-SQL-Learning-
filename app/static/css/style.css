@@ -962,9 +962,11 @@ kbd { color: var(--text); font-size: 11px; }
 .schema-type { color: var(--muted); font-size: 11px; }
 .schema-preview { margin: 0 12px 10px; }
 
-.cards-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
+.cards-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
 .cards-toolbar label { display: flex; gap: 8px; align-items: center; }
 .cards-toolbar select { width: auto; margin: 0; }
+.cards-due input { margin: 0; }
+.card-sql { margin-top: 12px; font-size: 13px; }
 .flashcard {
   perspective: 1000px;
   min-height: 260px;
@@ -1167,6 +1169,33 @@ kbd { color: var(--text); font-size: 11px; }
   background: var(--accent-dim);
   border-radius: 0 12px 12px 0;
 }
+.wissen-section { margin-top: 28px; }
+.wissen-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+.wissen-card {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  background: var(--panel-2);
+  text-decoration: none;
+  color: var(--text);
+}
+.wissen-card:hover { border-color: var(--border-strong); }
+.wissen-card h3 { margin: 4px 0 8px; font-size: 17px; }
+.wissen-article { max-width: 760px; }
+.wissen-article h1 { margin: 8px 0 12px; }
+.wissen-article h2 { margin: 28px 0 10px; font-size: 20px; }
+.wissen-body p { margin: 0 0 12px; line-height: 1.55; color: var(--text); }
+.wissen-body strong { color: var(--text); }
+.wissen-pitfalls { margin: 0 0 16px 18px; color: var(--muted); }
+.wissen-pitfalls li { margin-bottom: 6px; }
+.wissen-links { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
+.wissen-article .eyebrow a { color: var(--accent); text-decoration: none; }
 .glossary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));

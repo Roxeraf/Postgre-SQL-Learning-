@@ -1,6 +1,7 @@
 """Unit tests for learner feedback and academy metadata (no database)."""
 from __future__ import annotations
 
+import json
 import re
 import unittest
 from pathlib import Path
@@ -111,10 +112,18 @@ class AcademyContentTests(unittest.TestCase):
         ids = [l["id"] for l in ACADEMY["lessons"]]
         self.assertEqual(ids, PATH_IDS)
         for needed in (
-            "ch0", "ch7", "ch-alias", "ch8", "ch-having", "ch-keys",
-            "ch9", "ch10", "ch-dml", "ch-tx", "ch-pg", "challenge-3",
+            "ch0", "ch7", "ch-alias", "ch8", "ch-agg", "ch-having", "ch-keys",
+            "ch9", "ch10", "ch-items", "ch-case", "ch-subq", "challenge-4",
+            "ch-dml", "ch-tx", "ch-pg", "challenge-3",
         ):
             self.assertIn(needed, ids)
+        self.assertLess(ids.index("ch8"), ids.index("ch-agg"))
+        self.assertLess(ids.index("ch-agg"), ids.index("ch-having"))
+        self.assertLess(ids.index("ch10"), ids.index("ch-items"))
+        self.assertLess(ids.index("ch-items"), ids.index("ch-case"))
+        self.assertLess(ids.index("challenge-2"), ids.index("ch-subq"))
+        self.assertLess(ids.index("ch-subq"), ids.index("challenge-4"))
+        self.assertLess(ids.index("challenge-4"), ids.index("ch-dml"))
 
     def test_every_lesson_has_goal_interaction_and_quiz(self):
         self.assertGreaterEqual(len(ACADEMY["lessons"]), 18)
@@ -180,6 +189,24 @@ class AcademyContentTests(unittest.TestCase):
         labels = {g["id"] for g in glossary}
         for needed in ("NULL", "JOIN", "HAVING", "TX", "INDEX"):
             self.assertIn(needed, labels)
+
+    def test_knowledge_bible_is_complete(self):
+        from lessons.knowledge import ARTICLES, ARTICLES_BY_SLUG, knowledge_cards, sections
+
+        self.assertGreaterEqual(len(ARTICLES), 40)
+        self.assertEqual(len(ARTICLES_BY_SLUG), len(ARTICLES))
+        self.assertGreaterEqual(len(sections()), 6)
+        cards = knowledge_cards()
+        self.assertGreaterEqual(len(cards), 120)
+        for art in ARTICLES:
+            self.assertTrue(art["slug"], art["title"])
+            self.assertTrue(art["section"], art["slug"])
+            self.assertTrue(art["summary"], art["slug"])
+            self.assertTrue(art["body"], art["slug"])
+            self.assertTrue(art.get("sql"), art["slug"])
+            self.assertGreaterEqual(len(art.get("cards") or []), 3, art["slug"])
+            for c in art["cards"]:
+                self.assertTrue(c["front"] and c["back"], c.get("id"))
 
     def test_dml_steps_are_verified(self):
         dml = lesson_by_id("ch-dml")
@@ -386,6 +413,83 @@ class NoCustomerNamesTests(unittest.TestCase):
                     if rx.search(text):
                         hits.append(f"{path}:{rx.pattern}")
         self.assertEqual(hits, [], msg="WMX/Kundennamen im Repo:\n" + "\n".join(hits))
+
+
+class WorkshopAndMcpTests(unittest.TestCase):
+    def test_workshop_save_and_lookup(self):
+        import tempfile
+        from lessons import workshop as ws
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict("os.environ", {"WORKSHOP_DIR": tmp}):
+                path = ws.save_workshop_lesson({
+                    "id": "ws-test-open",
+                    "title": "Offene zählen",
+                    "goal": "Zähle offene Aufträge.",
+                    "steps": [{
+                        "type": "write",
+                        "title": "Zählen",
+                        "prompt": "Wie viele offene Aufträge?",
+                        "solution": "SELECT COUNT(*) FROM orders WHERE status = 'offen';",
+                        "hints": ["COUNT(*)", "WHERE status = 'offen'"],
+                    }],
+                    "quiz": [
+                        {"q": "A?", "options": ["1", "2", "3", "4"], "correct": 1, "explain": "x"},
+                    ],
+                })
+                self.assertTrue(path.is_file())
+                found = ws.workshop_by_id("ws-test-open")
+                self.assertEqual(found["title"], "Offene zählen")
+                with self.assertRaises(ValueError):
+                    ws.save_workshop_lesson({"id": "ch0", "steps": [{"type": "look", "title": "x"}]})
+
+    def test_mcp_lists_tools_and_drafts(self):
+        sys.path.insert(0, str(REPO / "mcp"))
+        import learnsql_mcp as mcp
+
+        listed = mcp.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+        names = {t["name"] for t in listed["result"]["tools"]}
+        for needed in ("schema", "run_sql", "search_wissen", "draft_exercise", "save_practice"):
+            self.assertIn(needed, names)
+        draft = mcp.handle({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+                "name": "draft_exercise",
+                "arguments": {
+                    "id": "ws-mcp-draft",
+                    "title": "Helio offen",
+                    "prompt": "Offene Helio-Aufträge",
+                    "solution": "SELECT * FROM orders WHERE client = 'Helio' AND status = 'offen';",
+                },
+            },
+        })
+        payload = json.loads(draft["result"]["content"][0]["text"])
+        self.assertEqual(payload["id"], "ws-mcp-draft")
+        self.assertTrue(payload["steps"])
+
+    def test_wissen_cards_and_werkstatt_routes(self):
+        import app as flask_app
+
+        client = flask_app.app.test_client()
+        wissen = client.get("/wissen")
+        self.assertEqual(wissen.status_code, 200)
+        self.assertIn("PostgreSQL-Bibel".encode("utf-8"), wissen.data)
+        article = client.get("/wissen/select")
+        self.assertEqual(article.status_code, 200)
+        self.assertIn(b"SELECT", article.data)
+        cards = client.get("/cards")
+        self.assertEqual(cards.status_code, 200)
+        self.assertIn("Nur fällige".encode("utf-8"), cards.data)
+        shop = client.get("/werkstatt")
+        self.assertEqual(shop.status_code, 200)
+        self.assertIn("Werkstatt".encode("utf-8"), shop.data)
+        lesson = client.get("/learn/ch-agg")
+        self.assertEqual(lesson.status_code, 200)
+        self.assertIn("Summen".encode("utf-8"), lesson.data)
+        missing = client.get("/wissen/gibt-es-nicht")
+        self.assertEqual(missing.status_code, 404)
 
 
 if __name__ == "__main__":

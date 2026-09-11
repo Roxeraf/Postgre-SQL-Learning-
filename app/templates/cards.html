@@ -4,18 +4,30 @@
 <header class="page-header">
   <p class="eyebrow">Aktiver Abruf</p>
   <h1>Karteikarten</h1>
-  <p class="lede">{{ card_count }} Karten aus Konzepten und Kurzchecks. Umdrehen, bewerten, wiederholen.</p>
+  <p class="lede">{{ card_count }} Karten aus der Bibel und den Kurzchecks. Umdrehen, bewerten, wiederholen — der Stand bleibt im Browser.</p>
 </header>
 
 <section class="card cards-wrap">
   <div class="cards-toolbar">
-    <label class="muted">Filter
+    <label class="muted">Thema
+      <select id="card-topic">
+        <option value="">Alle Themen</option>
+        {% for sec in card_topics %}
+        <option value="{{ sec.id }}">{{ sec.label }}</option>
+        {% endfor %}
+        <option value="quiz">Kurzchecks</option>
+      </select>
+    </label>
+    <label class="muted">Kapitel
       <select id="card-filter">
         <option value="">Alle Kapitel</option>
         {% for l in academy_lessons %}
         <option value="{{ l.id }}">Kapitel {{ l.chapter }} — {{ l.title }}</option>
         {% endfor %}
       </select>
+    </label>
+    <label class="muted cards-due">
+      <input type="checkbox" id="card-due"> Nur fällige
     </label>
     <span class="muted" id="card-progress">0 / 0</span>
   </div>
@@ -30,13 +42,16 @@
       <div class="flashcard-face back">
         <p class="flashcard-kicker">Antwort</p>
         <p class="flashcard-text" id="card-back"></p>
+        <pre class="sql-pre card-sql" id="card-sql" hidden></pre>
       </div>
     </div>
   </div>
 
   <div class="cards-actions">
     <button class="btn" type="button" id="card-again">Nochmal</button>
+    <button class="btn" type="button" id="card-hard">Schwer</button>
     <button class="btn btn-primary" type="button" id="card-got-it">Sitzt</button>
   </div>
+  <p class="muted" id="card-box-meta"></p>
 </section>
 {% endblock %}

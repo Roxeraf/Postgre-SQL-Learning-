@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{{ article.title }} — Wissensbasis{% endblock %}
+{% block content %}
+<article class="wissen-article content-wide">
+  <p class="eyebrow"><a href="/wissen">Wissensbasis</a> · {{ article.section_label }}{% if article.lookup_only %} · Nachschlagen{% endif %}</p>
+  <h1>{{ article.title }}</h1>
+  <p class="lede">{{ article.summary }}</p>
+
+  <div class="wissen-body" id="wissen-body"></div>
+  <script id="wissen-md" type="application/json">{{ article.body | tojson }}</script>
+
+  {% if article.sql %}
+  <h2>Am Lager</h2>
+  {% for s in article.sql %}
+  <pre class="sql-pre">{{ s }}</pre>
+  {% endfor %}
+  <p><a class="btn" href="/playground">Im Playground ausprobieren</a></p>
+  {% endif %}
+
+  {% if article.pitfalls %}
+  <h2>Typische Fehler</h2>
+  <ul class="wissen-pitfalls">
+    {% for p in article.pitfalls %}
+    <li>{{ p }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <div class="wissen-links">
+    {% if article.lesson_id %}
+    <a class="btn btn-primary" href="/learn/{{ article.lesson_id }}">Im Pfad üben</a>
+    {% endif %}
+    <a class="btn" href="/cards?topic={{ article.section }}">Karten zu {{ article.section_label }}</a>
+  </div>
+
+  {% if related %}
+  <h2>Weiterlesen</h2>
+  <div class="wissen-grid">
+    {% for r in related %}
+    <a class="wissen-card" href="/wissen/{{ r.slug }}">
+      <p class="wissen-kicker">{{ r.section_label }}</p>
+      <h3>{{ r.title }}</h3>
+      <p class="muted">{{ r.summary }}</p>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</article>
+{% endblock %}
+{% block page_scripts %}
+<script>
+(function () {
+  const host = document.getElementById("wissen-body");
+  const hold = document.getElementById("wissen-md");
+  if (!host || !hold || !window.marked) return;
+  host.innerHTML = window.marked.parse(JSON.parse(hold.textContent || "\"\""), { mangle: false, headerIds: false });
+})();
+</script>
+{% endblock %}
