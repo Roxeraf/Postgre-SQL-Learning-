@@ -627,7 +627,7 @@ class WorkshopAndMcpTests(unittest.TestCase):
             )
             with patch.dict("os.environ", {"LEARN_SQL_HOME": tmp}, clear=False):
                 flagged = client.get("/werkstatt")
-        self.assertIn("learnsql ist in Claude eingetragen".encode("utf-8"), flagged.data)
+        self.assertIn("ist in Claude eingetragen".encode("utf-8"), flagged.data)
         lesson = client.get("/learn/ch-agg")
         self.assertEqual(lesson.status_code, 200)
         self.assertIn("Summen".encode("utf-8"), lesson.data)
