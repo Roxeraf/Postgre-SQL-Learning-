@@ -1,5 +1,5 @@
 #define MyAppName "plx.learnSQL"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "plx.learnSQL"
 
 [Setup]
@@ -31,7 +31,6 @@ Name: "german"; MessagesFile: "compiler:Languages\German.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checkedonce
-Name: "claudemcp"; Description: "MCP in Claude Desktop einrichten (Claude danach neu starten)"; GroupDescription: "Claude"; Flags: checkedonce; Check: ClaudeDetected
 
 [Files]
 Source: "staging\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -45,7 +44,7 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\Start-FlowAppLearn.bat"; Wo
 
 [Run]
 Filename: "{app}\Start-FlowAppLearn.bat"; Description: "{#MyAppName} jetzt starten"; Flags: nowait postinstall skipifsilent
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Configure-LearnSqlMcp.ps1"" -HomeDir ""{app}"""; WorkingDir: "{app}"; Description: "MCP in Claude Desktop eintragen"; StatusMsg: "MCP für Claude einrichten…"; Flags: runhidden waituntilterminated; Tasks: claudemcp
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Configure-LearnSqlMcp.ps1"" -HomeDir ""{app}"""; WorkingDir: "{app}"; Description: "MCP in Claude eintragen"; StatusMsg: "MCP für Claude einrichten…"; Flags: runhidden waituntilterminated
 
 [UninstallRun]
 Filename: "{app}\Stop-FlowAppLearn.bat"; Flags: runhidden waituntilterminated; RunOnceId: "StopFlowAppLearn"
@@ -58,22 +57,3 @@ Type: filesandordirs; Name: "{app}\workshop"
 Type: files; Name: "{app}\runtime.json"
 Type: files; Name: "{app}\mcp-status.json"
 
-[Code]
-function ClaudeDetected: Boolean;
-var
-  FindRec: TFindRec;
-begin
-  Result := DirExists(ExpandConstant('{userappdata}\Claude'));
-  if Result then
-    Exit;
-  if DirExists(ExpandConstant('{localappdata}\Programs\Claude')) then
-  begin
-    Result := True;
-    Exit;
-  end;
-  if FindFirst(ExpandConstant('{localappdata}\Packages\Claude_*'), FindRec) then
-  begin
-    Result := True;
-    FindClose(FindRec);
-  end;
-end;

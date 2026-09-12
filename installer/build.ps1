@@ -65,6 +65,7 @@ if (-not $pth) { throw "python._pth nicht gefunden" }
     "python312.zip"
     "."
     "Lib\site-packages"
+    "..\app"
     "import site"
 ) | Set-Content -Path $pth.FullName -Encoding ascii
 
@@ -78,6 +79,7 @@ $req = Join-Path $ProjectRoot "app\requirements.txt"
 if ($LASTEXITCODE -ne 0) { throw "pip install fehlgeschlagen" }
 & $pythonExe -c "import flask, psycopg2; print('python-ok', flask.__version__)"
 if ($LASTEXITCODE -ne 0) { throw "Flask/psycopg2 Import fehlgeschlagen" }
+Copy-Item (Join-Path $InstallerDir "runtime\sitecustomize.py") (Join-Path $pythonDir "sitecustomize.py")
 Get-ChildItem $pythonDir -Recurse -Directory -Filter "__pycache__" | Remove-Item -Recurse -Force
 
 Write-Step "PostgreSQL 16 Binaries entpacken"

@@ -1,4 +1,4 @@
-# Entfernt nur mcpServers.learnsql aus der Claude-Desktop-Config.
+# Entfernt nur mcpServers.learnsql aus Claude Desktop und Claude Code.
 [CmdletBinding()]
 param(
     [string]$HomeDir = ""

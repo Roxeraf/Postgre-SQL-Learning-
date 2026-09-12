@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import sys
 from collections import Counter
 from pathlib import Path
 
@@ -8,16 +9,40 @@ import psycopg2
 import psycopg2.extras
 from flask import Flask, jsonify, render_template, request
 
-from lessons.academy_data import ACADEMY, lesson_by_id as academy_lesson_by_id
-from lessons.knowledge import (
+
+def ensure_app_on_path() -> Path:
+    """Keep `lessons` importable when cwd is not on sys.path.
+
+    The Windows embeddable runtime ships a python*._pth file. That file
+    replaces the normal path setup, so the working directory is not added
+    and PYTHONPATH is ignored. Resolve the folder that actually contains
+    the lesson package — either next to this file or in ./app.
+    """
+    here = Path(__file__).resolve().parent
+    for candidate in (here, here / "app"):
+        if (candidate / "lessons" / "academy_data.py").is_file():
+            path = str(candidate)
+            if path not in sys.path:
+                sys.path.insert(0, path)
+            return candidate
+    path = str(here)
+    if path not in sys.path:
+        sys.path.insert(0, path)
+    return here
+
+
+ensure_app_on_path()
+
+from lessons.academy_data import ACADEMY, lesson_by_id as academy_lesson_by_id  # noqa: E402
+from lessons.knowledge import (  # noqa: E402
     ARTICLES,
     article_by_slug,
     knowledge_cards,
     related_articles,
     sections as knowledge_sections,
 )
-from lessons.workshop import workshop_by_id, workshop_lessons
-from sql_coach import (
+from lessons.workshop import workshop_by_id, workshop_lessons  # noqa: E402
+from sql_coach import (  # noqa: E402
     diagnose_structure,
     explain_sql as explain_sql_query,
     friendly_sql_error,

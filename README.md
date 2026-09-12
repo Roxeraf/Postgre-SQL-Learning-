@@ -23,7 +23,7 @@ powershell -ExecutionPolicy Bypass -File .\installer\build.ps1
 Danach liegt `dist\plx.learnSQL-Setup.exe` bereit — diese Datei an den Kollegen schicken.
 Installation: Doppelklick, Assistent durchklicken, Desktop-Verknüpfung **plx.learnSQL** starten.
 Beim ersten Start wird die Lern-Datenbank einmalig eingerichtet, danach öffnet sich http://localhost:8080.
-Wenn Claude Desktop installiert ist, trägt das Setup das MCP ein — Claude danach einmal komplett neu starten.
+Das Setup trägt das MCP in Claude Desktop und Claude Code ein — Claude danach einmal komplett neu starten.
 Kurzanleitung: `mcp/ANLEITUNG.md` oder in der App **Werkstatt**.
 
 SmartScreen kann bei einer unsignierten EXE warnen: „Weitere Informationen“ → „Trotzdem ausführen“.
@@ -78,7 +78,7 @@ Was du sagen kannst: „Bau mir drei Werkstatt-Übungen zu offenen Aufträgen mi
 
 Schritt-für-Schritt: [mcp/ANLEITUNG.md](mcp/ANLEITUNG.md)
 
-- Windows-Setup trägt Claude Desktop automatisch ein, wenn Claude gefunden wird.
+- Windows-Setup trägt Claude Desktop und Claude Code automatisch ein.
 - Claude Code: `claude mcp add --scope user --transport stdio learnsql -- python mcp/learnsql_mcp.py`
 - Cursor / Repo: [mcp/cursor.mcp.example.json](mcp/cursor.mcp.example.json)
 

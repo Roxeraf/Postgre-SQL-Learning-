@@ -197,7 +197,14 @@ function Start-Flask {
     $env:PYTHONUNBUFFERED = "1"
     $env:PGPASSWORD = $Password
 
-    $flask = Start-Process -FilePath $Python -ArgumentList @("app.py") -WorkingDirectory $AppDir -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $LogDir "flask.out") -RedirectStandardError (Join-Path $LogDir "flask.err")
+    $appPy = Join-Path $AppDir "app.py"
+    $lessonMod = Join-Path $AppDir "lessons\academy_data.py"
+    if (-not (Test-Path $lessonMod)) {
+        throw "Lektionsdateien fehlen: $lessonMod. Bitte plx.learnSQL neu installieren."
+    }
+    # Absoluter Pfad, damit der Traceback nicht nach {app}\app.py (Installationswurzel) aussieht.
+    # sys.path setzt app.py selbst — das eingebettete Python ignoriert PYTHONPATH und cwd.
+    $flask = Start-Process -FilePath $Python -ArgumentList @($appPy) -WorkingDirectory $AppDir -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $LogDir "flask.out") -RedirectStandardError (Join-Path $LogDir "flask.err")
     Write-Log "Flask PID $($flask.Id) auf Port $AppPort"
 
     for ($i = 0; $i -lt 40; $i++) {
@@ -212,6 +219,17 @@ function Start-Flask {
         Start-Sleep -Milliseconds 400
     }
     throw "Die Lern-App antwortet nicht unter http://127.0.0.1:$AppPort"
+}
+
+function Register-LearnSqlMcp {
+    $mcpSetup = Join-Path $Root "Configure-LearnSqlMcp.ps1"
+    if (-not (Test-Path $mcpSetup)) { return }
+    try {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $mcpSetup -HomeDir $Root -Quiet
+        Write-Log "MCP-Config geschrieben"
+    } catch {
+        Write-Log "MCP-Setup uebersprungen: $($_.Exception.Message)"
+    }
 }
 
 function Stop-Stack {
@@ -248,9 +266,12 @@ Add-Type -AssemblyName System.Drawing
 try {
     Write-Log "Start in $Root"
 
-    foreach ($needed in @($Python, (Join-Path $PgBin "pg_ctl.exe"), $SqlFile, $InitDbPy, (Join-Path $AppDir "app.py"))) {
+    foreach ($needed in @($Python, (Join-Path $PgBin "pg_ctl.exe"), $SqlFile, $InitDbPy, (Join-Path $AppDir "app.py"), (Join-Path $AppDir "lessons\academy_data.py"))) {
         if (-not (Test-Path $needed)) { throw "Installationsdatei fehlt: $needed" }
     }
+
+    # MCP unabhängig vom Flask-Start eintragen — sonst bleibt Claude leer, wenn die App abstürzt.
+    Register-LearnSqlMcp
 
     $password = "postgres"
     $dbPort = 5432
@@ -326,15 +347,7 @@ try {
     Write-Log "Bereit: App=$appPort DB=$dbPort"
 
     New-Item -ItemType Directory -Force -Path (Join-Path $Root "workshop") | Out-Null
-    $mcpSetup = Join-Path $Root "Configure-LearnSqlMcp.ps1"
-    if (Test-Path $mcpSetup) {
-        try {
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $mcpSetup -HomeDir $Root -Quiet
-            Write-Log "MCP-Config geprueft"
-        } catch {
-            Write-Log "MCP-Setup uebersprungen: $($_.Exception.Message)"
-        }
-    }
+    Register-LearnSqlMcp
 
     Start-Process "http://localhost:$appPort"
 

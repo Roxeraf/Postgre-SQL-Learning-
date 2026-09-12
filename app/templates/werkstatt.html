@@ -21,20 +21,21 @@
 <section class="card mcp-help">
   <h2>Einrichten</h2>
   {% if mcp_status and mcp_status.installed %}
-  <p class="mcp-status">Claude Desktop ist eingetragen. <strong>Claude einmal komplett beenden</strong> (auch das Symbol unten rechts) und neu starten.</p>
+  <p class="mcp-status"><strong>learnsql</strong> ist in Claude eingetragen{% if mcp_status.clients %} ({{ mcp_status.clients|join(", ") }}){% endif %}. <strong>Claude einmal komplett beenden</strong> (auch das Symbol unten rechts) und neu starten.</p>
   {% endif %}
 
   <h3>Claude Desktop</h3>
   <ol class="mcp-steps">
-    <li>Windows-Setup: Haken „MCP in Claude Desktop einrichten“, wenn Claude gefunden wurde.</li>
-    <li>Oder: Settings → Developer → Edit Config, Block <code>learnsql</code> einfügen, andere Server lassen.</li>
+    <li>Windows-Setup und der erste App-Start tragen <code>learnsql</code> automatisch ein — unabhängig davon, ob Claude schon offen ist.</li>
+    <li>Falls der Server fehlt: Settings → Developer → Edit Config, Block <code>learnsql</code> einfügen, andere Server lassen.</li>
     <li>Claude komplett beenden und neu starten.</li>
   </ol>
   <p class="muted">Wenn der Server nicht erscheint: dieselbe Datei zusätzlich nach <code>%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude\claude_desktop_config.json</code>.</p>
 
   <h3>Claude Code</h3>
+  <p class="muted">Das Windows-Paket schreibt denselben Block nach <code>%USERPROFILE%\.claude.json</code> (Benutzer-weit). Claude Code danach neu starten.</p>
   <pre class="sql-pre">claude mcp add --scope user --transport stdio learnsql -- python mcp/learnsql_mcp.py</pre>
-  <p class="muted">Oder denselben Block in <code>%USERPROFILE%\.claude.json</code>. Im Windows-Paket die festen Pfade aus der MCP-Anleitung nutzen.</p>
+  <p class="muted">Im Windows-Paket die festen Pfade aus der MCP-Anleitung nutzen, nicht das System-<code>python</code>.</p>
 
   <h3>Cursor / Repo</h3>
   <p class="muted">Vorlage <code>mcp/cursor.mcp.example.json</code>, Arbeitsverzeichnis = Projektordner.</p>
