@@ -471,6 +471,47 @@ class WorkshopAndMcpTests(unittest.TestCase):
         self.assertEqual(payload["id"], "ws-mcp-draft")
         self.assertTrue(payload["steps"])
 
+    def test_sitecustomize_adds_app_dir(self):
+        import importlib.util
+
+        src = REPO / "installer" / "runtime" / "sitecustomize.py"
+        self.assertTrue(src.is_file())
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            python_dir = root / "python"
+            app_dir = root / "app"
+            python_dir.mkdir()
+            app_dir.mkdir()
+            dest = python_dir / "sitecustomize.py"
+            dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+            spec = importlib.util.spec_from_file_location("sitecustomize_bundled", dest)
+            mod = importlib.util.module_from_spec(spec)
+            saved = list(sys.path)
+            try:
+                spec.loader.exec_module(mod)
+                self.assertEqual(Path(sys.path[0]).resolve(), app_dir.resolve())
+            finally:
+                sys.path[:] = saved
+
+    def test_ensure_app_on_path_recovers_lessons(self):
+        import app as flask_app
+
+        app_dir = Path(flask_app.__file__).resolve().parent
+        saved = list(sys.path)
+        popped = {}
+        try:
+            sys.path[:] = [p for p in sys.path if Path(p).resolve() != app_dir]
+            for name in list(sys.modules):
+                if name == "lessons" or name.startswith("lessons."):
+                    popped[name] = sys.modules.pop(name)
+            flask_app.ensure_app_on_path()
+            self.assertEqual(Path(sys.path[0]).resolve(), app_dir)
+            from lessons.academy_data import ACADEMY
+            self.assertTrue(ACADEMY["lessons"])
+        finally:
+            sys.path[:] = saved
+            sys.modules.update(popped)
+
     def test_mcp_install_merges_and_reads_runtime_port(self):
         sys.path.insert(0, str(REPO / "mcp"))
         import install_mcp
@@ -483,20 +524,36 @@ class WorkshopAndMcpTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
+            user_home = home / "userhome"
+            user_home.mkdir()
             (home / "mcp").mkdir()
             claude_dir = home / "Claude"
             claude_dir.mkdir()
             (claude_dir / "claude_desktop_config.json").write_text(
                 json.dumps(existing), encoding="utf-8"
             )
-            with patch.dict("os.environ", {"APPDATA": tmp, "LOCALAPPDATA": str(home / "local")}, clear=False):
+            env = {
+                "APPDATA": tmp,
+                "LOCALAPPDATA": str(home / "local"),
+                "HOME": str(user_home),
+                "USERPROFILE": str(user_home),
+                "CLAUDE_CONFIG_DIR": "",
+            }
+            with patch.dict("os.environ", env, clear=False):
                 status = install_mcp.install(home)
-            written = Path(status["targets"][0])
-            self.assertTrue(written.is_file())
-            self.assertTrue((written.parent / (written.name + ".bak")).is_file())
-            saved = json.loads(written.read_text(encoding="utf-8"))
+            desktop = Path(tmp) / "Claude" / "claude_desktop_config.json"
+            code = user_home / ".claude.json"
+            self.assertIn(str(desktop), status["targets"])
+            self.assertIn(str(code), status["targets"])
+            self.assertIn("Claude Desktop", status["clients"])
+            self.assertIn("Claude Code", status["clients"])
+            self.assertTrue(desktop.is_file())
+            self.assertTrue((desktop.parent / (desktop.name + ".bak")).is_file())
+            saved = json.loads(desktop.read_text(encoding="utf-8"))
             self.assertEqual(saved["mcpServers"]["other"]["command"], "keep-me")
             self.assertEqual(saved["mcpServers"]["learnsql"]["env"]["LEARN_SQL_HOME"], str(home.resolve()))
+            code_saved = json.loads(code.read_text(encoding="utf-8"))
+            self.assertEqual(code_saved["mcpServers"]["learnsql"]["env"]["LEARN_SQL_HOME"], str(home.resolve()))
             self.assertTrue((home / "workshop").is_dir())
             self.assertTrue((home / "mcp-status.json").is_file())
 
@@ -507,13 +564,42 @@ class WorkshopAndMcpTests(unittest.TestCase):
                 applied = install_mcp.apply_runtime_env(home)
                 self.assertEqual(os.environ.get("DB_PORT"), "15432")
                 self.assertTrue(str(applied["workshop"]).endswith("workshop"))
+            entry_with_port = install_mcp.learnsql_server_entry(home)
+            self.assertEqual(entry_with_port["env"]["DB_PORT"], "15432")
 
-            with patch.dict("os.environ", {"APPDATA": tmp, "LOCALAPPDATA": str(home / "local")}, clear=False):
+            with patch.dict("os.environ", env, clear=False):
                 gone = install_mcp.uninstall(home)
-            after = json.loads(written.read_text(encoding="utf-8"))
+            after = json.loads(desktop.read_text(encoding="utf-8"))
             self.assertNotIn("learnsql", after.get("mcpServers") or {})
             self.assertIn("other", after["mcpServers"])
+            code_after = json.loads(code.read_text(encoding="utf-8"))
+            self.assertNotIn("learnsql", code_after.get("mcpServers") or {})
             self.assertTrue(gone["removed"])
+
+    def test_mcp_install_skips_invalid_json(self):
+        sys.path.insert(0, str(REPO / "mcp"))
+        import install_mcp
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            user_home = home / "userhome"
+            user_home.mkdir()
+            claude_dir = home / "Claude"
+            claude_dir.mkdir()
+            broken = claude_dir / "claude_desktop_config.json"
+            broken.write_text("{not-json", encoding="utf-8")
+            env = {
+                "APPDATA": tmp,
+                "LOCALAPPDATA": str(home / "local"),
+                "HOME": str(user_home),
+                "USERPROFILE": str(user_home),
+                "CLAUDE_CONFIG_DIR": "",
+            }
+            with patch.dict("os.environ", env, clear=False):
+                status = install_mcp.install(home)
+            self.assertIn(str(broken), status["skipped"])
+            self.assertEqual(broken.read_text(encoding="utf-8"), "{not-json")
+            self.assertTrue((user_home / ".claude.json").is_file())
 
     def test_wissen_cards_and_werkstatt_routes(self):
         import app as flask_app
@@ -541,7 +627,7 @@ class WorkshopAndMcpTests(unittest.TestCase):
             )
             with patch.dict("os.environ", {"LEARN_SQL_HOME": tmp}, clear=False):
                 flagged = client.get("/werkstatt")
-        self.assertIn("Claude Desktop ist eingetragen".encode("utf-8"), flagged.data)
+        self.assertIn("learnsql ist in Claude eingetragen".encode("utf-8"), flagged.data)
         lesson = client.get("/learn/ch-agg")
         self.assertEqual(lesson.status_code, 200)
         self.assertIn("Summen".encode("utf-8"), lesson.data)

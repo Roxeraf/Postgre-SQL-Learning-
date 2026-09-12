@@ -1,4 +1,4 @@
-# Trägt das LearnSQL-MCP in Claude Desktop ein (nur Schlüssel learnsql).
+# Trägt das LearnSQL-MCP in Claude Desktop und Claude Code ein (nur Schlüssel learnsql).
 [CmdletBinding()]
 param(
     [string]$HomeDir = "",

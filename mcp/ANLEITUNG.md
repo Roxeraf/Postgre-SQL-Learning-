@@ -21,9 +21,12 @@ Danach in der App **Werkstatt** öffnen und die neue Karte anklicken.
 
 ## Windows-Installer
 
-Wenn das Setup Claude Desktop gefunden hat, ist das MCP schon eingetragen.
+Setup und der erste App-Start tragen `learnsql` automatisch ein — in Claude Desktop
+(`%APPDATA%\Claude\claude_desktop_config.json`) und in Claude Code
+(`%USERPROFILE%\.claude.json`). Andere MCP-Server bleiben unverändert.
+
 **Claude einmal komplett beenden** (auch das Symbol unten rechts) und neu starten.
-In Claude unter Einstellungen → Developer sollte `learnsql` stehen.
+In Claude Desktop unter Einstellungen → Developer sollte `learnsql` stehen.
 
 ## Manuell: Claude Desktop
 

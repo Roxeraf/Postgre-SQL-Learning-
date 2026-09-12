@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Merge LearnSQL MCP into Claude Desktop config. Used by the Windows installer."""
+"""Merge LearnSQL MCP into Claude Desktop and Claude Code config."""
 
 from __future__ import annotations
 
@@ -53,20 +53,38 @@ def apply_runtime_env(home: Path | None = None) -> dict:
     return applied
 
 
+def user_home() -> Path:
+    for key in ("USERPROFILE", "HOME"):
+        raw = (os.environ.get(key) or "").strip()
+        if raw:
+            return Path(raw).expanduser()
+    return Path.home()
+
+
 def learnsql_server_entry(home: Path) -> dict:
     bundled = home / "python" / "python.exe"
     command = str(bundled if bundled.is_file() else Path(sys.executable).resolve())
+    env = {
+        "DB_HOST": "127.0.0.1",
+        "DB_NAME": "learnsql",
+        "DB_USER": "lernuser",
+        "DB_PASSWORD": "lernuser",
+        "LEARN_SQL_HOME": str(home),
+        "WORKSHOP_DIR": str(home / "workshop"),
+    }
+    runtime_path = home / "runtime.json"
+    if runtime_path.is_file():
+        try:
+            data = json.loads(runtime_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            data = {}
+        port = data.get("dbPort") or data.get("db_port")
+        if port:
+            env["DB_PORT"] = str(port)
     return {
         "command": command,
         "args": [str(home / "mcp" / "learnsql_mcp.py")],
-        "env": {
-            "DB_HOST": "127.0.0.1",
-            "DB_NAME": "learnsql",
-            "DB_USER": "lernuser",
-            "DB_PASSWORD": "lernuser",
-            "LEARN_SQL_HOME": str(home),
-            "WORKSHOP_DIR": str(home / "workshop"),
-        },
+        "env": env,
     }
 
 
@@ -100,10 +118,38 @@ def claude_is_installed() -> bool:
         for cand in (Path(local) / "Programs" / "Claude", Path(local) / "AnthropicClaude"):
             if cand.exists():
                 return True
+    home = user_home()
+    if (home / ".claude").is_dir() or (home / ".claude.json").is_file():
+        return True
+    cfg_dir = (os.environ.get("CLAUDE_CONFIG_DIR") or "").strip()
+    if cfg_dir and Path(cfg_dir).is_dir():
+        return True
     return False
 
 
-def claude_config_paths(*, include_standard: bool = True) -> list[Path]:
+def _unique_paths(paths: list[Path]) -> list[Path]:
+    seen = set()
+    unique = []
+    for path in paths:
+        key = str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(path)
+    return unique
+
+
+def claude_code_config_paths() -> list[Path]:
+    """User-scope Claude Code: ~/.claude.json (or $CLAUDE_CONFIG_DIR/.claude.json)."""
+    paths: list[Path] = []
+    cfg_dir = (os.environ.get("CLAUDE_CONFIG_DIR") or "").strip()
+    if cfg_dir:
+        paths.append(Path(cfg_dir) / ".claude.json")
+    paths.append(user_home() / ".claude.json")
+    return _unique_paths(paths)
+
+
+def claude_desktop_config_paths(*, include_standard: bool = True) -> list[Path]:
     paths: list[Path] = []
     appdata = os.environ.get("APPDATA") or ""
     local = os.environ.get("LOCALAPPDATA") or ""
@@ -116,25 +162,32 @@ def claude_config_paths(*, include_standard: bool = True) -> list[Path]:
                 paths.append(
                     pkg / "LocalCache" / "Roaming" / "Claude" / "claude_desktop_config.json"
                 )
-    # unique, keep order
-    seen = set()
-    unique = []
-    for path in paths:
-        key = str(path)
-        if key not in seen:
-            seen.add(key)
-            unique.append(path)
-    return unique
+    return _unique_paths(paths)
 
 
-def _read_config(path: Path) -> dict:
+def claude_config_paths(*, include_standard: bool = True) -> list[Path]:
+    return _unique_paths(
+        claude_desktop_config_paths(include_standard=include_standard)
+        + claude_code_config_paths()
+    )
+
+
+def client_label(path: Path) -> str:
+    name = path.name.lower()
+    if name == ".claude.json":
+        return "Claude Code"
+    return "Claude Desktop"
+
+
+def _read_config(path: Path) -> dict | None:
+    """Return config dict, empty dict if missing, None if the file is invalid."""
     if not path.is_file():
         return {}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return {}
-    return data if isinstance(data, dict) else {}
+        return None
+    return data if isinstance(data, dict) else None
 
 
 def write_status(home: Path, status: dict) -> Path:
@@ -168,16 +221,25 @@ def install(home: Path) -> dict:
     entry = learnsql_server_entry(home)
     written = []
     backups = []
+    skipped = []
+    clients = []
     for path in claude_config_paths(include_standard=True):
-        merged = merge_mcp_config(_read_config(path), SERVER_NAME, entry)
+        existing = _read_config(path)
+        if existing is None:
+            skipped.append(str(path))
+            continue
+        merged = merge_mcp_config(existing, SERVER_NAME, entry)
         backup = write_json_with_backup(path, merged)
         written.append(str(path))
+        clients.append(client_label(path))
         if backup:
             backups.append(str(backup))
     status = {
         "installed": bool(written),
         "detected": claude_is_installed(),
         "targets": written,
+        "clients": list(dict.fromkeys(clients)),
+        "skipped": skipped,
         "backups": backups,
         "home": str(home),
     }
@@ -187,10 +249,14 @@ def install(home: Path) -> dict:
 
 def uninstall(home: Path) -> dict:
     removed = []
+    skipped = []
     for path in claude_config_paths(include_standard=True):
         if not path.is_file():
             continue
         data = _read_config(path)
+        if data is None:
+            skipped.append(str(path))
+            continue
         servers = data.get("mcpServers")
         if not isinstance(servers, dict) or SERVER_NAME not in servers:
             continue
@@ -202,6 +268,7 @@ def uninstall(home: Path) -> dict:
     status = {
         "installed": False,
         "removed": removed,
+        "skipped": skipped,
         "home": str(home.resolve()),
     }
     write_status(home, status)
@@ -209,7 +276,7 @@ def uninstall(home: Path) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="LearnSQL MCP in Claude Desktop eintragen.")
+    parser = argparse.ArgumentParser(description="LearnSQL MCP in Claude Desktop und Claude Code eintragen.")
     parser.add_argument("action", choices=("install", "uninstall", "status"))
     parser.add_argument("--home", default="", help="Installationsverzeichnis von plx.learnSQL")
     args = parser.parse_args(argv)
