@@ -356,35 +356,77 @@ def handle(msg: dict):
     return {"jsonrpc": "2.0", "id": mid, "error": {"code": -32601, "message": method or "no method"}}
 
 
+def _read_message(stdin=None):
+    """Read one JSON-RPC message.
+
+    Claude Desktop / Code send newline-delimited JSON (MCP stdio spec).
+    Older LSP-style clients send Content-Length headers. A JSON line
+    contains colons, so treating every colon as a header deadlocks
+    initialize and Claude reports "Request timed out".
+    """
+    stream = stdin if stdin is not None else sys.stdin
+    line = stream.readline()
+    if line == "":
+        return None, None
+    if line.lower().startswith("content-length:"):
+        headers = {"content-length": line.split(":", 1)[1].strip()}
+        while True:
+            rest = stream.readline()
+            if rest == "":
+                return None, None
+            if rest in ("\r\n", "\n"):
+                break
+            if ":" in rest:
+                key, value = rest.split(":", 1)
+                headers[key.strip().lower()] = value.strip()
+        length = int(headers.get("content-length") or "0")
+        if length <= 0:
+            return None, None
+        body = stream.read(length)
+        return json.loads(body), "lsp"
+    stripped = line.strip()
+    if not stripped:
+        return _read_message(stream)
+    return json.loads(stripped), "ndjson"
+
+
+def _write_message(msg: dict, style: str = "ndjson", stdout=None):
+    raw = json.dumps(msg, ensure_ascii=False)
+    out = stdout if stdout is not None else sys.stdout
+    if style == "lsp":
+        data = raw.encode("utf-8")
+        header = f"Content-Length: {len(data)}\r\n\r\n".encode("ascii")
+        buffer = getattr(out, "buffer", None)
+        if buffer is not None:
+            buffer.write(header + data)
+            buffer.flush()
+        else:
+            out.write(header.decode("ascii") + raw)
+            out.flush()
+        return
+    out.write(raw + "\n")
+    out.flush()
+
+
 def _read_stdio():
-    headers = {}
-    while True:
-        line = sys.stdin.readline()
-        if line == "":
-            return None
-        if line in ("\r\n", "\n"):
-            break
-        if ":" in line:
-            key, value = line.split(":", 1)
-            headers[key.strip().lower()] = value.strip()
-    length = int(headers.get("content-length") or "0")
-    if length <= 0:
-        return None
-    body = sys.stdin.read(length)
-    return json.loads(body)
+    msg, _style = _read_message()
+    return msg
 
 
 def _write_stdio(msg: dict):
-    raw = json.dumps(msg, ensure_ascii=False).encode("utf-8")
-    header = f"Content-Length: {len(raw)}\r\n\r\n".encode("ascii")
-    sys.stdout.buffer.write(header + raw)
-    sys.stdout.buffer.flush()
+    _write_message(msg, "ndjson")
 
 
 def main():
+    if hasattr(sys.stdin, "reconfigure"):
+        try:
+            sys.stdin.reconfigure(encoding="utf-8")
+            sys.stdout.reconfigure(encoding="utf-8")
+        except Exception:  # noqa: BLE001
+            pass
     while True:
         try:
-            msg = _read_stdio()
+            msg, style = _read_message()
         except Exception:  # noqa: BLE001
             return
         if msg is None:
@@ -392,7 +434,7 @@ def main():
         reply = handle(msg)
         if reply is None:
             continue
-        _write_stdio(reply)
+        _write_message(reply, style or "ndjson")
 
 
 if __name__ == "__main__":

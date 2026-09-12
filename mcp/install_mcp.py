@@ -71,6 +71,8 @@ def learnsql_server_entry(home: Path) -> dict:
         "DB_PASSWORD": "lernuser",
         "LEARN_SQL_HOME": str(home),
         "WORKSHOP_DIR": str(home / "workshop"),
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONIOENCODING": "utf-8",
     }
     runtime_path = home / "runtime.json"
     if runtime_path.is_file():
@@ -83,7 +85,7 @@ def learnsql_server_entry(home: Path) -> dict:
             env["DB_PORT"] = str(port)
     return {
         "command": command,
-        "args": [str(home / "mcp" / "learnsql_mcp.py")],
+        "args": ["-u", str(home / "mcp" / "learnsql_mcp.py")],
         "env": env,
     }
 

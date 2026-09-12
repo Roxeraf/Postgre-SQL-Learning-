@@ -471,6 +471,60 @@ class WorkshopAndMcpTests(unittest.TestCase):
         self.assertEqual(payload["id"], "ws-mcp-draft")
         self.assertTrue(payload["steps"])
 
+    def test_mcp_stdio_reads_ndjson_not_as_headers(self):
+        import io
+
+        sys.path.insert(0, str(REPO / "mcp"))
+        import learnsql_mcp as mcp
+
+        incoming = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}\n'
+        msg, style = mcp._read_message(io.StringIO(incoming))
+        self.assertEqual(style, "ndjson")
+        self.assertEqual(msg["method"], "initialize")
+        reply = mcp.handle(msg)
+        out = io.StringIO()
+        mcp._write_message(reply, style, stdout=out)
+        line = out.getvalue()
+        self.assertTrue(line.startswith("{"))
+        self.assertNotIn("Content-Length", line)
+        self.assertEqual(json.loads(line)["id"], 1)
+
+        body = '{"jsonrpc":"2.0","id":2,"method":"ping"}'
+        framed = f"Content-Length: {len(body.encode('utf-8'))}\r\n\r\n{body}"
+        msg, style = mcp._read_message(io.StringIO(framed))
+        self.assertEqual(style, "lsp")
+        self.assertEqual(msg["method"], "ping")
+
+    def test_mcp_stdio_initialize_roundtrip_subprocess(self):
+        import subprocess
+
+        script = REPO / "mcp" / "learnsql_mcp.py"
+        payload = json.dumps({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "test", "version": "1"},
+            },
+        }) + "\n"
+        proc = subprocess.run(
+            [sys.executable, "-u", str(script)],
+            input=payload,
+            capture_output=True,
+            text=True,
+            timeout=15,
+            env={**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"},
+            cwd=str(REPO),
+        )
+        self.assertEqual(proc.returncode, 0, msg=proc.stderr)
+        first = proc.stdout.strip().splitlines()[0]
+        self.assertNotIn("Content-Length", first)
+        data = json.loads(first)
+        self.assertEqual(data["id"], 1)
+        self.assertEqual(data["result"]["serverInfo"]["name"], "learnsql")
+
     def test_sitecustomize_adds_app_dir(self):
         import importlib.util
 
@@ -566,6 +620,8 @@ class WorkshopAndMcpTests(unittest.TestCase):
                 self.assertTrue(str(applied["workshop"]).endswith("workshop"))
             entry_with_port = install_mcp.learnsql_server_entry(home)
             self.assertEqual(entry_with_port["env"]["DB_PORT"], "15432")
+            self.assertEqual(entry_with_port["args"][0], "-u")
+            self.assertEqual(entry_with_port["env"]["PYTHONUNBUFFERED"], "1")
 
             with patch.dict("os.environ", env, clear=False):
                 gone = install_mcp.uninstall(home)
