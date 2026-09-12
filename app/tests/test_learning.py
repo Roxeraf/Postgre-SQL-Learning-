@@ -451,8 +451,39 @@ class WorkshopAndMcpTests(unittest.TestCase):
 
         listed = mcp.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
         names = {t["name"] for t in listed["result"]["tools"]}
-        for needed in ("schema", "run_sql", "search_wissen", "draft_exercise", "save_practice"):
+        for needed in (
+            "schema", "run_sql", "search_wissen", "draft_exercise",
+            "save_practice", "get_lesson", "step_schema",
+        ):
             self.assertIn(needed, names)
+
+        init = mcp.handle({"jsonrpc": "2.0", "id": 10, "method": "initialize"})
+        instructions = init["result"]["instructions"]
+        self.assertIn("anschauen", instructions)
+        self.assertIn("Kurzcheck", instructions)
+        self.assertIn("step_schema", instructions)
+
+        schema = mcp.handle({
+            "jsonrpc": "2.0",
+            "id": 11,
+            "method": "tools/call",
+            "params": {"name": "step_schema", "arguments": {}},
+        })
+        schema_payload = json.loads(schema["result"]["content"][0]["text"])
+        self.assertIn("anschauen", schema_payload["ablauf"])
+        self.assertIn("steps", schema_payload["geruest"])
+        self.assertGreaterEqual(len(schema_payload["geruest"]["steps"]), 3)
+
+        lesson = mcp.handle({
+            "jsonrpc": "2.0",
+            "id": 12,
+            "method": "tools/call",
+            "params": {"name": "get_lesson", "arguments": {"id": "ch8"}},
+        })
+        ch8 = json.loads(lesson["result"]["content"][0]["text"])
+        self.assertEqual(ch8["id"], "ch8")
+        self.assertTrue(ch8["steps"])
+
         draft = mcp.handle({
             "jsonrpc": "2.0",
             "id": 2,
@@ -469,7 +500,14 @@ class WorkshopAndMcpTests(unittest.TestCase):
         })
         payload = json.loads(draft["result"]["content"][0]["text"])
         self.assertEqual(payload["id"], "ws-mcp-draft")
-        self.assertTrue(payload["steps"])
+        types = [step["type"] for step in payload["steps"]]
+        self.assertGreaterEqual(len(types), 3)
+        self.assertIn("look", types)
+        self.assertIn("write", types)
+        quiz_blob = json.dumps(payload["quiz"], ensure_ascii=False)
+        self.assertNotIn("save_practice", quiz_blob)
+        self.assertNotIn("PATH_IDS", quiz_blob)
+        self.assertGreaterEqual(len(payload["quiz"]), 4)
 
     def test_mcp_stdio_reads_ndjson_not_as_headers(self):
         import io
@@ -677,18 +715,54 @@ class WorkshopAndMcpTests(unittest.TestCase):
         self.assertIn("Claude Desktop".encode("utf-8"), shop.data)
         self.assertIn("Claude Code".encode("utf-8"), shop.data)
         self.assertNotIn("Cursor".encode("utf-8"), shop.data)
+        shop_html = shop.data.decode("utf-8")
+        self.assertLess(shop_html.find("Noch keine Übungen"), shop_html.find("Einrichten"))
+        self.assertIn('<details class="card mcp-help mcp-setup" open>', shop_html)
         with tempfile.TemporaryDirectory() as tmp:
             Path(tmp, "mcp-status.json").write_text(
                 json.dumps({"installed": True, "targets": ["x"]}), encoding="utf-8"
             )
             with patch.dict("os.environ", {"LEARN_SQL_HOME": tmp}, clear=False):
                 flagged = client.get("/werkstatt")
-        self.assertIn("ist in Claude eingetragen".encode("utf-8"), flagged.data)
+        flagged_html = flagged.data.decode("utf-8")
+        self.assertIn("ist in Claude eingetragen", flagged_html)
+        self.assertIn('<details class="card mcp-help mcp-setup">', flagged_html)
+        self.assertNotIn('<details class="card mcp-help mcp-setup" open>', flagged_html)
         lesson = client.get("/learn/ch-agg")
         self.assertEqual(lesson.status_code, 200)
         self.assertIn("Summen".encode("utf-8"), lesson.data)
         missing = client.get("/wissen/gibt-es-nicht")
         self.assertEqual(missing.status_code, 404)
+
+    def test_werkstatt_player_uses_werkstatt_chrome(self):
+        import app as flask_app
+        from lessons import workshop as ws
+
+        client = flask_app.app.test_client()
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict("os.environ", {"WORKSHOP_DIR": tmp}):
+                ws.save_workshop_lesson({
+                    "id": "ws-player-label",
+                    "title": "Offene zählen",
+                    "goal": "Zähle offene Aufträge.",
+                    "steps": [{
+                        "type": "write",
+                        "title": "Zählen",
+                        "prompt": "Wie viele offene Aufträge?",
+                        "solution": "SELECT COUNT(*) FROM orders WHERE status = 'offen';",
+                        "hints": ["COUNT(*)", "WHERE status = 'offen'"],
+                    }],
+                })
+                listing = client.get("/werkstatt")
+                listing_html = listing.data.decode("utf-8")
+                self.assertLess(listing_html.find("Deine Übungen"), listing_html.find("Einrichten"))
+                page = client.get("/werkstatt/ws-player-label")
+        self.assertEqual(page.status_code, 200)
+        html = page.data.decode("utf-8")
+        self.assertIn("Werkstatt", html)
+        self.assertNotIn("Kapitel W", html)
+        self.assertIn("Zur Werkstatt", html)
+        self.assertIn('data-workshop="1"', html)
 
 
 if __name__ == "__main__":

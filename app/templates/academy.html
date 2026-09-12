@@ -1,13 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Kapitel {{ lesson.chapter }} — {{ lesson.title }}{% endblock %}
+{% block title %}{% if lesson.workshop %}Werkstatt — {{ lesson.title }}{% else %}Kapitel {{ lesson.chapter }} — {{ lesson.title }}{% endif %}{% endblock %}
 {% block content %}
 <article class="academy" id="academy-root"
   data-lesson-id="{{ lesson.id }}"
   data-next-id="{{ next_id or '' }}"
   data-prev-id="{{ prev_id or '' }}"
-  data-quiz-count="{{ lesson.quiz|length if lesson.quiz else 0 }}">
+  data-quiz-count="{{ lesson.quiz|length if lesson.quiz else 0 }}"
+  data-workshop="{{ '1' if lesson.workshop else '' }}">
   <header class="lesson-hero academy-hero">
-    <p class="eyebrow">Kapitel {{ lesson.chapter }}{% if lesson.challenge %} · Challenge{% endif %} · ca. {{ lesson.minutes }} Min</p>
+    <p class="eyebrow">{% if lesson.workshop %}Werkstatt{% else %}Kapitel {{ lesson.chapter }}{% endif %}{% if lesson.challenge %} · Challenge{% endif %} · ca. {{ lesson.minutes }} Min</p>
     <h1>{{ lesson.title }}</h1>
     <p class="lesson-path-copy">{% if lesson.quiz %}Verstehen → schreiben → Kurzcheck. {{ lesson.goal }}
     {% else %}{{ lesson.goal }}{% endif %}</p>
@@ -58,13 +59,19 @@
   {% endif %}
 
   <nav class="lesson-nav">
+    {% if lesson.workshop %}
+    {% if prev_id %}<a class="btn" href="/werkstatt/{{ prev_id }}">← Vorherige Übung</a>{% else %}<a class="btn" href="/werkstatt">Zur Werkstatt</a>{% endif %}
+    {% if next_id %}<a class="btn" href="/werkstatt/{{ next_id }}">Nächste Übung →</a>
+    {% else %}<a class="btn" href="/werkstatt">Zur Werkstatt</a>{% endif %}
+    {% else %}
     {% if prev_id %}<a class="btn" href="/learn/{{ prev_id }}">← Vorheriges Kapitel</a>{% else %}<a class="btn" href="/">Zur Übersicht</a>{% endif %}
     {% if next_id %}<a class="btn" href="/learn/{{ next_id }}">Nächstes Kapitel →</a>
     {% else %}<a class="btn" href="/">Zur Übersicht</a>{% endif %}
+    {% endif %}
   </nav>
 </article>
 {% endblock %}
 {% block page_scripts %}
 <script id="academy-data" type="application/json">{{ lesson | tojson }}</script>
-<script src="/static/js/academy.js?v=18"></script>
+<script src="/static/js/academy.js?v=19"></script>
 {% endblock %}

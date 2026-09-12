@@ -122,6 +122,12 @@ function initAcademy() {
 
   const lesson = JSON.parse(hold.textContent);
   const steps = lesson.steps || [];
+  const workshop = Boolean(root.dataset.workshop);
+
+  function lessonHref(id) {
+    if (!id) return workshop ? "/werkstatt" : "/";
+    return workshop ? `/werkstatt/${id}` : `/learn/${id}`;
+  }
   const store = ui().loadStore();
   store.onboarded = true;
   store.lastAcademy = lesson.id;
@@ -272,9 +278,9 @@ function initAcademy() {
     } else if (quizCount()) {
       advance = `<button class="btn btn-primary" type="button" data-act="goto-quiz">Weiter zum Kurzcheck</button>`;
     } else if (nextLesson) {
-      advance = `<a class="btn btn-primary" href="/learn/${nextLesson}">Nächstes Kapitel</a>`;
+      advance = `<a class="btn btn-primary" href="${lessonHref(nextLesson)}">${workshop ? "Nächste Übung" : "Nächstes Kapitel"}</a>`;
     } else {
-      advance = `<a class="btn btn-primary" href="/">Zur Übersicht</a>`;
+      advance = `<a class="btn btn-primary" href="${lessonHref()}">${workshop ? "Zur Werkstatt" : "Zur Übersicht"}</a>`;
     }
     const why = note
       || step().feedback_ok
@@ -703,7 +709,7 @@ function initAcademy() {
         switchAcademyTab("quiz");
       } else {
         markStepDone();
-        window.location.href = root.dataset.nextId ? `/learn/${root.dataset.nextId}` : "/";
+        window.location.href = lessonHref(root.dataset.nextId);
       }
       return;
     }

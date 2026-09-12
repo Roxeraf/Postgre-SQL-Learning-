@@ -19,6 +19,9 @@ Kopieren und anpassen:
 
 Danach in der App **Werkstatt** öffnen und die neue Karte anklicken.
 
+Claude liest beim Anlegen zuerst `step_schema` (Übungsdesign wie der Lernpfad), holt bei Bedarf
+ein Vorbild mit `get_lesson` (zum Beispiel `ch8`) und prüft die Lösung mit `run_sql`, bevor er speichert.
+
 ## Windows-Installer
 
 Setup und der erste App-Start tragen `learnsql` automatisch ein — in Claude Desktop

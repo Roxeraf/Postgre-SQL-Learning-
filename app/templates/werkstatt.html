@@ -1,15 +1,34 @@
 {% extends "base.html" %}
 {% block title %}Werkstatt — plx.learnSQL{% endblock %}
 {% block content %}
+{% set mcp_ready = mcp_status and mcp_status.installed %}
+{% set setup_open = not mcp_ready and not practices %}
 <header class="page-header">
   <p class="eyebrow">Neben dem Pfad</p>
   <h1>Werkstatt</h1>
   <p class="lede">Claude kennt das Lager und die Bibel und schreibt dir zusätzliche Übungen. Der offizielle Lernpfad bleibt unverändert — du löst sie hier wie ein normales Kapitel.</p>
 </header>
 
-<section class="card">
-  <h2>Was du damit machst</h2>
-  <p class="muted">Sag Claude einen dieser Sätze. Danach erscheint eine Karte auf dieser Seite.</p>
+{% if practices %}
+<section class="werkstatt-main">
+  <div class="section-head">
+    <h2>Deine Übungen</h2>
+    <p class="muted">{{ practices|length }} {% if practices|length == 1 %}Übung{% else %}Übungen{% endif %} · wie ein normales Kapitel lösen</p>
+  </div>
+  <div class="wissen-grid">
+    {% for p in practices %}
+    <a class="wissen-card" href="/werkstatt/{{ p.id }}">
+      <p class="wissen-kicker">Werkstatt · {{ p.steps|length }} Schritte</p>
+      <h3>{{ p.title }}</h3>
+      <p class="muted">{{ p.goal }}</p>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="card werkstatt-prompts">
+  <h2>Weitere anlegen</h2>
+  <p class="muted">Sag Claude einen dieser Sätze. Danach erscheint eine weitere Karte hier.</p>
   <ul class="prompt-list">
     <li><code>Bau mir drei Werkstatt-Übungen zu offenen Aufträgen mit GROUP BY.</code></li>
     <li><code>Eine LEFT-JOIN-Übung, bei der 4730 ohne Kunde sichtbar bleibt.</code></li>
@@ -17,41 +36,41 @@
   </ul>
   <p class="muted">plx.learnSQL (oder Docker) muss laufen, bevor Claude SQL prüft. Nachschlagen und Speichern geht auch ohne Datenbank.</p>
 </section>
-
-<section class="card mcp-help">
-  <h2>Einrichten</h2>
-  {% if mcp_status and mcp_status.installed %}
-  <p class="mcp-status"><strong>learnsql</strong> ist in Claude eingetragen{% if mcp_status.clients %} ({{ mcp_status.clients|join(", ") }}){% endif %}. <strong>Claude einmal komplett beenden</strong> (auch das Symbol unten rechts) und neu starten.</p>
-  {% endif %}
-
-  <h3>Claude Desktop</h3>
-  <ol class="mcp-steps">
-    <li>Windows-Setup und der erste App-Start tragen <code>learnsql</code> automatisch ein — unabhängig davon, ob Claude schon offen ist.</li>
-    <li>Falls der Server fehlt: Settings → Developer → Edit Config, Block <code>learnsql</code> einfügen, andere Server lassen.</li>
-    <li>Claude komplett beenden und neu starten.</li>
-  </ol>
-  <p class="muted">Wenn der Server nicht erscheint: dieselbe Datei zusätzlich nach <code>%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude\claude_desktop_config.json</code>.</p>
-
-  <h3>Claude Code</h3>
-  <p class="muted">Das Windows-Paket schreibt denselben Block nach <code>%USERPROFILE%\.claude.json</code> (Benutzer-weit). Claude Code danach neu starten.</p>
-  <pre class="sql-pre">claude mcp add --scope user --transport stdio learnsql -- python mcp/learnsql_mcp.py</pre>
-  <p class="muted">Im Windows-Paket die festen Pfade aus der MCP-Anleitung nutzen, nicht das System-<code>python</code>.</p>
-</section>
-
-{% if practices %}
-<section class="wissen-grid">
-  {% for p in practices %}
-  <a class="wissen-card" href="/werkstatt/{{ p.id }}">
-    <p class="wissen-kicker">Werkstatt · {{ p.steps|length }} Schritte</p>
-    <h3>{{ p.title }}</h3>
-    <p class="muted">{{ p.goal }}</p>
-  </a>
-  {% endfor %}
-</section>
 {% else %}
-<section class="card">
+<section class="card werkstatt-empty">
   <h2>Noch keine Übungen</h2>
-  <p class="muted">Sag Claude einen der Sätze oben. Die Dateien landen in der Werkstatt, nicht im offiziellen Pfad.</p>
+  <p class="muted">Sag Claude einen dieser Sätze. Danach erscheint eine Karte hier — nicht im offiziellen Pfad.</p>
+  <ul class="prompt-list">
+    <li><code>Bau mir drei Werkstatt-Übungen zu offenen Aufträgen mit GROUP BY.</code></li>
+    <li><code>Eine LEFT-JOIN-Übung, bei der 4730 ohne Kunde sichtbar bleibt.</code></li>
+    <li><code>Prüf die Musterlösung mit run_sql, dann speichern.</code></li>
+  </ul>
+  <p class="muted">plx.learnSQL (oder Docker) muss laufen, bevor Claude SQL prüft. Nachschlagen und Speichern geht auch ohne Datenbank.</p>
 </section>
 {% endif %}
+
+{% if mcp_ready %}
+<p class="mcp-status">
+  <strong>learnsql</strong> ist in Claude eingetragen{% if mcp_status.clients %} ({{ mcp_status.clients|join(", ") }}){% endif %}.
+  <strong>Claude einmal komplett beenden</strong> (auch das Symbol unten rechts) und neu starten.
+</p>
+{% endif %}
+
+<details class="card mcp-help mcp-setup"{% if setup_open %} open{% endif %}>
+  <summary>Einrichten</summary>
+  <div class="mcp-setup-body">
+    <h3>Claude Desktop</h3>
+    <ol class="mcp-steps">
+      <li>Windows-Setup und der erste App-Start tragen <code>learnsql</code> automatisch ein — unabhängig davon, ob Claude schon offen ist.</li>
+      <li>Falls der Server fehlt: Settings → Developer → Edit Config, Block <code>learnsql</code> einfügen, andere Server lassen.</li>
+      <li>Claude komplett beenden und neu starten.</li>
+    </ol>
+    <p class="muted">Wenn der Server nicht erscheint: dieselbe Datei zusätzlich nach <code>%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude\claude_desktop_config.json</code>.</p>
+
+    <h3>Claude Code</h3>
+    <p class="muted">Das Windows-Paket schreibt denselben Block nach <code>%USERPROFILE%\.claude.json</code> (Benutzer-weit). Claude Code danach neu starten.</p>
+    <pre class="sql-pre">claude mcp add --scope user --transport stdio learnsql -- python mcp/learnsql_mcp.py</pre>
+    <p class="muted">Im Windows-Paket die festen Pfade aus der MCP-Anleitung nutzen, nicht das System-<code>python</code>.</p>
+  </div>
+</details>
 {% endblock %}
