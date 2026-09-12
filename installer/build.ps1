@@ -121,7 +121,7 @@ Get-ChildItem (Join-Path $stagingApp "lessons") -Recurse -Directory -Filter "__p
 
 $stagingMcp = Join-Path $StagingDir "mcp"
 New-Item -ItemType Directory -Force -Path $stagingMcp | Out-Null
-foreach ($name in @("learnsql_mcp.py", "install_mcp.py", "ANLEITUNG.md", "cursor.mcp.example.json")) {
+foreach ($name in @("learnsql_mcp.py", "install_mcp.py", "ANLEITUNG.md")) {
     Copy-Item (Join-Path $ProjectRoot "mcp\$name") $stagingMcp
 }
 

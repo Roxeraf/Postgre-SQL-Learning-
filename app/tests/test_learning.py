@@ -676,7 +676,7 @@ class WorkshopAndMcpTests(unittest.TestCase):
         self.assertIn("offenen Aufträgen".encode("utf-8"), shop.data)
         self.assertIn("Claude Desktop".encode("utf-8"), shop.data)
         self.assertIn("Claude Code".encode("utf-8"), shop.data)
-        self.assertIn("Cursor".encode("utf-8"), shop.data)
+        self.assertNotIn("Cursor".encode("utf-8"), shop.data)
         with tempfile.TemporaryDirectory() as tmp:
             Path(tmp, "mcp-status.json").write_text(
                 json.dumps({"installed": True, "targets": ["x"]}), encoding="utf-8"
