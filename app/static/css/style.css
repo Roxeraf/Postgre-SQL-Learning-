@@ -1209,7 +1209,29 @@ kbd { color: var(--text); font-size: 11px; }
 .mcp-help h3 { margin: 20px 0 8px; font-size: 17px; }
 .mcp-steps { margin: 0 0 12px 18px; color: var(--muted); }
 .mcp-steps li { margin-bottom: 6px; }
-.mcp-status { padding: 10px 12px; border-radius: 10px; background: var(--accent-dim); }
+.mcp-status { padding: 10px 12px; border-radius: 10px; background: var(--accent-dim); margin: 0 0 16px; }
+details.mcp-setup > summary {
+  cursor: pointer;
+  font-weight: 650;
+  font-size: 20px;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+details.mcp-setup > summary::-webkit-details-marker { display: none; }
+details.mcp-setup > summary::after {
+  content: "Anzeigen";
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+details.mcp-setup[open] > summary::after { content: "Verbergen"; }
+.mcp-setup-body { margin-top: 14px; }
+.werkstatt-main { margin-bottom: 28px; }
+.werkstatt-main .wissen-grid { margin-top: 12px; }
+.werkstatt-prompts { margin-bottom: 18px; }
 .glossary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));

@@ -18,9 +18,9 @@ from install_mcp import apply_runtime_env  # noqa: E402
 apply_runtime_env()
 os.environ.setdefault("DB_HOST", os.environ.get("DB_HOST", "127.0.0.1"))
 
-from lessons.academy_data import ACADEMY  # noqa: E402
+from lessons.academy_data import ACADEMY, lesson_by_id  # noqa: E402
 from lessons.knowledge import ARTICLES, article_by_slug, knowledge_cards  # noqa: E402
-from lessons.workshop import save_workshop_lesson, workshop_lessons  # noqa: E402
+from lessons.workshop import save_workshop_lesson, workshop_by_id, workshop_lessons  # noqa: E402
 
 PROTOCOL = "2024-11-05"
 
@@ -28,6 +28,18 @@ STEP_TYPES = [
     "look", "inspect", "explain", "demo", "predict", "predict-cols",
     "build", "fill", "write", "apply", "challenge", "mcq",
 ]
+
+INSTRUCTIONS = (
+    "Werkstatt-Übungen folgen dem gleichen Schema wie der Lernpfad. "
+    "Den Inhalt denkst du dir aus — die Form bleibt.\n"
+    "Ablauf: anschauen → verstehen/vorhersagen → selbst schreiben → Kurzcheck.\n"
+    "Jede Übung braucht: id (ws-…), title, goal, minutes, concepts, model, "
+    "steps (mindestens 3, nicht nur look) und quiz (mindestens 4 Fachfragen zum SQL-Thema).\n"
+    "Vor save_practice: step_schema lesen, bei Bedarf get_lesson als Vorbild "
+    "(zum Beispiel ch8 oder challenge-2), die Musterlösung mit run_sql prüfen.\n"
+    "Hints helfen, sind aber nicht die volle Lösung. Quiz fragt das SQL-Thema, nicht das MCP. "
+    "Offizielle PATH_IDS nicht überschreiben."
+)
 
 
 def _ok_text(payload) -> dict:
@@ -126,13 +138,120 @@ def tool_list_lessons(_args):
 
 def tool_step_schema(_args):
     return _ok_text({
+        "ablauf": "anschauen → verstehen/vorhersagen → selbst schreiben → Kurzcheck",
+        "rule": (
+            "Inhalt selbst ausdenken, Form wie der Lernpfad. "
+            "Roh-Entwurf von draft_exercise nicht unverändert speichern."
+        ),
+        "lesson_fields": {
+            "id": "ws-… (Buchstaben, Zahlen, Bindestrich)",
+            "title": "Kurzer Titel wie ein Kapitel",
+            "goal": "Ein Satz: was die Person danach kann",
+            "minutes": 8,
+            "concepts": ["SELECT", "WHERE", "GROUP BY", "JOIN"],
+            "model": ["SELECT", "FROM", "WHERE"],
+            "steps": "mindestens 3, nicht nur look",
+            "quiz": "mindestens 4 Fachfragen zum SQL-Thema",
+        },
+        "sequence": [
+            {"phase": "anschauen", "types": ["look", "inspect"], "why": "Daten und Frage zeigen, bevor jemand SQL schreibt."},
+            {"phase": "verstehen", "types": ["explain", "demo", "predict", "predict-cols"], "why": "SQL vorhersagen oder erklären, nicht nur abtippen."},
+            {"phase": "schreiben", "types": ["build", "fill", "write", "apply", "challenge"], "why": "Selbst formulieren, dann übertragen."},
+            {"phase": "kurzcheck", "types": ["mcq"], "why": "Quiz-Tab: vier Fachfragen, kein MCP."},
+        ],
         "types": STEP_TYPES,
-        "write_fields": ["title", "prompt", "placeholder", "solution", "hints", "concepts", "strict_columns"],
-        "predict_fields": ["title", "text", "sql", "table", "expected_ids", "feedback_ok", "feedback_bad"],
+        "fields": {
+            "look": ["title", "text", "table", "tables", "note", "cta", "concepts"],
+            "inspect": ["title", "text", "table", "interaction", "answer", "feedback_ok", "feedback_bad", "concepts"],
+            "explain": ["title", "text", "sql", "plain", "parts", "before_table", "after_table", "concepts"],
+            "demo": ["title", "text", "sql", "table", "visualize", "keep_columns", "concepts"],
+            "predict": ["title", "text", "sql", "table", "expected_ids", "id_field", "feedback_ok", "feedback_bad", "concepts"],
+            "predict-cols": ["title", "text", "sql", "table", "expected_columns", "feedback_ok", "feedback_bad", "concepts"],
+            "build": ["title", "prompt", "pieces", "distractors", "solution", "hints", "concepts"],
+            "fill": ["title", "template", "solution", "hints", "concepts"],
+            "write": ["title", "prompt", "placeholder", "solution", "hints", "concepts", "strict_columns", "ordered", "require", "forbid", "allow_write", "verify"],
+            "apply": ["title", "prompt", "placeholder", "solution", "hints", "concepts", "strict_columns", "ordered"],
+            "challenge": ["title", "prompt", "placeholder", "solution", "hints", "concepts", "strict_columns", "ordered"],
+            "mcq": ["title", "question", "options"],
+        },
+        "table": {
+            "name": "orders",
+            "label": "Aufträge",
+            "columns": ["id", "status"],
+            "rows": [{"id": 1, "status": "offen"}],
+        },
         "quiz_item": {"q": "Frage", "options": ["A", "B", "C", "D"], "correct": 1, "explain": "Warum"},
+        "hints": "Mindestens zwei. Der letzte Hint ist nicht die volle Lösung.",
+        "geruest": _draft_payload({
+            "id": "ws-beispiel",
+            "title": "Offene zählen",
+            "prompt": "Wie viele offene Aufträge gibt es? Nur die Anzahl.",
+            "solution": "SELECT COUNT(*) FROM orders WHERE status = 'offen';",
+            "concepts": ["GROUP BY"],
+        }),
         "id_prefix": "ws-",
-        "note": "Offizielle PATH_IDS nicht überschreiben. Speichern nur über save_practice.",
+        "note": "Offizielle PATH_IDS nicht überschreiben. Speichern nur über save_practice. Vorbild: get_lesson mit ch8 oder challenge-2.",
     })
+
+
+def tool_get_lesson(args):
+    lid = str(args.get("id") or "").strip()
+    if not lid:
+        return _err("id fehlt. Offizielle IDs über list_lessons, zum Beispiel ch8 oder challenge-2.")
+    lesson = lesson_by_id(lid) or workshop_by_id(lid)
+    if not lesson:
+        return _err(f"Übung {lid} nicht gefunden.")
+    return _ok_text(lesson)
+
+
+def _topic_quiz(concepts, prompt):
+    topic = (concepts[0] if concepts else "SELECT")
+    return [
+        {
+            "q": f"Was leistet {topic} in dieser Übung?",
+            "options": [
+                "Es sortiert nur die Ausgabe.",
+                f"Es hilft, die Frage zu beantworten: {prompt}",
+                "Es ersetzt FROM.",
+                "Es löscht Zeilen.",
+            ],
+            "correct": 1,
+            "explain": f"{topic} ist das Werkzeug für genau diese Lagerfrage.",
+        },
+        {
+            "q": "Was filtert WHERE?",
+            "options": [
+                "Die Spalten in der Ausgabe.",
+                "Die Zeilen, die übrig bleiben.",
+                "Die Sortierreihenfolge.",
+                "Den Namen der Tabelle.",
+            ],
+            "correct": 1,
+            "explain": "WHERE entscheidet, welche Zeilen bleiben. SELECT entscheidet, welche Spalten du siehst.",
+        },
+        {
+            "q": "Wann brauchst du GROUP BY?",
+            "options": [
+                "Immer, sobald ein WHERE steht.",
+                "Wenn du eine Zahl oder Summe pro Gruppe willst, nicht eine Zeile pro Auftrag.",
+                "Nur beim JOIN.",
+                "Statt ORDER BY.",
+            ],
+            "correct": 1,
+            "explain": "GROUP BY fasst gleichartige Zeilen zusammen, danach zählst oder summierst du.",
+        },
+        {
+            "q": "Woran merkst du, dass die Abfrage stimmt?",
+            "options": [
+                "Der Text ist identisch mit der Musterlösung.",
+                "Das Ergebnis passt zur gestellten Frage.",
+                "Die Abfrage enthält SELECT *.",
+                "Es gibt kein WHERE.",
+            ],
+            "correct": 1,
+            "explain": "Die App vergleicht das Ergebnis, nicht den Wortlaut.",
+        },
+    ]
 
 
 def _draft_payload(args) -> dict:
@@ -140,23 +259,34 @@ def _draft_payload(args) -> dict:
     title = str(args.get("title") or "Werkstatt-Übung")
     prompt = str(args.get("prompt") or "Schreibe die Abfrage.")
     solution = str(args.get("solution") or "SELECT * FROM orders;")
+    look = str(args.get("look") or prompt)
+    concepts = args.get("concepts") or ["SELECT"]
     hints = args.get("hints") or [
         "Welche Tabelle, welche Spalten, welcher Filter?",
         "Vergleich das Ergebnis mit der Frage, nicht mit einem auswendig gelernten Satz.",
     ]
+    apply_prompt = args.get("apply") or f"Gleiche Idee, leicht versetzt: {prompt}"
     return {
         "id": lid,
         "title": title,
-        "goal": args.get("goal") or "Eine zusätzliche Übung neben dem Pfad.",
+        "goal": args.get("goal") or "Eine zusätzliche Übung neben dem Pfad — Inhalt ersetzen, Form behalten.",
         "minutes": int(args.get("minutes") or 8),
-        "concepts": args.get("concepts") or ["SELECT"],
+        "concepts": concepts,
         "model": args.get("model") or ["SELECT", "FROM", "WHERE"],
         "steps": [
             {
                 "type": "look",
                 "title": "Die Frage",
-                "text": args.get("look") or prompt,
-                "cta": "Selbst schreiben",
+                "text": look,
+                "cta": "Vorhersagen",
+            },
+            {
+                "type": "predict",
+                "title": "Was bleibt übrig?",
+                "text": "Markiere im Kopf, welche Zeilen die Abfrage behält — bevor du selbst schreibst.",
+                "sql": solution,
+                "feedback_ok": "Die passenden Zeilen bleiben.",
+                "feedback_bad": "Schau nochmal auf Filter und Tabelle, nicht auf den ganzen Bestand.",
             },
             {
                 "type": args.get("step_type") or "write",
@@ -165,15 +295,19 @@ def _draft_payload(args) -> dict:
                 "placeholder": "SELECT …",
                 "solution": solution,
                 "hints": hints,
-                "concepts": args.get("concepts") or ["SELECT"],
+                "concepts": concepts,
+            },
+            {
+                "type": "apply",
+                "title": "Noch einmal, leicht anders",
+                "prompt": apply_prompt,
+                "placeholder": "SELECT …",
+                "solution": solution,
+                "hints": hints,
+                "concepts": concepts,
             },
         ],
-        "quiz": args.get("quiz") or [
-            {"q": "Woran erkennst du, dass die Übung sitzt?", "options": ["Musterstring", "Das Ergebnis passt zur Frage", "SELECT *", "Kein WHERE"], "correct": 1, "explain": "Die App prüft das Ergebnis."},
-            {"q": "Darf diese Übung ein offizielles Kapitel ersetzen?", "options": ["Ja", "Nein, Werkstatt bleibt daneben", "Nur samstags", "Nur ohne JOIN"], "correct": 1, "explain": "Der Pfad bleibt kuratiert."},
-            {"q": "Wohin speichert save_practice?", "options": ["PATH_IDS", "data/workshop", "Postgres-Systemkatalog", "localStorage"], "correct": 1, "explain": "JSON-Dateien in der Werkstatt."},
-            {"q": "Welche Tabellen nutzt das Lager?", "options": ["nur pg_stat", "orders, clients, stock, order_items", "nur json", "information_schema allein"], "correct": 1, "explain": "Schema learn."},
-        ],
+        "quiz": args.get("quiz") or _topic_quiz(concepts, prompt),
     }
 
 
@@ -259,12 +393,21 @@ TOOLS = {
         "fn": tool_list_lessons,
     },
     "step_schema": {
-        "description": "JSON-Form der Übungs-Schritte in der App.",
+        "description": "Übungsdesign und JSON-Form der Schritte — vor dem Anlegen lesen.",
         "inputSchema": {"type": "object", "properties": {}},
         "fn": tool_step_schema,
     },
+    "get_lesson": {
+        "description": "Eine offizielle oder Werkstatt-Übung als Vorbild laden (z.B. ch8).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"id": {"type": "string", "description": "ch8, challenge-2 oder eine ws-…-id"}},
+            "required": ["id"],
+        },
+        "fn": tool_get_lesson,
+    },
     "draft_exercise": {
-        "description": "Eine Werkstatt-Übung im App-JSON entwerfen (noch nicht speichern).",
+        "description": "Entwurf im Übungsdesign (anschauen → verstehen → schreiben → Kurzcheck). Inhalt selbst wählen, Form aus step_schema. Nicht unverändert speichern.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -281,7 +424,7 @@ TOOLS = {
         "fn": tool_draft_exercise,
     },
     "save_practice": {
-        "description": "Übung nach data/workshop schreiben, nicht in den offiziellen Pfad.",
+        "description": "Übung nach data/workshop schreiben. lesson folgt dem Übungsdesign aus step_schema. Vorher run_sql auf die Lösung. Nicht in den offiziellen Pfad.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -321,6 +464,7 @@ def handle(msg: dict):
                 "protocolVersion": PROTOCOL,
                 "capabilities": {"tools": {}},
                 "serverInfo": {"name": "learnsql", "version": "1.0.0"},
+                "instructions": INSTRUCTIONS,
             },
         }
     if method == "notifications/initialized":
