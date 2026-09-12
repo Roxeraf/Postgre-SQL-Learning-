@@ -41,7 +41,7 @@ Windows (Installer, feste Pfade — `{app}` durch dein Installationsverzeichnis 
   "mcpServers": {
     "learnsql": {
       "command": "C:/Users/DU/AppData/Local/plx.learnSQL/python/python.exe",
-      "args": ["C:/Users/DU/AppData/Local/plx.learnSQL/mcp/learnsql_mcp.py"],
+      "args": ["-u", "C:/Users/DU/AppData/Local/plx.learnSQL/mcp/learnsql_mcp.py"],
       "env": {
         "DB_HOST": "127.0.0.1",
         "DB_NAME": "learnsql",
