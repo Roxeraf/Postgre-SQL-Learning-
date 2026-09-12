@@ -14,6 +14,8 @@ Trainingsdaten setzt du bei Bedarf über **Datenbank zurücksetzen** zurück.
 
 ## Windows-Installer (für Kollegen)
 
+Version **1.1.0** — Lernpfad inkl. Zusatzkapitel, Bibel, Karten, Werkstatt, Claude-MCP.
+
 Kein Docker, kein Python, keine Admin-Rechte. Setup bauen:
 
 ```powershell

@@ -1,6 +1,9 @@
 plx.learnSQL — Installation für Kollegen
 ========================================
 
+Stand 1.1.0: Lernpfad inkl. Zusatzkapitel, PostgreSQL-Bibel, Karteikarten,
+Werkstatt und Claude-MCP.
+
 Das ist die lokale Lern-App für PostgreSQL-Grundlagen.
 Du brauchst KEIN Docker und KEIN Python.
 
