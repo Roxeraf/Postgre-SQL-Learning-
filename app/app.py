@@ -1,3 +1,4 @@
+import json
 import os
 import re
 from collections import Counter
@@ -25,6 +26,25 @@ from sql_coach import (
 )
 
 app = Flask(__name__)
+
+
+def load_mcp_status():
+    homes = []
+    env_home = os.environ.get("LEARN_SQL_HOME")
+    if env_home:
+        homes.append(Path(env_home))
+    homes.append(Path(__file__).resolve().parent.parent)
+    for home in homes:
+        path = home / "mcp-status.json"
+        if not path.is_file():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(data, dict):
+            return data
+    return None
 
 TABLE_LABELS = {
     "orders": "Aufträge",
@@ -682,6 +702,7 @@ def werkstatt():
         "werkstatt.html",
         active_tool="werkstatt",
         practices=workshop_lessons(),
+        mcp_status=load_mcp_status(),
     )
 
 

@@ -31,6 +31,7 @@ Name: "german"; MessagesFile: "compiler:Languages\German.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checkedonce
+Name: "claudemcp"; Description: "MCP in Claude Desktop einrichten (Claude danach neu starten)"; GroupDescription: "Claude"; Flags: checkedonce; Check: ClaudeDetected
 
 [Files]
 Source: "staging\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -39,15 +40,40 @@ Source: "staging\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs creat
 Name: "{group}\{#MyAppName}"; Filename: "{app}\Start-FlowAppLearn.bat"; WorkingDir: "{app}"; IconFilename: "{app}\flowapp.ico"; Comment: "plx.learnSQL starten"
 Name: "{group}\{#MyAppName} beenden"; Filename: "{app}\Stop-FlowAppLearn.bat"; WorkingDir: "{app}"; Comment: "plx.learnSQL und Datenbank beenden"
 Name: "{group}\Kurzanleitung"; Filename: "{app}\KOLLEGE.txt"
+Name: "{group}\MCP für Claude"; Filename: "{app}\mcp\ANLEITUNG.md"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\Start-FlowAppLearn.bat"; WorkingDir: "{app}"; IconFilename: "{app}\flowapp.ico"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\Start-FlowAppLearn.bat"; Description: "{#MyAppName} jetzt starten"; Flags: nowait postinstall skipifsilent
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Configure-LearnSqlMcp.ps1"" -HomeDir ""{app}"""; WorkingDir: "{app}"; Description: "MCP in Claude Desktop eintragen"; StatusMsg: "MCP für Claude einrichten…"; Flags: runhidden waituntilterminated; Tasks: claudemcp
 
 [UninstallRun]
 Filename: "{app}\Stop-FlowAppLearn.bat"; Flags: runhidden waituntilterminated; RunOnceId: "StopFlowAppLearn"
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Remove-LearnSqlMcp.ps1"" -HomeDir ""{app}"""; Flags: runhidden waituntilterminated; RunOnceId: "RemoveLearnSqlMcp"
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\data"
 Type: filesandordirs; Name: "{app}\logs"
+Type: filesandordirs; Name: "{app}\workshop"
 Type: files; Name: "{app}\runtime.json"
+Type: files; Name: "{app}\mcp-status.json"
+
+[Code]
+function ClaudeDetected: Boolean;
+var
+  FindRec: TFindRec;
+begin
+  Result := DirExists(ExpandConstant('{userappdata}\Claude'));
+  if Result then
+    Exit;
+  if DirExists(ExpandConstant('{localappdata}\Programs\Claude')) then
+  begin
+    Result := True;
+    Exit;
+  end;
+  if FindFirst(ExpandConstant('{localappdata}\Packages\Claude_*'), FindRec) then
+  begin
+    Result := True;
+    FindClose(FindRec);
+  end;
+end;

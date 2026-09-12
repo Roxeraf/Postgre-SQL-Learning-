@@ -10,8 +10,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "app"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(APP))
 
+from install_mcp import apply_runtime_env  # noqa: E402
+
+apply_runtime_env()
 os.environ.setdefault("DB_HOST", os.environ.get("DB_HOST", "127.0.0.1"))
 
 from lessons.academy_data import ACADEMY  # noqa: E402

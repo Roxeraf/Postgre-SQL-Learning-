@@ -4,8 +4,41 @@
 <header class="page-header">
   <p class="eyebrow">Neben dem Pfad</p>
   <h1>Werkstatt</h1>
-  <p class="lede">Hier landen Übungen, die Claude Code über das MCP schreibt. Der offizielle Lernpfad bleibt unverändert.</p>
+  <p class="lede">Claude kennt das Lager und die Bibel und schreibt dir zusätzliche Übungen. Der offizielle Lernpfad bleibt unverändert — du löst sie hier wie ein normales Kapitel.</p>
 </header>
+
+<section class="card">
+  <h2>Was du damit machst</h2>
+  <p class="muted">Sag Claude einen dieser Sätze. Danach erscheint eine Karte auf dieser Seite.</p>
+  <ul class="prompt-list">
+    <li><code>Bau mir drei Werkstatt-Übungen zu offenen Aufträgen mit GROUP BY.</code></li>
+    <li><code>Eine LEFT-JOIN-Übung, bei der 4730 ohne Kunde sichtbar bleibt.</code></li>
+    <li><code>Prüf die Musterlösung mit run_sql, dann speichern.</code></li>
+  </ul>
+  <p class="muted">plx.learnSQL (oder Docker) muss laufen, bevor Claude SQL prüft. Nachschlagen und Speichern geht auch ohne Datenbank.</p>
+</section>
+
+<section class="card mcp-help">
+  <h2>Einrichten</h2>
+  {% if mcp_status and mcp_status.installed %}
+  <p class="mcp-status">Claude Desktop ist eingetragen. <strong>Claude einmal komplett beenden</strong> (auch das Symbol unten rechts) und neu starten.</p>
+  {% endif %}
+
+  <h3>Claude Desktop</h3>
+  <ol class="mcp-steps">
+    <li>Windows-Setup: Haken „MCP in Claude Desktop einrichten“, wenn Claude gefunden wurde.</li>
+    <li>Oder: Settings → Developer → Edit Config, Block <code>learnsql</code> einfügen, andere Server lassen.</li>
+    <li>Claude komplett beenden und neu starten.</li>
+  </ol>
+  <p class="muted">Wenn der Server nicht erscheint: dieselbe Datei zusätzlich nach <code>%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude\claude_desktop_config.json</code>.</p>
+
+  <h3>Claude Code</h3>
+  <pre class="sql-pre">claude mcp add --scope user --transport stdio learnsql -- python mcp/learnsql_mcp.py</pre>
+  <p class="muted">Oder denselben Block in <code>%USERPROFILE%\.claude.json</code>. Im Windows-Paket die festen Pfade aus der MCP-Anleitung nutzen.</p>
+
+  <h3>Cursor / Repo</h3>
+  <p class="muted">Vorlage <code>mcp/cursor.mcp.example.json</code>, Arbeitsverzeichnis = Projektordner.</p>
+</section>
 
 {% if practices %}
 <section class="wissen-grid">
@@ -20,16 +53,7 @@
 {% else %}
 <section class="card">
   <h2>Noch keine Übungen</h2>
-  <p class="muted">Hänge das MCP <code>mcp/learnsql_mcp.py</code> in Claude Code ein und lass dir Übungen bauen. Sie erscheinen als JSON unter <code>data/workshop/</code>.</p>
-  <pre class="sql-pre">{
-  "mcpServers": {
-    "learnsql": {
-      "command": "python",
-      "args": ["mcp/learnsql_mcp.py"],
-      "env": { "DB_HOST": "127.0.0.1" }
-    }
-  }
-}</pre>
+  <p class="muted">Sag Claude einen der Sätze oben. Die Dateien landen in der Werkstatt, nicht im offiziellen Pfad.</p>
 </section>
 {% endif %}
 {% endblock %}

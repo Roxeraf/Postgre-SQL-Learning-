@@ -14,6 +14,9 @@ def workshop_dir() -> Path:
     env = os.environ.get("WORKSHOP_DIR")
     if env:
         return Path(env)
+    home = os.environ.get("LEARN_SQL_HOME")
+    if home:
+        return Path(home) / "workshop"
     here = Path(__file__).resolve()
     repo = here.parents[2] / "data" / "workshop"
     local = here.parents[1] / "data" / "workshop"

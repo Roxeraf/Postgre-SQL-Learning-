@@ -17,7 +17,27 @@ SELECT, INSERT, UPDATE und DELETE machst du in der App (Kapitel und
 SQL-Playground). Wenn Beispieldaten durcheinandergeraten:
 in der Seitenleiste "Datenbank zurücksetzen".
 
+Werkstatt und Claude
+--------------------
+Claude kennt das Lager und die Bibel und kann dir zusätzliche Übungen
+bauen. Der offizielle Lernpfad bleibt unverändert. Die Übungen liegen
+in der App unter "Werkstatt".
+
+Beispiele, die du Claude sagst:
+- Bau mir drei Werkstatt-Übungen zu offenen Aufträgen mit GROUP BY.
+- Eine LEFT-JOIN-Übung, bei der 4730 ohne Kunde sichtbar bleibt.
+- Prüf die Musterlösung mit run_sql, dann speichern.
+
+Wenn das Setup Claude Desktop gefunden hat, ist das MCP schon
+eingetragen. Claude einmal komplett beenden und neu starten.
+Die App muss laufen, bevor Claude SQL prüft.
+
+Manuelle Schritte: Startmenü → "MCP für Claude" oder in der App
+die Seite Werkstatt.
+
 Beenden: Rechtsklick auf das Symbol in der Taskleiste
 (unten rechts, ggf. bei "^" ausgeblendete Symbole) → Beenden.
 
 Deinstallation: Windows-Einstellungen → Apps → plx.learnSQL.
+Der Eintrag "learnsql" in Claude wird mit entfernt, andere
+MCP-Server bleiben.
