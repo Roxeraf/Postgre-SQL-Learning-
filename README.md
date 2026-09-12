@@ -8,7 +8,7 @@ Ein Lernpfad in der App: von der ersten Tabelle bis zu JOIN, Gruppen, Änderunge
 - SQL-Playground gegen Schema `learn`
 - PostgreSQL-Bibel unter `/wissen` (eigene Artikel, nicht das alte Mini-Glossar)
 - Karteikarten mit Leitner (Nochmal / Schwer / Sitzt) in localStorage
-- Werkstatt für dynamische Übungen plus MCP für Claude Desktop, Claude Code und Cursor
+- Werkstatt für dynamische Übungen plus MCP für Claude Desktop und Claude Code
 
 Trainingsdaten setzt du bei Bedarf über **Datenbank zurücksetzen** zurück.
 
@@ -60,7 +60,7 @@ docker compose up --build
 ├── docker-compose.yml
 ├── db/init/01_schema_and_data.sql   # Schema learn
 ├── data/workshop/                   # Dynamische Übungen (MCP), nicht der offizielle Pfad
-├── mcp/learnsql_mcp.py              # MCP für Claude Code / Cursor
+├── mcp/learnsql_mcp.py              # MCP für Claude Desktop / Claude Code
 └── app/
     ├── app.py                       # Flask-Backend
     ├── sql_coach.py                 # Lernfeedback statt Roh-Postgres-Fehler
@@ -70,7 +70,7 @@ docker compose up --build
     └── templates/
 ```
 
-### MCP (Claude Desktop, Claude Code, Cursor)
+### MCP (Claude Desktop, Claude Code)
 
 Die App ruft kein LLM auf. Claude hängt als Client am MCP und legt **zusätzliche Übungen** in die Werkstatt — der offizielle Pfad bleibt unverändert.
 
@@ -80,7 +80,6 @@ Schritt-für-Schritt: [mcp/ANLEITUNG.md](mcp/ANLEITUNG.md)
 
 - Windows-Setup trägt Claude Desktop und Claude Code automatisch ein.
 - Claude Code: `claude mcp add --scope user --transport stdio learnsql -- python mcp/learnsql_mcp.py`
-- Cursor / Repo: [mcp/cursor.mcp.example.json](mcp/cursor.mcp.example.json)
 
 Docker hängt `data/workshop` nach `/data/workshop` (`WORKSHOP_DIR`). Die Windows-App nutzt `{app}\workshop` und liest den Datenbank-Port aus `runtime.json`.
 

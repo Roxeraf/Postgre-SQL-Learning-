@@ -72,12 +72,4 @@ Zusätzlich die `env`-Werte setzen (gleiche wie im JSON).
 
 Oder in `%USERPROFILE%\.claude.json` denselben `mcpServers.learnsql`-Block eintragen.
 
-## Manuell: Cursor / Repo
-
-Arbeitsverzeichnis = Projektordner. Vorlage: `mcp/cursor.mcp.example.json`.
-
-```bash
-python3 mcp/learnsql_mcp.py
-```
-
 Docker: App mit `docker compose up` starten. Übungen liegen in `data/workshop/`.
