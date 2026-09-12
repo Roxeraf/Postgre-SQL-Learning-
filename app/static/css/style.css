@@ -1196,6 +1196,20 @@ kbd { color: var(--text); font-size: 11px; }
 .wissen-pitfalls li { margin-bottom: 6px; }
 .wissen-links { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
 .wissen-article .eyebrow a { color: var(--accent); text-decoration: none; }
+.prompt-list { margin: 12px 0 16px; padding-left: 18px; }
+.prompt-list li { margin-bottom: 10px; }
+.prompt-list code {
+  display: block;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  white-space: pre-wrap;
+}
+.mcp-help h3 { margin: 20px 0 8px; font-size: 17px; }
+.mcp-steps { margin: 0 0 12px 18px; color: var(--muted); }
+.mcp-steps li { margin-bottom: 6px; }
+.mcp-status { padding: 10px 12px; border-radius: 10px; background: var(--accent-dim); }
 .glossary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));

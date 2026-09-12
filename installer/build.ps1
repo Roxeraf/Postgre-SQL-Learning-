@@ -113,10 +113,19 @@ Copy-Item (Join-Path $ProjectRoot "app\sql_coach.py") $stagingApp
 Copy-Item (Join-Path $ProjectRoot "app\requirements.txt") $stagingApp
 Copy-Item (Join-Path $ProjectRoot "app\templates") (Join-Path $stagingApp "templates") -Recurse
 Copy-Item (Join-Path $ProjectRoot "app\static") (Join-Path $stagingApp "static") -Recurse
-New-Item -ItemType Directory -Force -Path (Join-Path $stagingApp "lessons") | Out-Null
-Copy-Item (Join-Path $ProjectRoot "app\lessons\__init__.py") (Join-Path $stagingApp "lessons\")
-Copy-Item (Join-Path $ProjectRoot "app\lessons\academy_data.py") (Join-Path $stagingApp "lessons\")
-Copy-Item (Join-Path $ProjectRoot "app\lessons\academy_more.py") (Join-Path $stagingApp "lessons\")
+Copy-Item (Join-Path $ProjectRoot "app\lessons") (Join-Path $stagingApp "lessons") -Recurse
+Get-ChildItem (Join-Path $stagingApp "lessons") -Recurse -Directory -Filter "__pycache__" -ErrorAction SilentlyContinue |
+    Remove-Item -Recurse -Force
+
+$stagingMcp = Join-Path $StagingDir "mcp"
+New-Item -ItemType Directory -Force -Path $stagingMcp | Out-Null
+foreach ($name in @("learnsql_mcp.py", "install_mcp.py", "ANLEITUNG.md", "cursor.mcp.example.json")) {
+    Copy-Item (Join-Path $ProjectRoot "mcp\$name") $stagingMcp
+}
+
+$stagingWorkshop = Join-Path $StagingDir "workshop"
+New-Item -ItemType Directory -Force -Path $stagingWorkshop | Out-Null
+Set-Content -Path (Join-Path $stagingWorkshop ".gitkeep") -Value "" -Encoding ascii
 
 $stagingDb = Join-Path $StagingDir "db\init"
 New-Item -ItemType Directory -Force -Path $stagingDb | Out-Null
@@ -131,7 +140,9 @@ foreach ($name in @(
     "Stop-FlowAppLearn.bat",
     "Start-FlowAppLearn.vbs",
     "KOLLEGE.txt",
-    "init-db.py"
+    "init-db.py",
+    "Configure-LearnSqlMcp.ps1",
+    "Remove-LearnSqlMcp.ps1"
 )) {
     $src = Join-Path $runtimeDir $name
     $dst = Join-Path $StagingDir $name

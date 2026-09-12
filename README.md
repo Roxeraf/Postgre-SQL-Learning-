@@ -8,7 +8,7 @@ Ein Lernpfad in der App: von der ersten Tabelle bis zu JOIN, Gruppen, Änderunge
 - SQL-Playground gegen Schema `learn`
 - PostgreSQL-Bibel unter `/wissen` (eigene Artikel, nicht das alte Mini-Glossar)
 - Karteikarten mit Leitner (Nochmal / Schwer / Sitzt) in localStorage
-- Werkstatt für dynamische Übungen plus MCP für Claude Code
+- Werkstatt für dynamische Übungen plus MCP für Claude Desktop, Claude Code und Cursor
 
 Trainingsdaten setzt du bei Bedarf über **Datenbank zurücksetzen** zurück.
 
@@ -23,6 +23,8 @@ powershell -ExecutionPolicy Bypass -File .\installer\build.ps1
 Danach liegt `dist\plx.learnSQL-Setup.exe` bereit — diese Datei an den Kollegen schicken.
 Installation: Doppelklick, Assistent durchklicken, Desktop-Verknüpfung **plx.learnSQL** starten.
 Beim ersten Start wird die Lern-Datenbank einmalig eingerichtet, danach öffnet sich http://localhost:8080.
+Wenn Claude Desktop installiert ist, trägt das Setup das MCP ein — Claude danach einmal komplett neu starten.
+Kurzanleitung: `mcp/ANLEITUNG.md` oder in der App **Werkstatt**.
 
 SmartScreen kann bei einer unsignierten EXE warnen: „Weitere Informationen“ → „Trotzdem ausführen“.
 
@@ -68,17 +70,19 @@ docker compose up --build
     └── templates/
 ```
 
-### MCP (Claude Code / Cursor)
+### MCP (Claude Desktop, Claude Code, Cursor)
 
-Die App ruft kein LLM auf. Claude Code hängt als Client am MCP und legt Übungen in `data/workshop/` ab.
+Die App ruft kein LLM auf. Claude hängt als Client am MCP und legt **zusätzliche Übungen** in die Werkstatt — der offizielle Pfad bleibt unverändert.
 
-Beispiel-Config: `mcp/cursor.mcp.example.json`. Docker hängt `data/workshop` nach `/data/workshop` (`WORKSHOP_DIR`).
+Was du sagen kannst: „Bau mir drei Werkstatt-Übungen zu offenen Aufträgen mit GROUP BY.“ Danach `/werkstatt` öffnen.
 
-```bash
-python mcp/learnsql_mcp.py
-```
+Schritt-für-Schritt: [mcp/ANLEITUNG.md](mcp/ANLEITUNG.md)
 
-Werkzeuge: Schema, Beispieldaten, SELECT, Bibel-Suche, Artikel, Lesson-Schema, Übung entwerfen, in die Werkstatt speichern.
+- Windows-Setup trägt Claude Desktop automatisch ein, wenn Claude gefunden wird.
+- Claude Code: `claude mcp add --scope user --transport stdio learnsql -- python mcp/learnsql_mcp.py`
+- Cursor / Repo: [mcp/cursor.mcp.example.json](mcp/cursor.mcp.example.json)
+
+Docker hängt `data/workshop` nach `/data/workshop` (`WORKSHOP_DIR`). Die Windows-App nutzt `{app}\workshop` und liest den Datenbank-Port aus `runtime.json`.
 
 ## Hinweise
 

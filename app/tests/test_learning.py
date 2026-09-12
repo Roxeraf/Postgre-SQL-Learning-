@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -469,6 +471,50 @@ class WorkshopAndMcpTests(unittest.TestCase):
         self.assertEqual(payload["id"], "ws-mcp-draft")
         self.assertTrue(payload["steps"])
 
+    def test_mcp_install_merges_and_reads_runtime_port(self):
+        sys.path.insert(0, str(REPO / "mcp"))
+        import install_mcp
+
+        existing = {"mcpServers": {"other": {"command": "keep-me"}}}
+        entry = {"command": "py", "args": ["mcp.py"]}
+        merged = install_mcp.merge_mcp_config(existing, "learnsql", entry)
+        self.assertEqual(merged["mcpServers"]["other"]["command"], "keep-me")
+        self.assertEqual(merged["mcpServers"]["learnsql"]["command"], "py")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            (home / "mcp").mkdir()
+            claude_dir = home / "Claude"
+            claude_dir.mkdir()
+            (claude_dir / "claude_desktop_config.json").write_text(
+                json.dumps(existing), encoding="utf-8"
+            )
+            with patch.dict("os.environ", {"APPDATA": tmp, "LOCALAPPDATA": str(home / "local")}, clear=False):
+                status = install_mcp.install(home)
+            written = Path(status["targets"][0])
+            self.assertTrue(written.is_file())
+            self.assertTrue((written.parent / (written.name + ".bak")).is_file())
+            saved = json.loads(written.read_text(encoding="utf-8"))
+            self.assertEqual(saved["mcpServers"]["other"]["command"], "keep-me")
+            self.assertEqual(saved["mcpServers"]["learnsql"]["env"]["LEARN_SQL_HOME"], str(home.resolve()))
+            self.assertTrue((home / "workshop").is_dir())
+            self.assertTrue((home / "mcp-status.json").is_file())
+
+            (home / "runtime.json").write_text(json.dumps({"dbPort": 15432}), encoding="utf-8")
+            with patch.dict("os.environ", {"LEARN_SQL_HOME": str(home)}, clear=False):
+                os.environ.pop("DB_PORT", None)
+                os.environ.pop("WORKSHOP_DIR", None)
+                applied = install_mcp.apply_runtime_env(home)
+                self.assertEqual(os.environ.get("DB_PORT"), "15432")
+                self.assertTrue(str(applied["workshop"]).endswith("workshop"))
+
+            with patch.dict("os.environ", {"APPDATA": tmp, "LOCALAPPDATA": str(home / "local")}, clear=False):
+                gone = install_mcp.uninstall(home)
+            after = json.loads(written.read_text(encoding="utf-8"))
+            self.assertNotIn("learnsql", after.get("mcpServers") or {})
+            self.assertIn("other", after["mcpServers"])
+            self.assertTrue(gone["removed"])
+
     def test_wissen_cards_and_werkstatt_routes(self):
         import app as flask_app
 
@@ -485,6 +531,17 @@ class WorkshopAndMcpTests(unittest.TestCase):
         shop = client.get("/werkstatt")
         self.assertEqual(shop.status_code, 200)
         self.assertIn("Werkstatt".encode("utf-8"), shop.data)
+        self.assertIn("offenen Aufträgen".encode("utf-8"), shop.data)
+        self.assertIn("Claude Desktop".encode("utf-8"), shop.data)
+        self.assertIn("Claude Code".encode("utf-8"), shop.data)
+        self.assertIn("Cursor".encode("utf-8"), shop.data)
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "mcp-status.json").write_text(
+                json.dumps({"installed": True, "targets": ["x"]}), encoding="utf-8"
+            )
+            with patch.dict("os.environ", {"LEARN_SQL_HOME": tmp}, clear=False):
+                flagged = client.get("/werkstatt")
+        self.assertIn("Claude Desktop ist eingetragen".encode("utf-8"), flagged.data)
         lesson = client.get("/learn/ch-agg")
         self.assertEqual(lesson.status_code, 200)
         self.assertIn("Summen".encode("utf-8"), lesson.data)

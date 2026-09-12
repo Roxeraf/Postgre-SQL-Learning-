@@ -189,6 +189,8 @@ function Start-Flask {
     $env:DB_ADMIN_USER = "postgres"
     $env:DB_ADMIN_PASSWORD = $Password
     $env:SQL_INIT_PATH = $SqlFile
+    $env:LEARN_SQL_HOME = $Root
+    $env:WORKSHOP_DIR = Join-Path $Root "workshop"
     $env:FLASK_DEBUG = "0"
     $env:APP_HOST = "127.0.0.1"
     $env:APP_PORT = "$AppPort"
@@ -322,6 +324,17 @@ try {
     }
     Save-Runtime $runtime
     Write-Log "Bereit: App=$appPort DB=$dbPort"
+
+    New-Item -ItemType Directory -Force -Path (Join-Path $Root "workshop") | Out-Null
+    $mcpSetup = Join-Path $Root "Configure-LearnSqlMcp.ps1"
+    if (Test-Path $mcpSetup) {
+        try {
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $mcpSetup -HomeDir $Root -Quiet
+            Write-Log "MCP-Config geprueft"
+        } catch {
+            Write-Log "MCP-Setup uebersprungen: $($_.Exception.Message)"
+        }
+    }
 
     Start-Process "http://localhost:$appPort"
 
