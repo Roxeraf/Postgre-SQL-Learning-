@@ -33,6 +33,20 @@ def ensure_app_on_path() -> Path:
 
 ensure_app_on_path()
 
+
+def ensure_mcp_on_path() -> Path | None:
+    here = Path(__file__).resolve().parent
+    for candidate in (here.parent / "mcp", here / "mcp"):
+        if (candidate / "install_mcp.py").is_file():
+            path = str(candidate)
+            if path not in sys.path:
+                sys.path.insert(0, path)
+            return candidate
+    return None
+
+
+ensure_mcp_on_path()
+
 from lessons.academy_data import ACADEMY, lesson_by_id as academy_lesson_by_id  # noqa: E402
 from lessons.knowledge import (  # noqa: E402
     ARTICLES,
@@ -53,7 +67,7 @@ from sql_coach import (  # noqa: E402
 app = Flask(__name__)
 
 
-def load_mcp_status():
+def _load_mcp_status_file():
     homes = []
     env_home = os.environ.get("LEARN_SQL_HOME")
     if env_home:
@@ -70,6 +84,22 @@ def load_mcp_status():
         if isinstance(data, dict):
             return data
     return None
+
+
+def _install_mcp():
+    ensure_mcp_on_path()
+    try:
+        import install_mcp
+    except ImportError:
+        return None
+    return install_mcp
+
+
+def load_mcp_status():
+    helper = _install_mcp()
+    if helper:
+        return helper.probe_status(helper.resolve_home())
+    return _load_mcp_status_file()
 
 TABLE_LABELS = {
     "orders": "Aufträge",
@@ -688,6 +718,7 @@ def inject_nav():
     return {
         "academy": ACADEMY,
         "academy_lessons": ACADEMY["lessons"],
+        "mcp_status": load_mcp_status(),
     }
 
 
@@ -1058,6 +1089,44 @@ def api_reset():
     if not ok:
         return jsonify({"ok": False, "error": message})
     return jsonify({"ok": True, "message": message})
+
+
+@app.route("/api/mcp/connect", methods=["POST"])
+def api_mcp_connect():
+    helper = _install_mcp()
+    if not helper:
+        return jsonify({
+            "ok": False,
+            "error": "MCP-Einrichtung ist in diesem Paket nicht enthalten.",
+            "status": {"installed": False, "clients": []},
+        })
+    home = helper.resolve_home()
+    try:
+        result = helper.install(home)
+    except OSError as exc:
+        return jsonify({
+            "ok": False,
+            "error": str(exc),
+            "status": helper.probe_status(home),
+        })
+    status = helper.probe_status(home)
+    if not result.get("installed") and not status.get("installed"):
+        return jsonify({
+            "ok": False,
+            "error": (
+                "Keine Claude-Konfiguration gefunden. "
+                "Im Windows-Paket schreibt der Knopf die Dateien automatisch."
+            ),
+            "status": status,
+        })
+    return jsonify({
+        "ok": True,
+        "status": {
+            "installed": bool(status.get("installed")),
+            "clients": list(status.get("clients") or []),
+            "detected": bool(status.get("detected")),
+        },
+    })
 
 
 @app.route("/api/cards")
