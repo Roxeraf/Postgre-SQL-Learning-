@@ -30,6 +30,10 @@ def claude_sandbox_env(tmp: str) -> dict:
     user.mkdir(exist_ok=True)
     local = home / "local"
     local.mkdir(exist_ok=True)
+    (home / "mcp-status.json").write_text(
+        json.dumps({"installed": False, "clients": []}),
+        encoding="utf-8",
+    )
     return {
         "APPDATA": tmp,
         "LOCALAPPDATA": str(local),
@@ -738,7 +742,8 @@ class WorkshopAndMcpTests(unittest.TestCase):
         self.assertIn("Mit Claude verbinden", shop_html)
         self.assertIn("MCP · nicht installiert", shop_html)
         self.assertLess(shop_html.find("Noch keine Übungen"), shop_html.find("Einrichten"))
-        self.assertIn('<details class="card mcp-help mcp-setup" open>', shop_html)
+        self.assertIn('<details class="card mcp-help mcp-setup">', shop_html)
+        self.assertNotIn('<details class="card mcp-help mcp-setup" open>', shop_html)
         self.assertIn("MCP · nicht installiert", wissen_nav.data.decode("utf-8"))
         with tempfile.TemporaryDirectory() as tmp:
             env = claude_sandbox_env(tmp)
@@ -783,6 +788,8 @@ class WorkshopAndMcpTests(unittest.TestCase):
                 })
                 listing = client.get("/werkstatt")
                 listing_html = listing.data.decode("utf-8")
+                self.assertIn("Deine Übungen", listing_html)
+                self.assertIn("path-card", listing_html)
                 if "Einrichten" in listing_html:
                     self.assertLess(listing_html.find("Deine Übungen"), listing_html.find("Einrichten"))
                 page = client.get("/werkstatt/ws-player-label")
