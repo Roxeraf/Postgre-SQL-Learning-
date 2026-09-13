@@ -59,7 +59,7 @@ Eine skalare Unterabfrage steht in SELECT: `(SELECT MAX(quantity) FROM orders)` 
             "with-cte",
             "WITH (CTE)",
             "schachteln",
-            "WITH benennt eine Zwischenergebnis-Tabelle für den Rest der Query. Nur Nachschlagen im Pfad, im Playground erlaubt.",
+            "WITH benennt eine Zwischenergebnis-Tabelle für den Rest der Query. Nur Nachschlagen im Pfad.",
             """
 `WITH offen AS (SELECT * FROM orders WHERE status = 'offen') SELECT COUNT(*) FROM offen;`
 

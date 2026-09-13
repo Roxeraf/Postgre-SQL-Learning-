@@ -82,7 +82,7 @@ DELETE ist nicht DROP. DROP wäre die Tabelle selbst — in der Sandbox gesperrt
 
 Ohne RETURNING siehst du nur „INSERT 0 1“. Mit RETURNING kommt die Zeile wie ein SELECT zurück.
 
-Geht auch bei UPDATE und DELETE. In der App prüft der Pfad über ein zweites SELECT (`verify`). RETURNING darfst du im Playground nutzen.
+Geht auch bei UPDATE und DELETE. In der App prüft der Pfad über ein zweites SELECT (`verify`).
 """,
             sql=["INSERT INTO stock (id, item, quantity, weight) VALUES (8, 'Karton H', 4, 18) RETURNING *;", "UPDATE orders SET status = 'fertig' WHERE id = 1 RETURNING order_number, status;"],
             pitfalls=["RETURNING ist kein Ersatz für WHERE.", "Nicht jeder Client zeigt RETURNING automatisch."],

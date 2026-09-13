@@ -1,8 +1,8 @@
 # MCP für Claude — Übungen neben dem Pfad
 
 Claude kennt das Lager (`orders`, `clients`, `stock`, `order_items`) und die Bibel.
-Er schreibt **zusätzliche Übungen** in die Werkstatt. Der offizielle Lernpfad bleibt unverändert.
-Du öffnest sie in der App unter **Werkstatt** und löst sie wie ein normales Kapitel.
+Er schreibt **zusätzliche Übungen** in den SQL-Playground. Der offizielle Lernpfad bleibt unverändert.
+Du öffnest sie in der App unter **SQL-Playground** und löst sie wie ein normales Kapitel.
 
 Die App ruft kein Sprachmodell auf. Claude hängt nur als Client am MCP.
 
@@ -13,11 +13,12 @@ Bibel lesen und Übungen speichern geht auch ohne Datenbank.
 
 Kopieren und anpassen:
 
-- Bau mir drei Werkstatt-Übungen zu offenen Aufträgen mit GROUP BY.
+- Bau mir drei Playground-Übungen zu offenen Aufträgen mit GROUP BY.
 - Eine LEFT-JOIN-Übung, bei der 4730 ohne Kunde sichtbar bleibt.
 - Prüf die Musterlösung mit run_sql, dann speichern.
+- Lösch die vier alten Übungen zu GROUP BY.
 
-Danach in der App **Werkstatt** öffnen und die neue Karte anklicken.
+Danach in der App **SQL-Playground** öffnen und die neue Karte anklicken. Überflüssige Karten löschst du am Knopf auf der Karte oder lässt Claude `delete_practice` nutzen.
 
 Claude liest beim Anlegen zuerst `step_schema` (Übungsdesign wie der Lernpfad), holt bei Bedarf
 ein Vorbild mit `get_lesson` (zum Beispiel `ch8`) und prüft die Lösung mit `run_sql`, bevor er speichert.

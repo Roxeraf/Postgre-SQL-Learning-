@@ -332,6 +332,33 @@ h3 { margin: 0 0 8px; font-size: 17px; }
 }
 .path-card.done .path-state { color: var(--ok); border-color: transparent; background: var(--ok-dim); }
 .path-card.started .path-state { color: var(--amber); border-color: transparent; background: var(--amber-dim); }
+.path-playground {
+  grid-template-columns: repeat(3, 1fr);
+}
+.playground-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.path-card-body {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  flex: 1;
+}
+.path-playground .path-goals { min-height: 36px; }
+.path-card-delete {
+  align-self: flex-start;
+  margin-top: 10px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.path-card-delete:hover { color: var(--fail); }
 
 .conn-toggle {
   width: 100%;
@@ -901,7 +928,6 @@ kbd { color: var(--text); font-size: 11px; }
 .quiz-feedback { margin-top: 8px; }
 
 .lesson-nav { justify-content: space-between; margin-top: 28px; }
-.playground-toolbar { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 12px; }
 
 .drawer {
   position: fixed;
@@ -1238,9 +1264,9 @@ kbd { color: var(--text); font-size: 11px; }
 .mcp-bar-hint { width: 100%; margin: 0; }
 .mcp-connect-msg { width: 100%; margin: 0; color: var(--fail); }
 .mcp-status-ready { margin: 0; }
-.werkstatt-prompts { margin-bottom: 22px; }
-.werkstatt-prompt-chips { margin: 0; }
-.werkstatt-prompt-chips .section-chip {
+.playground-prompts { margin-bottom: 22px; }
+.playground-prompt-chips { margin: 0; }
+.playground-prompt-chips .section-chip {
   font-size: 13px;
   padding: 8px 12px;
   text-align: left;
@@ -1248,7 +1274,7 @@ kbd { color: var(--text); font-size: 11px; }
   line-height: 1.4;
   max-width: 100%;
 }
-.werkstatt-prompt-chips .section-chip.is-copied {
+.playground-prompt-chips .section-chip.is-copied {
   color: var(--ok);
   border-color: transparent;
   background: var(--ok-dim);
@@ -1272,9 +1298,9 @@ details.mcp-setup > summary::after {
 }
 details.mcp-setup[open] > summary::after { content: "Verbergen"; }
 .mcp-setup-body { margin-top: 14px; }
-.werkstatt-main { margin-bottom: 28px; }
-.werkstatt-main .wissen-grid { margin-top: 12px; }
-.werkstatt-prompts { margin-bottom: 18px; }
+.playground-main { margin-bottom: 28px; }
+.playground-main .wissen-grid { margin-top: 12px; }
+.playground-prompts { margin-bottom: 18px; }
 .glossary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -1335,33 +1361,6 @@ details.mcp-setup[open] > summary::after { content: "Verbergen"; }
 .xp-line { color: var(--ok); font-weight: 650; }
 .pg-error { margin-top: 8px; color: var(--muted); font-size: 13px; }
 .pg-error pre { white-space: pre-wrap; font-family: var(--mono); font-size: 12px; }
-.pg-shell {
-  display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
-}
-.pg-schema {
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: #0c1424;
-  padding: 12px;
-  max-height: calc(100vh - 160px);
-  overflow: auto;
-}
-.pg-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
-.pg-tab {
-  flex: 1;
-  border: 1px solid var(--border);
-  background: var(--panel-2);
-  color: var(--muted);
-  border-radius: 10px;
-  padding: 8px;
-  font: inherit;
-  font-weight: 650;
-  cursor: pointer;
-}
-.pg-tab.active { background: var(--accent-dim); color: var(--text); border-color: var(--border-strong); }
 .explain-panel {
   margin: 12px 0;
   padding: 12px;
@@ -1387,8 +1386,9 @@ details.mcp-setup[open] > summary::after { content: "Verbergen"; }
 }
 
 @media (max-width: 1180px) {
-  .practice-layout, .academy-layout, .pg-shell, .dash-grid, .split-tables { grid-template-columns: 1fr; }
-  .schema-rail, .model-rail, .pg-schema { position: static; max-height: none; }
+  .practice-layout, .academy-layout, .dash-grid, .split-tables { grid-template-columns: 1fr; }
+  .path-playground { grid-template-columns: repeat(2, 1fr); }
+  .schema-rail, .model-rail { position: static; max-height: none; }
 }
 
 @media (max-width: 1180px) {
@@ -1411,6 +1411,6 @@ details.mcp-setup[open] > summary::after { content: "Verbergen"; }
   body.nav-open .sidebar { transform: none; }
   body.nav-open .nav-backdrop { display: block; }
   .content { padding: 64px 18px 72px; }
-  .path, .stat-row { grid-template-columns: 1fr; }
+  .path, .path-playground, .stat-row { grid-template-columns: 1fr; }
   h1 { font-size: 28px; }
 }

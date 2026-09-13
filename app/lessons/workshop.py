@@ -42,7 +42,7 @@ def _read_lesson(path: Path) -> dict | None:
         return None
     data["id"] = lid
     data.setdefault("title", lid)
-    data.setdefault("goal", "Übung aus der Werkstatt.")
+    data.setdefault("goal", "Übung aus dem SQL-Playground.")
     data.setdefault("minutes", 8)
     data.setdefault("concepts", [])
     data.setdefault("model", ["SELECT", "FROM", "WHERE"])
@@ -78,7 +78,7 @@ def save_workshop_lesson(data: dict) -> Path:
     if not SAFE_ID.match(lid):
         raise ValueError("id muss wie ws-having-1 aussehen (Buchstaben, Zahlen, Bindestrich).")
     if lid in PATH_IDS:
-        raise ValueError("Offizielle Kapitel darf die Werkstatt nicht überschreiben.")
+        raise ValueError("Offizielle Kapitel darf der Playground nicht überschreiben.")
     if not (data.get("steps") or []):
         raise ValueError("steps darf nicht leer sein.")
     folder = workshop_dir()
@@ -88,3 +88,18 @@ def save_workshop_lesson(data: dict) -> Path:
     payload["id"] = lid
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return path
+
+
+def delete_workshop_lesson(lesson_id: str) -> bool:
+    from lessons.academy_data import PATH_IDS
+
+    lid = str(lesson_id or "").strip()
+    if not SAFE_ID.match(lid):
+        raise ValueError("id muss wie ws-having-1 aussehen (Buchstaben, Zahlen, Bindestrich).")
+    if lid in PATH_IDS:
+        raise ValueError("Offizielle Kapitel darf der Playground nicht löschen.")
+    path = workshop_dir() / f"{lid}.json"
+    if not path.is_file():
+        return False
+    path.unlink()
+    return True

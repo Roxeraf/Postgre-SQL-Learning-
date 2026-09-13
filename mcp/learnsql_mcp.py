@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""stdio MCP server: schema, Wissen, Übungen in die Werkstatt legen."""
+"""stdio MCP server: schema, Wissen, Übungen in den SQL-Playground legen."""
 
 from __future__ import annotations
 
@@ -20,7 +20,12 @@ os.environ.setdefault("DB_HOST", os.environ.get("DB_HOST", "127.0.0.1"))
 
 from lessons.academy_data import ACADEMY, lesson_by_id  # noqa: E402
 from lessons.knowledge import ARTICLES, article_by_slug, knowledge_cards  # noqa: E402
-from lessons.workshop import save_workshop_lesson, workshop_by_id, workshop_lessons  # noqa: E402
+from lessons.workshop import (  # noqa: E402
+    delete_workshop_lesson,
+    save_workshop_lesson,
+    workshop_by_id,
+    workshop_lessons,
+)
 
 PROTOCOL = "2024-11-05"
 
@@ -30,13 +35,14 @@ STEP_TYPES = [
 ]
 
 INSTRUCTIONS = (
-    "Werkstatt-Übungen folgen dem gleichen Schema wie der Lernpfad. "
+    "Playground-Übungen folgen dem gleichen Schema wie der Lernpfad. "
     "Den Inhalt denkst du dir aus — die Form bleibt.\n"
     "Ablauf: anschauen → verstehen/vorhersagen → selbst schreiben → Kurzcheck.\n"
     "Jede Übung braucht: id (ws-…), title, goal, minutes, concepts, model, "
     "steps (mindestens 3, nicht nur look) und quiz (mindestens 4 Fachfragen zum SQL-Thema).\n"
     "Vor save_practice: step_schema lesen, bei Bedarf get_lesson als Vorbild "
     "(zum Beispiel ch8 oder challenge-2), die Musterlösung mit run_sql prüfen.\n"
+    "Alte Übungen entfernen über delete_practice (eine id oder eine Liste).\n"
     "Hints helfen, sind aber nicht die volle Lösung. Quiz fragt das SQL-Thema, nicht das MCP. "
     "Offizielle PATH_IDS nicht überschreiben."
 )
@@ -256,7 +262,7 @@ def _topic_quiz(concepts, prompt):
 
 def _draft_payload(args) -> dict:
     lid = str(args.get("id") or "ws-draft")
-    title = str(args.get("title") or "Werkstatt-Übung")
+    title = str(args.get("title") or "Playground-Übung")
     prompt = str(args.get("prompt") or "Schreibe die Abfrage.")
     solution = str(args.get("solution") or "SELECT * FROM orders;")
     look = str(args.get("look") or prompt)
@@ -328,7 +334,7 @@ def tool_save_practice(args):
         path = save_workshop_lesson(data)
     except ValueError as exc:
         return _err(str(exc))
-    return _ok_text({"saved": str(path), "id": data.get("id"), "url": f"/werkstatt/{data.get('id')}"})
+    return _ok_text({"saved": str(path), "id": data.get("id"), "url": f"/playground/{data.get('id')}"})
 
 
 def tool_list_workshop(_args):
@@ -336,6 +342,35 @@ def tool_list_workshop(_args):
         {"id": l["id"], "title": l["title"], "steps": len(l.get("steps") or [])}
         for l in workshop_lessons()
     ])
+
+
+def tool_delete_practice(args):
+    raw = args.get("id")
+    if raw is None:
+        raw = args.get("ids")
+    if isinstance(raw, str):
+        ids = [raw]
+    elif isinstance(raw, list):
+        ids = [str(item) for item in raw]
+    else:
+        return _err("id fehlt (eine ws-…-id oder eine Liste).")
+    deleted = []
+    missing = []
+    errors = []
+    for lid in ids:
+        lid = str(lid).strip()
+        if not lid:
+            continue
+        try:
+            if delete_workshop_lesson(lid):
+                deleted.append(lid)
+            else:
+                missing.append(lid)
+        except ValueError as exc:
+            errors.append({"id": lid, "error": str(exc)})
+    if not deleted and not missing and not errors:
+        return _err("id fehlt (eine ws-…-id oder eine Liste).")
+    return _ok_text({"deleted": deleted, "missing": missing, "errors": errors})
 
 
 def tool_list_cards(args):
@@ -388,7 +423,7 @@ TOOLS = {
         "fn": tool_get_article,
     },
     "list_lessons": {
-        "description": "Offizielle Kapitel und Werkstatt-Übungen.",
+        "description": "Offizielle Kapitel und SQL-Playground-Übungen.",
         "inputSchema": {"type": "object", "properties": {}},
         "fn": tool_list_lessons,
     },
@@ -398,7 +433,7 @@ TOOLS = {
         "fn": tool_step_schema,
     },
     "get_lesson": {
-        "description": "Eine offizielle oder Werkstatt-Übung als Vorbild laden (z.B. ch8).",
+        "description": "Eine offizielle oder Playground-Übung als Vorbild laden (z.B. ch8).",
         "inputSchema": {
             "type": "object",
             "properties": {"id": {"type": "string", "description": "ch8, challenge-2 oder eine ws-…-id"}},
@@ -424,7 +459,7 @@ TOOLS = {
         "fn": tool_draft_exercise,
     },
     "save_practice": {
-        "description": "Übung nach data/workshop schreiben. lesson folgt dem Übungsdesign aus step_schema. Vorher run_sql auf die Lösung. Nicht in den offiziellen Pfad.",
+        "description": "Übung in den SQL-Playground schreiben (data/workshop). lesson folgt dem Übungsdesign aus step_schema. Vorher run_sql auf die Lösung. Nicht in den offiziellen Pfad.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -438,9 +473,26 @@ TOOLS = {
         "fn": tool_save_practice,
     },
     "list_workshop": {
-        "description": "Gespeicherte Werkstatt-Übungen.",
+        "description": "Gespeicherte SQL-Playground-Übungen.",
         "inputSchema": {"type": "object", "properties": {}},
         "fn": tool_list_workshop,
+    },
+    "delete_practice": {
+        "description": "Eine oder mehrere Playground-Übungen löschen. id ist eine ws-…-id oder eine Liste. Offizielle Kapitel bleiben.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "description": "Eine ws-…-id oder eine Liste von ids.",
+                },
+                "ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Mehrere ws-…-ids auf einmal.",
+                },
+            },
+        },
+        "fn": tool_delete_practice,
     },
     "list_cards": {
         "description": "Karteikarten der Bibel, optional nach Thema (lesen, filtern, …).",

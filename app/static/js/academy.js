@@ -125,8 +125,8 @@ function initAcademy() {
   const workshop = Boolean(root.dataset.workshop);
 
   function lessonHref(id) {
-    if (!id) return workshop ? "/werkstatt" : "/";
-    return workshop ? `/werkstatt/${id}` : `/learn/${id}`;
+    if (!id) return workshop ? "/playground" : "/";
+    return workshop ? `/playground/${id}` : `/learn/${id}`;
   }
   const store = ui().loadStore();
   store.onboarded = true;
@@ -280,7 +280,7 @@ function initAcademy() {
     } else if (nextLesson) {
       advance = `<a class="btn btn-primary" href="${lessonHref(nextLesson)}">${workshop ? "Nächste Übung" : "Nächstes Kapitel"}</a>`;
     } else {
-      advance = `<a class="btn btn-primary" href="${lessonHref()}">${workshop ? "Zur Werkstatt" : "Zur Übersicht"}</a>`;
+      advance = `<a class="btn btn-primary" href="${lessonHref()}">${workshop ? "Zum Playground" : "Zur Übersicht"}</a>`;
     }
     const why = note
       || step().feedback_ok

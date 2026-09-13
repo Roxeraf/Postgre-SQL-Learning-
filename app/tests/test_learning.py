@@ -464,6 +464,11 @@ class WorkshopAndMcpTests(unittest.TestCase):
                 self.assertEqual(found["title"], "Offene zählen")
                 with self.assertRaises(ValueError):
                     ws.save_workshop_lesson({"id": "ch0", "steps": [{"type": "look", "title": "x"}]})
+                self.assertTrue(ws.delete_workshop_lesson("ws-test-open"))
+                self.assertIsNone(ws.workshop_by_id("ws-test-open"))
+                self.assertFalse(ws.delete_workshop_lesson("ws-test-open"))
+                with self.assertRaises(ValueError):
+                    ws.delete_workshop_lesson("ch0")
 
     def test_mcp_lists_tools_and_drafts(self):
         sys.path.insert(0, str(REPO / "mcp"))
@@ -473,7 +478,7 @@ class WorkshopAndMcpTests(unittest.TestCase):
         names = {t["name"] for t in listed["result"]["tools"]}
         for needed in (
             "schema", "run_sql", "search_wissen", "draft_exercise",
-            "save_practice", "get_lesson", "step_schema",
+            "save_practice", "get_lesson", "step_schema", "delete_practice",
         ):
             self.assertIn(needed, names)
 
@@ -528,6 +533,40 @@ class WorkshopAndMcpTests(unittest.TestCase):
         self.assertNotIn("save_practice", quiz_blob)
         self.assertNotIn("PATH_IDS", quiz_blob)
         self.assertGreaterEqual(len(payload["quiz"]), 4)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict("os.environ", {"WORKSHOP_DIR": tmp}):
+                saved = mcp.handle({
+                    "jsonrpc": "2.0",
+                    "id": 3,
+                    "method": "tools/call",
+                    "params": {
+                        "name": "save_practice",
+                        "arguments": {
+                            "lesson": {
+                                "id": "ws-mcp-del",
+                                "title": "Löschen",
+                                "goal": "Eine Karte anlegen und wieder entfernen.",
+                                "steps": [{
+                                    "type": "write",
+                                    "title": "Zählen",
+                                    "prompt": "Wie viele offene Aufträge?",
+                                    "solution": "SELECT COUNT(*) FROM orders WHERE status = 'offen';",
+                                }],
+                            },
+                        },
+                    },
+                })
+                saved_payload = json.loads(saved["result"]["content"][0]["text"])
+                self.assertIn("/playground/ws-mcp-del", saved_payload.get("url", ""))
+                deleted = mcp.handle({
+                    "jsonrpc": "2.0",
+                    "id": 4,
+                    "method": "tools/call",
+                    "params": {"name": "delete_practice", "arguments": {"id": ["ws-mcp-del"]}},
+                })
+                deleted_payload = json.loads(deleted["result"]["content"][0]["text"])
+                self.assertEqual(deleted_payload.get("deleted"), ["ws-mcp-del"])
 
     def test_mcp_stdio_reads_ndjson_not_as_headers(self):
         import io
@@ -715,7 +754,7 @@ class WorkshopAndMcpTests(unittest.TestCase):
             self.assertEqual(broken.read_text(encoding="utf-8"), "{not-json")
             self.assertTrue((user_home / ".claude.json").is_file())
 
-    def test_wissen_cards_and_werkstatt_routes(self):
+    def test_wissen_cards_and_playground_routes(self):
         import app as flask_app
 
         client = flask_app.app.test_client()
@@ -730,10 +769,15 @@ class WorkshopAndMcpTests(unittest.TestCase):
         self.assertIn("Nur fällige".encode("utf-8"), cards.data)
         with tempfile.TemporaryDirectory() as tmp:
             with patch.dict("os.environ", claude_sandbox_env(tmp), clear=False):
-                shop = client.get("/werkstatt")
+                shop = client.get("/playground")
                 wissen_nav = client.get("/wissen")
+                old = client.get("/werkstatt")
         self.assertEqual(shop.status_code, 200)
-        self.assertIn("Werkstatt".encode("utf-8"), shop.data)
+        self.assertEqual(old.status_code, 301)
+        self.assertIn("/playground", old.headers.get("Location", ""))
+        self.assertIn("SQL-Playground".encode("utf-8"), shop.data)
+        self.assertNotIn("Werkstatt".encode("utf-8"), shop.data)
+        self.assertNotIn(b"pg-editor", shop.data)
         self.assertIn("offenen Aufträgen".encode("utf-8"), shop.data)
         self.assertIn("Claude Desktop".encode("utf-8"), shop.data)
         self.assertIn("Claude Code".encode("utf-8"), shop.data)
@@ -754,7 +798,7 @@ class WorkshopAndMcpTests(unittest.TestCase):
                 encoding="utf-8",
             )
             with patch.dict("os.environ", env, clear=False):
-                flagged = client.get("/werkstatt")
+                flagged = client.get("/playground")
                 nav = client.get("/")
         flagged_html = flagged.data.decode("utf-8")
         self.assertIn("verbunden mit Claude", flagged_html)
@@ -767,7 +811,7 @@ class WorkshopAndMcpTests(unittest.TestCase):
         missing = client.get("/wissen/gibt-es-nicht")
         self.assertEqual(missing.status_code, 404)
 
-    def test_werkstatt_player_uses_werkstatt_chrome(self):
+    def test_playground_player_and_delete(self):
         import app as flask_app
         from lessons import workshop as ws
 
@@ -786,19 +830,32 @@ class WorkshopAndMcpTests(unittest.TestCase):
                         "hints": ["COUNT(*)", "WHERE status = 'offen'"],
                     }],
                 })
-                listing = client.get("/werkstatt")
+                listing = client.get("/playground")
                 listing_html = listing.data.decode("utf-8")
                 self.assertIn("Deine Übungen", listing_html)
                 self.assertIn("path-card", listing_html)
+                self.assertIn("path-playground", listing_html)
+                self.assertIn("Löschen", listing_html)
                 if "Einrichten" in listing_html:
                     self.assertLess(listing_html.find("Deine Übungen"), listing_html.find("Einrichten"))
-                page = client.get("/werkstatt/ws-player-label")
+                page = client.get("/playground/ws-player-label")
+                old = client.get("/werkstatt/ws-player-label")
+                blocked = client.post("/api/playground/ch0/delete")
+                gone = client.post("/api/playground/ws-player-label/delete")
+                missing = client.post("/api/playground/ws-player-label/delete")
         self.assertEqual(page.status_code, 200)
         html = page.data.decode("utf-8")
-        self.assertIn("Werkstatt", html)
+        self.assertIn("SQL-Playground", html)
         self.assertNotIn("Kapitel W", html)
-        self.assertIn("Zur Werkstatt", html)
+        self.assertIn("Zum Playground", html)
         self.assertIn('data-workshop="1"', html)
+        self.assertEqual(old.status_code, 301)
+        self.assertIn("/playground/ws-player-label", old.headers.get("Location", ""))
+        self.assertEqual(blocked.status_code, 400)
+        self.assertFalse(blocked.get_json().get("ok"))
+        self.assertEqual(gone.status_code, 200)
+        self.assertTrue(gone.get_json().get("ok"))
+        self.assertEqual(missing.status_code, 404)
 
     def test_mcp_probe_and_connect_from_app(self):
         sys.path.insert(0, str(REPO / "mcp"))
@@ -832,7 +889,7 @@ class WorkshopAndMcpTests(unittest.TestCase):
                 self.assertTrue(code.is_file())
                 saved = json.loads(code.read_text(encoding="utf-8"))
                 self.assertIn("learnsql", saved.get("mcpServers") or {})
-                page = client.get("/werkstatt")
+                page = client.get("/playground")
             html = page.data.decode("utf-8")
             self.assertIn("verbunden mit Claude", html)
             self.assertNotIn("Einrichten", html)
