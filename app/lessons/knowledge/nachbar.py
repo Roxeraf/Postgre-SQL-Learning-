@@ -39,7 +39,7 @@ Das ist kein JOIN. JOIN stellt Spalten nebeneinander. UNION stellt Zeilen untere
 
 GROUP BY verdichtet. Window nicht. Deshalb siehst du Nummer, Status und Rang in einer Zeile.
 
-Im Grundlagenpfad übst du das nicht. Wenn du es im Playground siehst: PARTITION BY ist „pro Gruppe“, ORDER BY im Fenster die Reihenfolge für Rang.
+Im Grundlagenpfad übst du das nicht. PARTITION BY ist „pro Gruppe“, ORDER BY im Fenster die Reihenfolge für Rang.
 """,
             sql=[
                 "SELECT order_number, client, ROW_NUMBER() OVER (PARTITION BY client ORDER BY created_at DESC) FROM orders WHERE client IS NOT NULL;",

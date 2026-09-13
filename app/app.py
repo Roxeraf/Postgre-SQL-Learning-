@@ -7,7 +7,7 @@ from pathlib import Path
 
 import psycopg2
 import psycopg2.extras
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, redirect, render_template, request
 
 
 def ensure_app_on_path() -> Path:
@@ -55,7 +55,7 @@ from lessons.knowledge import (  # noqa: E402
     related_articles,
     sections as knowledge_sections,
 )
-from lessons.workshop import workshop_by_id, workshop_lessons  # noqa: E402
+from lessons.workshop import delete_workshop_lesson, workshop_by_id, workshop_lessons  # noqa: E402
 from sql_coach import (  # noqa: E402
     diagnose_structure,
     explain_sql as explain_sql_query,
@@ -498,7 +498,7 @@ def run_sql(sql: str, allow_write: bool = False):
                             "ok": False,
                             "error": (
                                 "Hier sind nur lesende Abfragen erlaubt: `SELECT`, `WITH` und `EXPLAIN`. "
-                                "Schreiben übst du in den späteren Kapiteln — oder im Playground."
+                                "Schreiben übst du in den späteren Kapiteln."
                             ),
                             "columns": None,
                             "rows": None,
@@ -749,21 +749,16 @@ def academy_lesson(lesson_id):
 
 @app.route("/playground")
 def playground():
-    return render_template("playground.html", active_tool="playground")
-
-
-@app.route("/werkstatt")
-def werkstatt():
     return render_template(
-        "werkstatt.html",
-        active_tool="werkstatt",
+        "playground.html",
+        active_tool="playground",
         practices=workshop_lessons(),
         mcp_status=load_mcp_status(),
     )
 
 
-@app.route("/werkstatt/<lesson_id>")
-def werkstatt_lesson(lesson_id):
+@app.route("/playground/<lesson_id>")
+def playground_lesson(lesson_id):
     lesson_obj = workshop_by_id(lesson_id)
     if not lesson_obj:
         return "Übung nicht gefunden", 404
@@ -775,6 +770,20 @@ def werkstatt_lesson(lesson_id):
         next_id=next_id,
         current_academy_id=lesson_id,
     )
+
+
+@app.route("/werkstatt")
+def werkstatt_redirect():
+    target = "/playground"
+    qs = request.query_string.decode() if request.query_string else ""
+    if qs:
+        target = f"{target}?{qs}"
+    return redirect(target, 301)
+
+
+@app.route("/werkstatt/<lesson_id>")
+def werkstatt_lesson_redirect(lesson_id):
+    return redirect(f"/playground/{lesson_id}", 301)
 
 
 @app.route("/cards")
@@ -1089,6 +1098,17 @@ def api_reset():
     if not ok:
         return jsonify({"ok": False, "error": message})
     return jsonify({"ok": True, "message": message})
+
+
+@app.route("/api/playground/<lesson_id>/delete", methods=["POST"])
+def api_playground_delete(lesson_id):
+    try:
+        deleted = delete_workshop_lesson(lesson_id)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    if not deleted:
+        return jsonify({"ok": False, "error": "Übung nicht gefunden."}), 404
+    return jsonify({"ok": True, "id": lesson_id})
 
 
 @app.route("/api/mcp/connect", methods=["POST"])

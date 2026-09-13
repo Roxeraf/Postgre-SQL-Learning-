@@ -5,10 +5,10 @@ Ein Lernpfad in der App: von der ersten Tabelle bis zu JOIN, Gruppen, Änderunge
 - Interaktive Akademie (verstehen → vorhersagen → bauen → schreiben → anwenden)
 - Zusatz-Kapitel zu Aggregaten, Positionen, CASE und Unterabfragen
 - Kurz-Quiz nach jedem Kapitel
-- SQL-Playground gegen Schema `learn`
+- SQL-Playground für Zusatzübungen von Claude (MCP)
 - PostgreSQL-Bibel unter `/wissen` (eigene Artikel, nicht das alte Mini-Glossar)
 - Karteikarten mit Leitner (Nochmal / Schwer / Sitzt) in localStorage
-- Werkstatt für dynamische Übungen plus MCP für Claude Desktop und Claude Code
+- MCP für Claude Desktop und Claude Code, Übungen erscheinen im SQL-Playground
 
 Trainingsdaten setzt du bei Bedarf über **Datenbank zurücksetzen** zurück.
 
@@ -24,7 +24,7 @@ Danach liegt `dist\plx.learnSQL-Setup.exe` bereit — diese Datei an den Kollege
 Installation: Doppelklick, Assistent durchklicken, Desktop-Verknüpfung **plx.learnSQL** starten.
 Beim ersten Start wird die Lern-Datenbank einmalig eingerichtet, danach öffnet sich http://localhost:8080.
 Das Setup trägt das MCP in Claude Desktop und Claude Code ein — Claude danach einmal komplett neu starten.
-Kurzanleitung: `mcp/ANLEITUNG.md` oder in der App **Werkstatt**.
+Kurzanleitung: `mcp/ANLEITUNG.md` oder in der App **SQL-Playground**.
 
 SmartScreen kann bei einer unsignierten EXE warnen: „Weitere Informationen“ → „Trotzdem ausführen“.
 
@@ -42,7 +42,7 @@ Danach:
 - **Pfad:** http://localhost:8080/learn/ch0
 - **Wissensbasis:** http://localhost:8080/wissen
 - **Karten:** http://localhost:8080/cards
-- **Werkstatt:** http://localhost:8080/werkstatt
+- **SQL-Playground:** http://localhost:8080/playground
 
 Zum Stoppen: `Ctrl+C`, danach `docker compose down` (mit `-v` werden auch die DB-Daten gelöscht,
 damit die Datenbank beim nächsten Start wieder mit den Ausgangsdaten neu initialisiert wird).
@@ -72,9 +72,9 @@ docker compose up --build
 
 ### MCP (Claude Desktop, Claude Code)
 
-Die App ruft kein LLM auf. Claude hängt als Client am MCP und legt **zusätzliche Übungen** in die Werkstatt — der offizielle Pfad bleibt unverändert.
+Die App ruft kein LLM auf. Claude hängt als Client am MCP und legt **zusätzliche Übungen** in den SQL-Playground — der offizielle Pfad bleibt unverändert.
 
-Was du sagen kannst: „Bau mir drei Werkstatt-Übungen zu offenen Aufträgen mit GROUP BY.“ Danach `/werkstatt` öffnen.
+Was du sagen kannst: „Bau mir drei Playground-Übungen zu offenen Aufträgen mit GROUP BY.“ Danach `/playground` öffnen. Alte Karten löschst du in der App oder sagst Claude `delete_practice`.
 
 Schritt-für-Schritt: [mcp/ANLEITUNG.md](mcp/ANLEITUNG.md)
 

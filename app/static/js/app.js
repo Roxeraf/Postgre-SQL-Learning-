@@ -608,7 +608,7 @@ function initMcpConnect() {
       const res = await fetch("/api/mcp/connect", { method: "POST" });
       const data = await res.json();
       if (data.ok && data.status && data.status.installed) {
-        window.location.href = "/werkstatt?verbunden=1";
+        window.location.href = "/playground?verbunden=1";
         return;
       }
       if (msg) {
@@ -1163,87 +1163,49 @@ function initQuiz(lessonId, exerciseCount, quizCount) {
   });
 }
 
-function initPlayground() {
-  const editor = document.getElementById("pg-editor");
-  const resultEl = document.getElementById("pg-result");
-  const runBtn = document.getElementById("pg-run");
-  if (!editor || !runBtn) return;
-  lastEditor = editor;
-  let tables = [];
-  const LEARN_SQL = "SELECT *\nFROM orders;";
+function initPlaygroundDelete() {
+  const grid = document.querySelector(".path-playground");
+  if (!grid) return;
+  const countEl = document.getElementById("playground-count");
+  const mainEl = document.getElementById("playground-main");
+  const promptsEl = document.getElementById("playground-prompts");
+  const emptyEl = document.getElementById("playground-empty");
 
-  const renderTables = () => {
-    const host = document.getElementById("pg-tables");
-    if (!host) return;
-    host.innerHTML = tables.map((t) => `
-      <details class="schema-table" data-short="${esc(t.short)}">
-        <summary>
-          <span class="insert-name" data-insert="${esc(t.name)}">${esc(t.label || t.short)}</span>
-          <span class="schema-type">${esc(t.short)}</span>
-        </summary>
-        <div class="schema-cols">
-          ${t.columns.map((c) => `<button class="schema-col" type="button" data-insert="${esc(c.name)}"><span>${esc(c.name)}</span><span class="schema-type">${esc(c.type)}</span></button>`).join("")}
-        </div>
-      </details>`).join("") || '<p class="muted">Keine Tabellen geladen.</p>';
+  const refreshEmpty = () => {
+    const left = grid.querySelectorAll(".playground-card").length;
+    if (countEl) {
+      countEl.textContent = left === 1
+        ? "1 Übung · wie ein normales Kapitel lösen"
+        : `${left} Übungen · wie ein normales Kapitel lösen`;
+    }
+    if (left > 0) return;
+    if (mainEl) mainEl.hidden = true;
+    if (promptsEl) promptsEl.hidden = true;
+    if (emptyEl) emptyEl.hidden = false;
   };
 
-  fetch("/api/schema").then((r) => r.json()).then((data) => {
-    tables = data.tables || [];
-    renderTables();
-  }).catch(() => {});
-
-  document.getElementById("pg-tables")?.addEventListener("click", (e) => {
-    const insert = e.target.closest("[data-insert]");
-    if (!insert) return;
+  grid.addEventListener("click", async (e) => {
+    const btn = e.target.closest(".path-card-delete");
+    if (!btn) return;
     e.preventDefault();
-    insertAtCursor(insert.dataset.insert, editor);
-  });
-
-  const run = async () => {
-    resultEl.innerHTML = '<p class="muted">Führe Abfrage aus…</p>';
-    runBtn.disabled = true;
+    e.stopPropagation();
+    const id = btn.dataset.id;
+    const title = btn.dataset.title || id;
+    if (!id || !window.confirm(`Übung „${title}“ löschen?`)) return;
+    btn.disabled = true;
     try {
-      const data = await postJson("/api/run", { sql: editor.value, allow_write: true });
+      const res = await fetch(`/api/playground/${encodeURIComponent(id)}/delete`, { method: "POST" });
+      const data = await res.json();
       if (!data.ok) {
-        const pg = data.pg_error && data.pg_error !== data.error
-          ? `<details class="pg-error"><summary>PostgreSQL-Meldung anzeigen</summary><pre>${esc(data.pg_error)}</pre></details>`
-          : "";
-        resultEl.innerHTML = `<p class="error">${esc(data.error)}</p>${pg}`;
+        window.alert(data.error || "Löschen fehlgeschlagen.");
         return;
       }
-      resultEl.innerHTML = renderSqlResult(data);
+      btn.closest(".playground-card")?.remove();
+      refreshEmpty();
+    } catch {
+      window.alert("Löschen fehlgeschlagen.");
     } finally {
-      runBtn.disabled = false;
-    }
-  };
-
-  document.getElementById("pg-explain")?.addEventListener("click", async () => {
-    const out = document.getElementById("pg-explain-out");
-    if (!out) return;
-    const data = await postJson("/api/explain", { sql: editor.value });
-    if (!data.ok) {
-      out.hidden = false;
-      out.innerHTML = `<p class="error">${esc(data.error)}</p>`;
-      return;
-    }
-    out.hidden = false;
-    out.innerHTML = `<p class="plain-sql">${esc(data.plain || "")}</p>`
-      + (data.parts || []).map((p, i) => `
-        <div class="explain-step">
-          <span class="explain-n">${i + 1}</span>
-          <div>
-            <strong>${esc(p.key)} — ${esc(p.title)}</strong>
-            <pre>${colorizeSql(p.sql)}</pre>
-            <p class="muted">${esc(p.blurb)}</p>
-          </div>
-        </div>`).join("");
-  });
-
-  runBtn.addEventListener("click", run);
-  editor.addEventListener("keydown", (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-      e.preventDefault();
-      run();
+      btn.disabled = false;
     }
   });
 }
@@ -1452,7 +1414,7 @@ function initWissen() {
 
 initNav();
 initSchema();
-initPlayground();
+initPlaygroundDelete();
 initCards();
 initWissen();
 initResetDb();
