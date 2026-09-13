@@ -2,12 +2,27 @@
 {% block title %}Werkstatt — plx.learnSQL{% endblock %}
 {% block content %}
 {% set mcp_ready = mcp_status and mcp_status.installed %}
-{% set setup_open = not mcp_ready and not practices %}
 <header class="page-header">
   <p class="eyebrow">Neben dem Pfad</p>
   <h1>Werkstatt</h1>
   <p class="lede">Claude kennt das Lager und die Bibel und schreibt dir zusätzliche Übungen. Der offizielle Lernpfad bleibt unverändert — du löst sie hier wie ein normales Kapitel.</p>
 </header>
+
+<section class="card mcp-connect" id="mcp-connect">
+  {% if mcp_ready %}
+  <p class="mcp-status mcp-status-ready">
+    MCP · verbunden mit Claude{% if mcp_status.clients %} ({{ mcp_status.clients|join(", ") }}){% endif %}
+  </p>
+  {% if request.args.get("verbunden") %}
+  <p class="muted"><strong>Claude einmal komplett beenden</strong> (auch das Symbol unten rechts) und neu starten.</p>
+  {% endif %}
+  {% else %}
+  <h2>MCP · nicht installiert</h2>
+  <p class="muted">Trägt <code>learnsql</code> in Claude Desktop und Claude Code ein — auch wenn Claude erst später kommt.</p>
+  <button class="btn btn-primary" type="button" id="mcp-connect-btn">Mit Claude verbinden</button>
+  <p class="muted mcp-connect-msg" id="mcp-connect-msg" hidden></p>
+  {% endif %}
+</section>
 
 {% if practices %}
 <section class="werkstatt-main">
@@ -49,14 +64,8 @@
 </section>
 {% endif %}
 
-{% if mcp_ready %}
-<p class="mcp-status">
-  <strong>learnsql</strong> ist in Claude eingetragen{% if mcp_status.clients %} ({{ mcp_status.clients|join(", ") }}){% endif %}.
-  <strong>Claude einmal komplett beenden</strong> (auch das Symbol unten rechts) und neu starten.
-</p>
-{% endif %}
-
-<details class="card mcp-help mcp-setup"{% if setup_open %} open{% endif %}>
+{% if not mcp_ready %}
+<details class="card mcp-help mcp-setup"{% if not practices %} open{% endif %}>
   <summary>Einrichten</summary>
   <div class="mcp-setup-body">
     <h3>Claude Desktop</h3>
@@ -73,4 +82,5 @@
     <p class="muted">Im Windows-Paket die festen Pfade aus der MCP-Anleitung nutzen, nicht das System-<code>python</code>.</p>
   </div>
 </details>
+{% endif %}
 {% endblock %}

@@ -24,6 +24,22 @@ from sql_coach import (  # noqa: E402
     uses_equals_null,
 )
 
+def claude_sandbox_env(tmp: str) -> dict:
+    home = Path(tmp)
+    user = home / "userhome"
+    user.mkdir(exist_ok=True)
+    local = home / "local"
+    local.mkdir(exist_ok=True)
+    return {
+        "APPDATA": tmp,
+        "LOCALAPPDATA": str(local),
+        "HOME": str(user),
+        "USERPROFILE": str(user),
+        "CLAUDE_CONFIG_DIR": "",
+        "LEARN_SQL_HOME": tmp,
+    }
+
+
 FORBIDDEN_SNIPPETS = (
     "Red Bull",
     "Nordlog",
@@ -708,7 +724,10 @@ class WorkshopAndMcpTests(unittest.TestCase):
         cards = client.get("/cards")
         self.assertEqual(cards.status_code, 200)
         self.assertIn("Nur fällige".encode("utf-8"), cards.data)
-        shop = client.get("/werkstatt")
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict("os.environ", claude_sandbox_env(tmp), clear=False):
+                shop = client.get("/werkstatt")
+                wissen_nav = client.get("/wissen")
         self.assertEqual(shop.status_code, 200)
         self.assertIn("Werkstatt".encode("utf-8"), shop.data)
         self.assertIn("offenen Aufträgen".encode("utf-8"), shop.data)
@@ -716,18 +735,27 @@ class WorkshopAndMcpTests(unittest.TestCase):
         self.assertIn("Claude Code".encode("utf-8"), shop.data)
         self.assertNotIn("Cursor".encode("utf-8"), shop.data)
         shop_html = shop.data.decode("utf-8")
+        self.assertIn("Mit Claude verbinden", shop_html)
+        self.assertIn("MCP · nicht installiert", shop_html)
         self.assertLess(shop_html.find("Noch keine Übungen"), shop_html.find("Einrichten"))
         self.assertIn('<details class="card mcp-help mcp-setup" open>', shop_html)
+        self.assertIn("MCP · nicht installiert", wissen_nav.data.decode("utf-8"))
         with tempfile.TemporaryDirectory() as tmp:
-            Path(tmp, "mcp-status.json").write_text(
-                json.dumps({"installed": True, "targets": ["x"]}), encoding="utf-8"
+            env = claude_sandbox_env(tmp)
+            desktop = Path(tmp) / "Claude"
+            desktop.mkdir()
+            (desktop / "claude_desktop_config.json").write_text(
+                json.dumps({"mcpServers": {"learnsql": {"command": "py"}}}),
+                encoding="utf-8",
             )
-            with patch.dict("os.environ", {"LEARN_SQL_HOME": tmp}, clear=False):
+            with patch.dict("os.environ", env, clear=False):
                 flagged = client.get("/werkstatt")
+                nav = client.get("/")
         flagged_html = flagged.data.decode("utf-8")
-        self.assertIn("ist in Claude eingetragen", flagged_html)
-        self.assertIn('<details class="card mcp-help mcp-setup">', flagged_html)
-        self.assertNotIn('<details class="card mcp-help mcp-setup" open>', flagged_html)
+        self.assertIn("verbunden mit Claude", flagged_html)
+        self.assertNotIn("Einrichten", flagged_html)
+        self.assertNotIn("Mit Claude verbinden", flagged_html)
+        self.assertIn("MCP · verbunden mit Claude", nav.data.decode("utf-8"))
         lesson = client.get("/learn/ch-agg")
         self.assertEqual(lesson.status_code, 200)
         self.assertIn("Summen".encode("utf-8"), lesson.data)
@@ -755,7 +783,8 @@ class WorkshopAndMcpTests(unittest.TestCase):
                 })
                 listing = client.get("/werkstatt")
                 listing_html = listing.data.decode("utf-8")
-                self.assertLess(listing_html.find("Deine Übungen"), listing_html.find("Einrichten"))
+                if "Einrichten" in listing_html:
+                    self.assertLess(listing_html.find("Deine Übungen"), listing_html.find("Einrichten"))
                 page = client.get("/werkstatt/ws-player-label")
         self.assertEqual(page.status_code, 200)
         html = page.data.decode("utf-8")
@@ -763,6 +792,43 @@ class WorkshopAndMcpTests(unittest.TestCase):
         self.assertNotIn("Kapitel W", html)
         self.assertIn("Zur Werkstatt", html)
         self.assertIn('data-workshop="1"', html)
+
+    def test_mcp_probe_and_connect_from_app(self):
+        sys.path.insert(0, str(REPO / "mcp"))
+        import install_mcp
+        import app as flask_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            env = claude_sandbox_env(tmp)
+            with patch.dict("os.environ", env, clear=False):
+                empty = install_mcp.probe_status(Path(tmp))
+                self.assertFalse(empty["installed"])
+                desktop = Path(tmp) / "Claude"
+                desktop.mkdir()
+                (desktop / "claude_desktop_config.json").write_text(
+                    json.dumps({"mcpServers": {"learnsql": {"command": "py"}}}),
+                    encoding="utf-8",
+                )
+                found = install_mcp.probe_status(Path(tmp))
+                self.assertTrue(found["installed"])
+                self.assertIn("Claude Desktop", found["clients"])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            env = claude_sandbox_env(tmp)
+            client = flask_app.app.test_client()
+            with patch.dict("os.environ", env, clear=False):
+                res = client.post("/api/mcp/connect")
+                payload = res.get_json()
+                self.assertTrue(payload["ok"], msg=payload)
+                self.assertTrue(payload["status"]["installed"])
+                code = Path(tmp) / "userhome" / ".claude.json"
+                self.assertTrue(code.is_file())
+                saved = json.loads(code.read_text(encoding="utf-8"))
+                self.assertIn("learnsql", saved.get("mcpServers") or {})
+                page = client.get("/werkstatt")
+            html = page.data.decode("utf-8")
+            self.assertIn("verbunden mit Claude", html)
+            self.assertNotIn("Einrichten", html)
 
 
 if __name__ == "__main__":

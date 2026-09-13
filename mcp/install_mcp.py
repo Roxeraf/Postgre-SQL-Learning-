@@ -198,6 +198,48 @@ def write_status(home: Path, status: dict) -> Path:
     return path
 
 
+def config_has_learnsql(data: dict | None) -> bool:
+    if not isinstance(data, dict):
+        return False
+    servers = data.get("mcpServers")
+    return isinstance(servers, dict) and SERVER_NAME in servers
+
+
+def probe_status(home: Path | None = None) -> dict:
+    """Read Claude configs: installed means learnsql is registered."""
+    home = (home or resolve_home()).resolve()
+    clients: list[str] = []
+    targets: list[str] = []
+    skipped: list[str] = []
+    readable = False
+    for path in claude_config_paths(include_standard=True):
+        if not path.is_file():
+            continue
+        data = _read_config(path)
+        if data is None:
+            skipped.append(str(path))
+            continue
+        readable = True
+        if config_has_learnsql(data):
+            targets.append(str(path))
+            clients.append(client_label(path))
+    installed = bool(targets)
+    if not readable:
+        cached = load_status(home)
+        if cached and cached.get("installed"):
+            installed = True
+            clients = list(cached.get("clients") or [])
+            targets = list(cached.get("targets") or [])
+    return {
+        "installed": installed,
+        "detected": claude_is_installed(),
+        "clients": list(dict.fromkeys(clients)),
+        "targets": targets,
+        "skipped": skipped,
+        "home": str(home),
+    }
+
+
 def load_status(home: Path | None = None) -> dict | None:
     candidates = []
     if home:
@@ -288,7 +330,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.action == "uninstall":
         result = uninstall(home)
     else:
-        result = load_status(home) or {"installed": False, "detected": claude_is_installed()}
+        result = probe_status(home)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 

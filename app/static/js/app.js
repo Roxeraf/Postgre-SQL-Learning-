@@ -562,6 +562,38 @@ async function postJson(url, body, timeoutMs = 15000) {
   }
 }
 
+function initMcpConnect() {
+  const btn = document.getElementById("mcp-connect-btn");
+  if (!btn) return;
+  const msg = document.getElementById("mcp-connect-msg");
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    if (msg) {
+      msg.hidden = true;
+      msg.textContent = "";
+    }
+    try {
+      const res = await fetch("/api/mcp/connect", { method: "POST" });
+      const data = await res.json();
+      if (data.ok && data.status && data.status.installed) {
+        window.location.href = "/werkstatt?verbunden=1";
+        return;
+      }
+      if (msg) {
+        msg.hidden = false;
+        msg.textContent = data.error || "Verbinden fehlgeschlagen.";
+      }
+    } catch {
+      if (msg) {
+        msg.hidden = false;
+        msg.textContent = "Verbinden fehlgeschlagen.";
+      }
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
+
 function initResetDb() {
   const run = async (btn) => {
     const ok = window.confirm(
@@ -1392,6 +1424,7 @@ initPlayground();
 initCards();
 initWissen();
 initResetDb();
+initMcpConnect();
 initDashboard();
 refreshChrome();
 
