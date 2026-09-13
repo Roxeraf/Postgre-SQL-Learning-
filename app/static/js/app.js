@@ -562,6 +562,38 @@ async function postJson(url, body, timeoutMs = 15000) {
   }
 }
 
+function initPromptChips() {
+  document.querySelectorAll(".js-prompt-chip").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const text = btn.getAttribute("data-prompt") || btn.textContent.trim();
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          throw new Error("clipboard");
+        }
+      } catch {
+        const hold = document.createElement("textarea");
+        hold.value = text;
+        hold.setAttribute("readonly", "");
+        hold.style.position = "fixed";
+        hold.style.left = "-9999px";
+        document.body.appendChild(hold);
+        hold.select();
+        document.execCommand("copy");
+        hold.remove();
+      }
+      const label = btn.textContent;
+      btn.classList.add("is-copied", "active");
+      btn.textContent = "Kopiert";
+      window.setTimeout(() => {
+        btn.classList.remove("is-copied", "active");
+        btn.textContent = label;
+      }, 1200);
+    });
+  });
+}
+
 function initMcpConnect() {
   const btn = document.getElementById("mcp-connect-btn");
   if (!btn) return;
@@ -1425,6 +1457,7 @@ initCards();
 initWissen();
 initResetDb();
 initMcpConnect();
+initPromptChips();
 initDashboard();
 refreshChrome();
 

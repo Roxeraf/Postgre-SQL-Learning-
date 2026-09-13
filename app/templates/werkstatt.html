@@ -2,26 +2,28 @@
 {% block title %}Werkstatt — plx.learnSQL{% endblock %}
 {% block content %}
 {% set mcp_ready = mcp_status and mcp_status.installed %}
+{% set claude_prompts = [
+  "Bau mir drei Werkstatt-Übungen zu offenen Aufträgen mit GROUP BY.",
+  "Eine LEFT-JOIN-Übung, bei der 4730 ohne Kunde sichtbar bleibt.",
+  "Prüf die Musterlösung mit run_sql, dann speichern.",
+] %}
 <header class="page-header">
   <p class="eyebrow">Neben dem Pfad</p>
   <h1>Werkstatt</h1>
-  <p class="lede">Claude kennt das Lager und die Bibel und schreibt dir zusätzliche Übungen. Der offizielle Lernpfad bleibt unverändert — du löst sie hier wie ein normales Kapitel.</p>
+  <p class="lede">Claude schreibt dir Zusatzübungen. Der Lernpfad bleibt unverändert.</p>
 </header>
 
-<section class="card mcp-connect" id="mcp-connect">
+<section class="mcp-bar" id="mcp-connect">
   {% if mcp_ready %}
-  <p class="mcp-status mcp-status-ready">
-    MCP · verbunden mit Claude{% if mcp_status.clients %} ({{ mcp_status.clients|join(", ") }}){% endif %}
-  </p>
-  {% if request.args.get("verbunden") %}
-  <p class="muted"><strong>Claude einmal komplett beenden</strong> (auch das Symbol unten rechts) und neu starten.</p>
-  {% endif %}
+  <span class="mcp-nav-status is-on">MCP · verbunden mit Claude{% if mcp_status.clients %} ({{ mcp_status.clients|join(", ") }}){% endif %}</span>
   {% else %}
-  <h2>MCP · nicht installiert</h2>
-  <p class="muted">Trägt <code>learnsql</code> in Claude Desktop und Claude Code ein — auch wenn Claude erst später kommt.</p>
+  <span class="mcp-nav-status is-off">MCP · nicht installiert</span>
   <button class="btn btn-primary" type="button" id="mcp-connect-btn">Mit Claude verbinden</button>
-  <p class="muted mcp-connect-msg" id="mcp-connect-msg" hidden></p>
   {% endif %}
+  {% if request.args.get("verbunden") %}
+  <p class="muted mcp-bar-hint"><strong>Claude einmal komplett beenden</strong> (auch das Symbol unten rechts) und neu starten.</p>
+  {% endif %}
+  <p class="mcp-connect-msg" id="mcp-connect-msg" hidden></p>
 </section>
 
 {% if practices %}
@@ -30,42 +32,50 @@
     <h2>Deine Übungen</h2>
     <p class="muted">{{ practices|length }} {% if practices|length == 1 %}Übung{% else %}Übungen{% endif %} · wie ein normales Kapitel lösen</p>
   </div>
-  <div class="wissen-grid">
+  <div class="path path-academy">
     {% for p in practices %}
-    <a class="wissen-card" href="/werkstatt/{{ p.id }}">
-      <p class="wissen-kicker">Werkstatt · {{ p.steps|length }} Schritte</p>
+    <a class="path-card" href="/werkstatt/{{ p.id }}">
+      <div class="path-top">
+        <span class="path-letter">W</span>
+        <span class="path-mins">{{ p.minutes }} Min</span>
+      </div>
       <h3>{{ p.title }}</h3>
-      <p class="muted">{{ p.goal }}</p>
+      <p class="path-goals">{{ p.goal }}</p>
+      <div class="path-meta">
+        <span>{{ p.steps|length }} Schritte</span>
+        {% if p.concepts %}<span>{{ p.concepts[0] }}</span>{% endif %}
+      </div>
     </a>
     {% endfor %}
   </div>
 </section>
 
-<section class="card werkstatt-prompts">
-  <h2>Weitere anlegen</h2>
-  <p class="muted">Sag Claude einen dieser Sätze. Danach erscheint eine weitere Karte hier.</p>
-  <ul class="prompt-list">
-    <li><code>Bau mir drei Werkstatt-Übungen zu offenen Aufträgen mit GROUP BY.</code></li>
-    <li><code>Eine LEFT-JOIN-Übung, bei der 4730 ohne Kunde sichtbar bleibt.</code></li>
-    <li><code>Prüf die Musterlösung mit run_sql, dann speichern.</code></li>
-  </ul>
-  <p class="muted">plx.learnSQL (oder Docker) muss laufen, bevor Claude SQL prüft. Nachschlagen und Speichern geht auch ohne Datenbank.</p>
+<section class="werkstatt-prompts">
+  <div class="section-head">
+    <h2>Weitere anlegen</h2>
+    <p class="muted">Klick kopiert den Satz für Claude.</p>
+  </div>
+  <div class="chip-row werkstatt-prompt-chips">
+    {% for text in claude_prompts %}
+    <button type="button" class="section-chip js-prompt-chip" data-prompt="{{ text }}">{{ text }}</button>
+    {% endfor %}
+  </div>
 </section>
 {% else %}
 <section class="card werkstatt-empty">
   <h2>Noch keine Übungen</h2>
   <p class="muted">Sag Claude einen dieser Sätze. Danach erscheint eine Karte hier — nicht im offiziellen Pfad.</p>
-  <ul class="prompt-list">
-    <li><code>Bau mir drei Werkstatt-Übungen zu offenen Aufträgen mit GROUP BY.</code></li>
-    <li><code>Eine LEFT-JOIN-Übung, bei der 4730 ohne Kunde sichtbar bleibt.</code></li>
-    <li><code>Prüf die Musterlösung mit run_sql, dann speichern.</code></li>
-  </ul>
-  <p class="muted">plx.learnSQL (oder Docker) muss laufen, bevor Claude SQL prüft. Nachschlagen und Speichern geht auch ohne Datenbank.</p>
+  <div class="chip-row werkstatt-prompt-chips">
+    {% for text in claude_prompts %}
+    <button type="button" class="section-chip js-prompt-chip" data-prompt="{{ text }}">{{ text }}</button>
+    {% endfor %}
+  </div>
+  <p class="muted">Klick kopiert den Satz.</p>
 </section>
 {% endif %}
 
 {% if not mcp_ready %}
-<details class="card mcp-help mcp-setup"{% if not practices %} open{% endif %}>
+<details class="card mcp-help mcp-setup">
   <summary>Einrichten</summary>
   <div class="mcp-setup-body">
     <h3>Claude Desktop</h3>
