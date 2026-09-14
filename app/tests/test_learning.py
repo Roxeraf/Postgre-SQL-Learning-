@@ -1090,13 +1090,20 @@ class WorkshopRuntimeTests(unittest.TestCase):
         client = flask_app.app.test_client()
         wissen = client.get("/wissen")
         self.assertEqual(wissen.status_code, 200)
-        self.assertIn("PostgreSQL-Bibel".encode("utf-8"), wissen.data)
+        self.assertIn("Wissensbasis".encode("utf-8"), wissen.data)
+        self.assertNotIn("PostgreSQL-Bibel".encode("utf-8"), wissen.data)
+        buddy_js = (REPO / "app" / "static" / "js" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("Wissensbasis ·", buddy_js)
+        self.assertNotIn("Bibel ·", buddy_js)
+        self.assertNotIn("Zur Bibel", buddy_js)
         article = client.get("/wissen/select")
         self.assertEqual(article.status_code, 200)
         self.assertIn(b"SELECT", article.data)
         cards = client.get("/cards")
         self.assertEqual(cards.status_code, 200)
         self.assertIn("Nur fällige".encode("utf-8"), cards.data)
+        self.assertIn("Wissensbasis".encode("utf-8"), cards.data)
+        self.assertNotIn("Bibel".encode("utf-8"), cards.data)
         with tempfile.TemporaryDirectory() as tmp:
             with patch.dict("os.environ", claude_sandbox_env(tmp), clear=False):
                 shop = client.get("/playground")
@@ -1479,6 +1486,8 @@ class ClaudeBuddyChatTests(unittest.TestCase):
         import claude_cli
 
         self.assertIn("aktualisiert den Playground selbst", claude_cli.BUDDY_PERSONA)
+        self.assertIn("Wissensbasis", claude_cli.BUDDY_PERSONA)
+        self.assertNotIn(" der Bibel ", claude_cli.BUDDY_PERSONA)
         self.assertEqual(
             claude_cli.playground_href("http://127.0.0.1:8080/playground/ws-a", "ws-a"),
             "/playground/ws-a",

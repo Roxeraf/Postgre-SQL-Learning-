@@ -1,10 +1,10 @@
 # MCP für Claude — Buddy auf dem Pfad, Übungen daneben
 
-Claude kennt das Lager (`orders`, `clients`, `stock`, `order_items`), den **offiziellen Lernpfad** und die Bibel.
+Claude kennt das Lager (`orders`, `clients`, `stock`, `order_items`), den **offiziellen Lernpfad** und die Wissensbasis.
 
 Zwei Rollen:
 
-1. **Lern-Buddy** überall in der App (Kapitel, Bibel, Karten, Playground). In der App **Claude** antippen und direkt fragen — die App startet dafür im Hintergrund die `claude`-Kommandozeile mit genau diesem MCP. Claude liest `buddy_context` (Kapitel, Schritt, letzte Query). Dieselben Werkzeuge hast du auch in Claude Desktop, wenn du lieber dort arbeitest.
+1. **Lern-Buddy** überall in der App (Kapitel, Wissensbasis, Karten, Playground). In der App **Claude** antippen und direkt fragen — die App startet dafür im Hintergrund die `claude`-Kommandozeile mit genau diesem MCP. Claude liest `buddy_context` (Kapitel, Schritt, letzte Query). Dieselben Werkzeuge hast du auch in Claude Desktop, wenn du lieber dort arbeitest.
 2. **Zusatzübungen** in den SQL-Playground schreiben. Der offizielle Lernpfad bleibt unverändert. Übungen brauchen jetzt eine richtige Erklärung: `explain` mit Alltagssprache (`plain`) und antippenbaren SQL-Teilen (`parts`), plus `teach` an den Schreib-Schritten.
 
 Die App enthält kein Modell und keinen API-Key. Sie startet die lokale Claude-Code-Kommandozeile
@@ -19,7 +19,7 @@ zweite Weg — beide sehen dieselben Daten.
   `claude` starten und anmelden, App neu starten. Eigener Pfad über `CLAUDE_CLI`.
 
 **Voraussetzung:** plx.learnSQL (oder Docker) muss laufen, bevor Claude SQL-Werkzeuge nutzt.
-Bibel lesen, Standort (`buddy_context`) und Übungen speichern geht auch ohne Datenbank.
+Wissensbasis lesen, Standort (`buddy_context`) und Übungen speichern geht auch ohne Datenbank.
 
 ## Was du Claude sagst
 
@@ -27,7 +27,7 @@ Kopieren und anpassen:
 
 - Ich bin im Lernpfad. Lies `buddy_context` und erklär mir den aktuellen Schritt, ohne die Lösung zu verraten.
 - Meine Query gibt das Falsche zurück. `coach_sql` — was übersehe ich?
-- Welche Bibel-Stelle passt zu JOIN?
+- Welche Stelle in der Wissensbasis passt zu JOIN?
 - Bau mir drei Playground-Übungen zu offenen Aufträgen mit GROUP BY — mit explain-Schritt und teach.
 - Eine LEFT-JOIN-Übung, bei der 4730 ohne Kunde sichtbar bleibt.
 - Prüf die Musterlösung mit run_sql, dann speichern.

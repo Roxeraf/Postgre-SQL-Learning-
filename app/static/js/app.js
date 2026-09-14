@@ -656,7 +656,7 @@ function formatBuddyHere(state) {
     const stepNo = Number.isFinite(Number(state.step)) ? Number(state.step) + 1 : "";
     return `${where} · ${state.lesson_title} · Schritt ${stepNo} · ${state.step_title || state.step_type}`;
   }
-  if (state.page === "wissen") return `Bibel · ${state.lesson_title || "Nachschlagen"}`;
+  if (state.page === "wissen") return `Wissensbasis · ${state.lesson_title || "Nachschlagen"}`;
   if (state.page === "cards") return "Karteikarten";
   if (state.page === "playground") {
     if (state.workshop && state.lesson_title) return `Playground · ${state.lesson_title}`;
@@ -673,7 +673,7 @@ function buddyChipSets(state) {
       ["Erklär mir diesen Schritt, ohne die Lösung zu verraten.", "Diesen Schritt erklären"],
       ["Meine Query passt noch nicht. Was übersehe ich?", "Meine Query verstehen"],
       ["Erklär das Konzept nochmal an der Auftragstabelle.", "Konzept nochmal"],
-      ["Welche Bibel-Stelle sollte ich dazu lesen?", "Zur Bibel"],
+      ["Welche Stelle in der Wissensbasis sollte ich dazu lesen?", "Zur Wissensbasis"],
     ];
   }
   if (state.page === "wissen") {
@@ -728,8 +728,8 @@ const BUDDY_TOOL_LABELS = {
   help_with: "sucht die passende Erklärung",
   coach_sql: "sieht sich deine Query an",
   search_path: "durchsucht den Lernpfad",
-  search_wissen: "blättert in der Bibel",
-  get_article: "liest einen Bibel-Artikel",
+  search_wissen: "blättert in der Wissensbasis",
+  get_article: "liest einen Artikel",
   get_lesson: "liest ein Kapitel",
   list_lessons: "sieht sich den Lernpfad an",
   list_cards: "sieht sich die Karteikarten an",
