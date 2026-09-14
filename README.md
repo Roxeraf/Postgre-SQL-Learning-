@@ -26,6 +26,7 @@ Installation: Doppelklick, Assistent durchklicken, Desktop-Verknüpfung **plx.le
 Beim ersten Start wird die Lern-Datenbank einmalig eingerichtet, danach öffnet sich http://localhost:8080.
 Das Setup trägt das MCP in Claude Desktop und Claude Code ein — Claude danach einmal komplett neu starten.
 Kurzanleitung: `mcp/ANLEITUNG.md` oder in der App **SQL-Playground**.
+Deinstallation (Windows-Einstellungen → Apps) räumt den Programmordner inkl. Datenbank, Logs und Playground ab.
 
 SmartScreen kann bei einer unsignierten EXE warnen: „Weitere Informationen“ → „Trotzdem ausführen“.
 

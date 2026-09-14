@@ -1704,6 +1704,34 @@ class InstallerPackagesEverythingTests(unittest.TestCase):
         start = (REPO / "installer" / "runtime" / "Start-FlowAppLearn.ps1").read_text(encoding="utf-8")
         self.assertIn("Register-LearnSqlMcp", start)
 
+    def test_uninstall_clears_runtime_folders(self):
+        """Inno only deletes files it installed; first run leaves data/logs/pycache."""
+        iss = (REPO / "installer" / "FlowAppLearn.iss").read_text(encoding="utf-8")
+        self.assertIn("Clear-LearnSqlLeftovers.ps1", iss)
+        self.assertIn("usPostUninstall", iss)
+        self.assertIn("DelTree", iss)
+        self.assertIn("{app}\\data", iss)
+        self.assertIn("{app}\\logs", iss)
+        self.assertIn("{app}\\workshop", iss)
+        self.assertIn("Type: dirifempty; Name: \"{app}\"", iss)
+        self.assertIn("InstallDirLooksLikeOurs", iss)
+
+        cleanup = (REPO / "installer" / "runtime" / "Clear-LearnSqlLeftovers.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("__pycache__", cleanup)
+        self.assertIn("Remove-TreeRetry", cleanup)
+        self.assertIn("stop -m immediate", cleanup)
+
+        stop = (REPO / "installer" / "runtime" / "Stop-FlowAppLearn.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("stop -m immediate", stop)
+        self.assertIn("postgres", stop)
+
+        build = (REPO / "installer" / "build.ps1").read_text(encoding="utf-8")
+        self.assertIn("Clear-LearnSqlLeftovers.ps1", build)
+
 
 class DocsMatchRealityTests(unittest.TestCase):
     """The app used to call no model at all. It does now — say so."""
