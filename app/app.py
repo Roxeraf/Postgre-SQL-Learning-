@@ -70,6 +70,8 @@ from learn_db import (  # noqa: E402
 )
 from lessons.workshop import (  # noqa: E402
     delete_workshop_lesson,
+    public_practice,
+    recent_workshop_lessons,
     workshop_by_id,
     workshop_dir,
     workshop_lessons,
@@ -430,6 +432,10 @@ def inject_nav():
         "academy_lessons": ACADEMY["lessons"],
         "mcp_status": load_mcp_status(),
         "claude_cli": claude_status(),
+        "playground_recent": [
+            {"id": item["id"], "title": item.get("title") or item["id"]}
+            for item in recent_workshop_lessons(3)
+        ],
     }
 
 
@@ -480,6 +486,8 @@ def playground_lesson(lesson_id):
         prev_id=prev_id,
         next_id=next_id,
         current_academy_id=lesson_id,
+        current_playground_id=lesson_id,
+        active_tool="playground",
     )
 
 
@@ -774,6 +782,14 @@ def api_reset():
     if not ok:
         return jsonify({"ok": False, "error": message})
     return jsonify({"ok": True, "message": message})
+
+
+@app.route("/api/playground")
+def api_playground_list():
+    return jsonify({
+        "ok": True,
+        "practices": [public_practice(item) for item in workshop_lessons()],
+    })
 
 
 @app.route("/api/playground/<lesson_id>/delete", methods=["POST"])

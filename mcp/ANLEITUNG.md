@@ -33,7 +33,8 @@ Kopieren und anpassen:
 - Prüf die Musterlösung mit run_sql, dann speichern.
 - Lösch die vier alten Übungen zu GROUP BY.
 
-Danach in der App **SQL-Playground** öffnen und die neue Karte anklicken. Überflüssige Karten löschst du am Knopf auf der Karte oder lässt Claude `delete_practice` nutzen.
+Danach öffnet der **Claude-Buddy** in der App eine Karte **Öffnen** — neu laden ist nicht nötig.
+Überflüssige Karten löschst du am Knopf auf der Karte oder lässt Claude `delete_practice` nutzen.
 
 Als Buddy: zuerst `buddy_context`, Fragen mit `help_with` / `search_path`, SQL mit `coach_sql`.
 (Der Buddy in der App bekommt das schon über seinen Systemprompt mit.)
@@ -41,7 +42,7 @@ Als Buddy: zuerst `buddy_context`, Fragen mit `help_with` / `search_path`, SQL m
 Als Übungsautor: zuerst `exercise_context` (Übungsdesign, Live-Sandbox, Beispiel, Ziel-URL).
 Tabellenzeilen kommen über `table_rows`, IDs über `run_sql` mit `as_ids`.
 Vor dem Speichern prüft `validate_exercise` — ohne `explain` (plain + parts) und ohne `teach` am Schreib-Schritt wird nicht gespeichert.
-`save_practice` legt die Karte unter `/playground/{id}` ab und bestätigt, dass die laufende App sie sieht. `draft_exercise` ist nur ein Gerüst.
+`save_practice` legt die Karte unter `/playground/{id}` ab. Die App aktualisiert den Playground selbst. `draft_exercise` ist nur ein Gerüst.
 
 Beim Zurücksetzen baut die App das Schema `learn` per `DROP SCHEMA learn CASCADE` neu auf.
 Zusätzliche Tabellen in `learn` sind danach weg.

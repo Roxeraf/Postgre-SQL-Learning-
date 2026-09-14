@@ -419,7 +419,8 @@ def buddy_snapshot() -> dict:
             "2. Fragen mit `help_with` und `search_path` / `search_wissen` beantworten. "
             "3. SQL der Person mit `coach_sql` prüfen. "
             "4. Kapitel: `get_lesson`. Bibel: `get_article`. "
-            "5. Zusatzübungen nur auf Wunsch in den Playground (`exercise_context` → `save_practice`)."
+            "5. Zusatzübungen nur auf Wunsch in den Playground (`exercise_context` → `save_practice`). "
+            "Die App aktualisiert den Playground selbst — nicht zum Neuladen auffordern."
         ),
         "tools": [
             "buddy_context", "help_with", "search_path", "coach_sql",

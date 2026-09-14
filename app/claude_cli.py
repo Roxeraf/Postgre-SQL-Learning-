@@ -81,6 +81,8 @@ So antwortest du:
 Wenn die Person um Zusatzübungen bittet: `exercise_context` lesen, mit `draft_exercise` bauen,
 mit `validate_exercise` prüfen und erst dann `save_practice`. Übungen brauchen einen `explain`-Schritt
 (Alltagssprache plus antippbare SQL-Teile) und `teach` an den Schreib-Schritten.
+Nach `save_practice`: nenn Titel und den Pfad `/playground/{id}`. Sag nicht, die Person solle neu
+laden, und erwähne `reachable` nicht — die App aktualisiert den Playground selbst.
 """
 
 _STATUS_CACHE: dict | None = None
@@ -245,7 +247,21 @@ def server_env() -> dict:
         env["WORKSHOP_DIR"] = str(workshop_dir())
     except Exception:
         pass
+    # So save_practice can confirm /playground/{id} without runtime.json
+    # (local `python app/app.py`, Docker). 0.0.0.0 is bind-all, not a URL host.
+    env["APP_URL"] = app_base_url()
     return env
+
+
+def app_base_url() -> str:
+    explicit = (os.environ.get("APP_URL") or "").strip().rstrip("/")
+    if explicit:
+        return explicit
+    host = (os.environ.get("APP_HOST") or "127.0.0.1").strip() or "127.0.0.1"
+    if host in ("0.0.0.0", "::", "[::]"):
+        host = "127.0.0.1"
+    port = (os.environ.get("APP_PORT") or "8080").strip() or "8080"
+    return f"http://{host}:{port}"
 
 
 def mcp_config_path(target_dir: Path) -> Path | None:
@@ -393,6 +409,90 @@ def tool_label(raw: str) -> str:
     return text.rsplit("__", 1)[-1] or text
 
 
+def playground_href(url: str | None, lid: str) -> str:
+    """Turn an absolute save_practice URL into a same-origin path."""
+    lid = str(lid or "").strip()
+    default = f"/playground/{lid}" if lid else "/playground"
+    raw = str(url or "").strip()
+    if not raw:
+        return default
+    if "://" in raw:
+        parts = raw.split("/", 3)
+        raw = "/" + parts[3] if len(parts) > 3 else default
+    path = raw.split("?")[0]
+    return path if path.startswith("/playground") else default
+
+
+def _tool_result_text(block: dict) -> str:
+    content = block.get("content")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict) and item.get("type") == "text":
+                parts.append(str(item.get("text") or ""))
+            elif isinstance(item, str):
+                parts.append(item)
+        return "".join(parts)
+    return ""
+
+
+def _parse_json_blob(text: str) -> dict | None:
+    raw = (text or "").strip()
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        start = raw.find("{")
+        end = raw.rfind("}")
+        if start < 0 or end <= start:
+            return None
+        try:
+            data = json.loads(raw[start:end + 1])
+        except json.JSONDecodeError:
+            return None
+    return data if isinstance(data, dict) else None
+
+
+def practice_event(name: str | None, payload: dict) -> dict | None:
+    """SSE payload when Claude saves or deletes a playground exercise."""
+    tool = str(name or "")
+    if not tool:
+        if payload.get("saved") or (payload.get("id") and payload.get("url")):
+            tool = "save_practice"
+        elif "deleted" in payload:
+            tool = "delete_practice"
+    if tool == "save_practice":
+        lid = str(payload.get("id") or "").strip()
+        if not lid:
+            return None
+        return {
+            "action": "save",
+            "id": lid,
+            "title": str(payload.get("title") or lid),
+            "url": playground_href(payload.get("url"), lid),
+        }
+    if tool == "delete_practice":
+        ids = payload.get("deleted") or payload.get("ids") or []
+        if isinstance(ids, str):
+            ids = [ids]
+        if not ids and payload.get("id"):
+            ids = [payload.get("id")]
+        ids = [str(item).strip() for item in ids if str(item).strip()]
+        if not ids:
+            return None
+        return {
+            "action": "delete",
+            "id": ids[0],
+            "ids": ids,
+            "title": str(payload.get("title") or ids[0]),
+            "url": "/playground",
+        }
+    return None
+
+
 def iter_events(lines, state: dict | None = None):
     """Turn the CLI's NDJSON into the handful of events the drawer needs.
 
@@ -462,6 +562,9 @@ def iter_events(lines, state: dict | None = None):
                     continue
                 name = tool_label(raw)
                 state.setdefault("tools", set()).add(name)
+                uid = block.get("id")
+                if uid:
+                    state.setdefault("tool_ids", {})[str(uid)] = name
                 yield "tool", {"name": name}
             continue
 
@@ -470,12 +573,21 @@ def iter_events(lines, state: dict | None = None):
             if not isinstance(content, list):
                 continue
             for block in content:
-                if isinstance(block, dict) and block.get("type") == "tool_result":
-                    if block.get("is_error"):
-                        yield "notice", {
-                            "kind": "tool_error",
-                            "text": "Ein Werkzeug hat nicht geklappt — Claude versucht es anders.",
-                        }
+                if not isinstance(block, dict) or block.get("type") != "tool_result":
+                    continue
+                if block.get("is_error"):
+                    yield "notice", {
+                        "kind": "tool_error",
+                        "text": "Ein Werkzeug hat nicht geklappt — Claude versucht es anders.",
+                    }
+                    continue
+                payload = _parse_json_blob(_tool_result_text(block))
+                if not payload:
+                    continue
+                name = state.get("tool_ids", {}).get(str(block.get("tool_use_id") or ""))
+                event = practice_event(name, payload)
+                if event:
+                    yield "practice", event
             continue
 
         if kind == "result":
