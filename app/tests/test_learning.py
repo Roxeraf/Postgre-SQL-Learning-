@@ -1525,6 +1525,8 @@ class ClaudeBuddyChatTests(unittest.TestCase):
         self.assertNotIn("Bash", allowed)
         self.assertIn("Bash", argv)  # ...but it is explicitly denied
         self.assertIn("Write", argv)
+        # The app does not pin a model; Claude Code picks the account default.
+        self.assertNotIn("--model", argv)
 
         resumed = claude_cli.build_argv(
             "Frage", mcp_path="/tmp/m.json", session_id="abc-123",
@@ -1660,6 +1662,12 @@ class ClaudeBuddyChatTests(unittest.TestCase):
                 self.assertIn("Neues Gespräch", html)
                 self.assertIn('id="buddy-reset"', html)
                 self.assertNotIn('id="buddy-reset" hidden', html)
+                reset_at = html.find('id="buddy-reset"')
+                send_at = html.find('id="buddy-send"')
+                close_at = html.find('id="buddy-close"')
+                self.assertGreater(reset_at, html.find('id="buddy-ask"'))
+                self.assertLess(reset_at, send_at)
+                self.assertLess(close_at, html.find('id="buddy-ask"'))
             # The copy-the-prompt workaround is gone for good.
             self.assertNotIn("Prompt für Claude kopieren", html)
             self.assertNotIn("buddy-preview", html)

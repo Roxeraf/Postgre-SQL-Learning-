@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/css/style.css?v=30">
+<link rel="stylesheet" href="/static/css/style.css?v=31">
 <script src="/static/js/vendor/marked.min.js?v=1"></script>
 </head>
 <body>
@@ -115,9 +115,6 @@
       </p>
     </div>
     <div class="buddy-head-actions">
-      {% if claude_cli and claude_cli.available %}
-      <button class="btn ghost" type="button" id="buddy-reset">Neues Gespräch</button>
-      {% endif %}
       <button class="icon-btn" type="button" id="buddy-close" aria-label="Schließen">✕</button>
     </div>
   </div>
@@ -130,6 +127,7 @@
   <label class="sr-only" for="buddy-ask">Frage an Claude</label>
   <textarea class="sql-editor buddy-ask" id="buddy-ask" rows="3" placeholder="Was ist unklar? z. B. Warum braucht WHERE Anführungszeichen?"></textarea>
   <div class="exercise-actions buddy-actions">
+    <button class="btn ghost" type="button" id="buddy-reset">Neues Gespräch</button>
     <button class="btn btn-primary" type="button" id="buddy-send">Fragen</button>
     <button class="btn" type="button" id="buddy-stop" hidden>Stopp</button>
   </div>
