@@ -872,6 +872,17 @@ class McpAgentWorkflowTests(unittest.TestCase):
         self.assertIn("LEARN_SQL_HOME", text)
         self.assertIn("DB", text)
 
+    def test_sql_tools_do_not_import_flask(self):
+        src = (REPO / "mcp" / "learnsql_mcp.py").read_text(encoding="utf-8")
+        self.assertNotIn("import app as flask_app", src)
+        self.assertNotIn("test_client", src)
+        listed = self.mcp.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+        names = {t["name"]: t for t in listed["result"]["tools"]}
+        for tool in ("sample_rows", "table_rows"):
+            table = names[tool]["inputSchema"]["properties"]["table"]
+            self.assertNotIn("enum", table, msg=tool)
+            self.assertIn("orders", table["description"])
+
 
 class WorkshopRuntimeTests(unittest.TestCase):
     def test_sitecustomize_adds_app_dir(self):

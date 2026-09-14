@@ -1232,19 +1232,20 @@ LESSON_OBJECT_SCHEMA = {
 }
 
 
-def _table_enum() -> list[str]:
+def _table_names() -> list[str]:
     return [t["name"] for t in CORE_SANDBOX]
 
 
 def _tools():
-    tables = _table_enum()
+    tables = _table_names()
     table_desc = ", ".join(tables)
     sample_table = {
         "type": "string",
-        "description": f"Tabelle in learn: {table_desc}",
+        "description": (
+            f"Tabelle in learn, z.B. {table_desc}. "
+            "Weitere Namen stehen in schema / exercise_context (kein festes Enum — Extra-Tabellen sind erlaubt)."
+        ),
     }
-    if tables:
-        sample_table["enum"] = tables
     return {
         "schema": {
             "description": "Tabellen, Spalten und Zeilenzahlen im Schema learn (live).",
@@ -1270,7 +1271,10 @@ def _tools():
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "table": {**sample_table, "description": f"Tabellenname in learn: {table_desc}"},
+                    "table": {**sample_table, "description": (
+                        f"Tabellenname in learn, z.B. {table_desc}. "
+                        "Live-Liste: schema oder exercise_context."
+                    )},
                     "columns": {
                         "type": "array",
                         "items": {"type": "string"},
