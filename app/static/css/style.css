@@ -968,6 +968,17 @@ kbd { color: var(--text); font-size: 11px; }
 .drawer[hidden] { display: none; }
 .drawer-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .drawer-head h2 { margin: 0; }
+.buddy-head-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex: none;
+}
+.buddy-head-actions .btn {
+  white-space: nowrap;
+  font-size: 13px;
+  padding: 8px 12px;
+}
 .search-input, select {
   width: 100%;
   margin-bottom: 12px;

@@ -1009,7 +1009,6 @@ function buddyReset() {
   const box = document.getElementById("buddy-chat");
   if (box) box.innerHTML = "";
   buddyError("");
-  document.getElementById("buddy-reset").hidden = true;
   try {
     window.sessionStorage.removeItem("learnsql-buddy-log");
   } catch {
@@ -1092,8 +1091,6 @@ function buddyHandle(block, ctx) {
     if (!ctx.practices && (ctx.tools.has("save_practice") || ctx.tools.has("delete_practice"))) {
       refreshPlaygroundCatalog();
     }
-    const reset = document.getElementById("buddy-reset");
-    if (reset) reset.hidden = false;
   } else if (name === "error") {
     ctx.done = true;
     buddyError(data.text || "Etwas ist schiefgelaufen.");
