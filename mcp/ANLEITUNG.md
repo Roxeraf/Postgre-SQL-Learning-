@@ -20,8 +20,13 @@ Kopieren und anpassen:
 
 Danach in der App **SQL-Playground** öffnen und die neue Karte anklicken. Überflüssige Karten löschst du am Knopf auf der Karte oder lässt Claude `delete_practice` nutzen.
 
-Claude liest beim Anlegen zuerst `step_schema` (Übungsdesign wie der Lernpfad), holt bei Bedarf
-ein Vorbild mit `get_lesson` (zum Beispiel `ch8`) und prüft die Lösung mit `run_sql`, bevor er speichert.
+Claude holt zuerst `exercise_context` (Übungsdesign, Live-Sandbox, Beispiel, Ziel-URL).
+Tabellenzeilen kommen über `table_rows`, IDs über `run_sql` mit `as_ids`.
+Vor dem Speichern prüft `validate_exercise`; `save_practice` legt die Karte unter `/playground/{id}` ab
+und bestätigt, dass die laufende App sie sieht. `draft_exercise` ist nur ein Gerüst.
+
+Beim Zurücksetzen baut die App das Schema `learn` per `DROP SCHEMA learn CASCADE` neu auf.
+Zusätzliche Tabellen in `learn` sind danach weg.
 
 ## Windows-Installer
 

@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+import copy
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -43,6 +44,77 @@ def claude_sandbox_env(tmp: str) -> dict:
         "LEARN_SQL_HOME": tmp,
     }
 
+
+def mcp_call(mcp, name, arguments, mid=1):
+    return mcp.handle({
+        "jsonrpc": "2.0",
+        "id": mid,
+        "method": "tools/call",
+        "params": {"name": name, "arguments": arguments},
+    })
+
+
+def mcp_payload(reply):
+    return json.loads(reply["result"]["content"][0]["text"])
+
+
+def mcp_is_error(reply):
+    return bool(reply["result"].get("isError"))
+
+
+def ok_sandbox_sql(_sql="", allow_write=False, as_ids=None):
+    if as_ids:
+        return {
+            "ok": True,
+            "ids": [1, 3],
+            "id_field": as_ids,
+            "columns": [as_ids],
+            "rows": None,
+            "error": None,
+            "pg_error": None,
+        }
+    return {
+        "ok": True,
+        "columns": ["id"],
+        "rows": [{"id": 1}, {"id": 3}],
+        "error": None,
+        "pg_error": None,
+        "note": None,
+        "messages": [],
+    }
+
+
+def ok_sandbox_table(table, columns=None, where=None):
+    cols = list(columns) if columns else ["id"]
+    rows = [{c: (1 if n == 0 else 3) if c == "id" else "x" for c in cols} for n in range(2)]
+    return {"ok": True, "name": table, "label": table, "columns": cols, "rows": rows}
+
+
+VALID_PLAYGROUND_LESSON = {
+    "id": "ws-mcp-del",
+    "title": "Löschen",
+    "goal": "Eine Karte anlegen und wieder entfernen.",
+    "minutes": 8,
+    "concepts": ["SELECT"],
+    "model": ["SELECT", "FROM"],
+    "steps": [
+        {"type": "look", "title": "Frage", "text": "Schau dir die Aufträge an.", "cta": "Weiter"},
+        {"type": "explain", "title": "SQL", "text": "COUNT zählt Zeilen.", "sql": "SELECT COUNT(*) FROM orders;"},
+        {
+            "type": "write",
+            "title": "Zählen",
+            "prompt": "Wie viele offene Aufträge?",
+            "solution": "SELECT COUNT(*) FROM orders WHERE status = 'offen';",
+            "hints": ["COUNT(*)", "WHERE status = 'offen'"],
+        },
+    ],
+    "quiz": [
+        {"q": "A?", "options": ["1", "2", "3", "4"], "correct": 1, "explain": "x"},
+        {"q": "B?", "options": ["1", "2", "3", "4"], "correct": 0, "explain": "x"},
+        {"q": "C?", "options": ["1", "2", "3", "4"], "correct": 2, "explain": "x"},
+        {"q": "D?", "options": ["1", "2", "3", "4"], "correct": 3, "explain": "x"},
+    ],
+}
 
 FORBIDDEN_SNIPPETS = (
     "Red Bull",
@@ -479,6 +551,7 @@ class WorkshopAndMcpTests(unittest.TestCase):
         for needed in (
             "schema", "run_sql", "search_wissen", "draft_exercise",
             "save_practice", "get_lesson", "step_schema", "delete_practice",
+            "exercise_context", "validate_exercise", "table_rows",
         ):
             self.assertIn(needed, names)
 
@@ -486,7 +559,13 @@ class WorkshopAndMcpTests(unittest.TestCase):
         instructions = init["result"]["instructions"]
         self.assertIn("anschauen", instructions)
         self.assertIn("Kurzcheck", instructions)
+        self.assertIn("exercise_context", instructions)
+        self.assertIn("draft_exercise", instructions)
         self.assertIn("step_schema", instructions)
+        self.assertEqual(init["result"]["serverInfo"]["version"], mcp.BUILD)
+        mentioned = set(re.findall(r"`([a-z][a-z0-9_]+)`", instructions))
+        unknown = mentioned - names
+        self.assertEqual(unknown, set())
 
         schema = mcp.handle({
             "jsonrpc": "2.0",
@@ -498,6 +577,18 @@ class WorkshopAndMcpTests(unittest.TestCase):
         self.assertIn("anschauen", schema_payload["ablauf"])
         self.assertIn("steps", schema_payload["geruest"])
         self.assertGreaterEqual(len(schema_payload["geruest"]["steps"]), 3)
+        self.assertIn("required", schema_payload["fields"]["write"])
+        self.assertIn("ordered", schema_payload["fields"]["write"]["optional"])
+        self.assertIn("ordered", schema_payload["field_semantics"])
+        self.assertEqual(schema_payload["build"], mcp.BUILD)
+        save_spec = next(t for t in listed["result"]["tools"] if t["name"] == "save_practice")
+        lesson_schema = save_spec["inputSchema"]["properties"]["lesson"]
+        self.assertTrue(lesson_schema.get("description"))
+        self.assertIn("id", lesson_schema["properties"])
+        self.assertIn("enum", lesson_schema["properties"]["steps"]["items"]["properties"]["type"])
+        for key, spec in save_spec["inputSchema"]["properties"].items():
+            if isinstance(spec, dict):
+                self.assertTrue(spec.get("description"), msg=key)
 
         lesson = mcp.handle({
             "jsonrpc": "2.0",
@@ -536,29 +627,20 @@ class WorkshopAndMcpTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             with patch.dict("os.environ", {"WORKSHOP_DIR": tmp}):
-                saved = mcp.handle({
-                    "jsonrpc": "2.0",
-                    "id": 3,
-                    "method": "tools/call",
-                    "params": {
-                        "name": "save_practice",
-                        "arguments": {
-                            "lesson": {
-                                "id": "ws-mcp-del",
-                                "title": "Löschen",
-                                "goal": "Eine Karte anlegen und wieder entfernen.",
-                                "steps": [{
-                                    "type": "write",
-                                    "title": "Zählen",
-                                    "prompt": "Wie viele offene Aufträge?",
-                                    "solution": "SELECT COUNT(*) FROM orders WHERE status = 'offen';",
-                                }],
-                            },
+                with patch.object(mcp, "sandbox_sql", side_effect=ok_sandbox_sql):
+                    saved = mcp.handle({
+                        "jsonrpc": "2.0",
+                        "id": 3,
+                        "method": "tools/call",
+                        "params": {
+                            "name": "save_practice",
+                            "arguments": {"lesson": VALID_PLAYGROUND_LESSON},
                         },
-                    },
-                })
+                    })
                 saved_payload = json.loads(saved["result"]["content"][0]["text"])
+                self.assertFalse(saved["result"].get("isError"))
                 self.assertIn("/playground/ws-mcp-del", saved_payload.get("url", ""))
+                self.assertEqual(saved_payload.get("reachable"), None)
                 deleted = mcp.handle({
                     "jsonrpc": "2.0",
                     "id": 4,
@@ -621,7 +703,188 @@ class WorkshopAndMcpTests(unittest.TestCase):
         data = json.loads(first)
         self.assertEqual(data["id"], 1)
         self.assertEqual(data["result"]["serverInfo"]["name"], "learnsql")
+        self.assertEqual(data["result"]["serverInfo"]["version"], "1.1.0")
 
+
+class McpAgentWorkflowTests(unittest.TestCase):
+    def setUp(self):
+        sys.path.insert(0, str(REPO / "mcp"))
+        import learnsql_mcp as mcp
+        self.mcp = mcp
+
+    def test_db_host_defaults_to_localhost(self):
+        import learn_db
+        env = {k: v for k, v in os.environ.items() if k != "DB_HOST"}
+        with patch.dict(os.environ, env, clear=True):
+            self.assertEqual(learn_db.db_config()["host"], "127.0.0.1")
+
+    def test_environment_report_names_paths_and_flask(self):
+        mcp = self.mcp
+        exc = ModuleNotFoundError("No module named 'app'", name="app")
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            (home / "runtime.json").write_text(
+                json.dumps({"flaskPid": 31512, "appPort": 8081}),
+                encoding="utf-8",
+            )
+            with patch.dict(os.environ, {"LEARN_SQL_HOME": str(home), "WORKSHOP_DIR": str(home / "workshop")}):
+                with patch.object(mcp, "pid_alive", return_value=True):
+                    with patch.object(mcp, "http_get", return_value=(200, "http://127.0.0.1:8081/")):
+                        text = mcp.environment_report("Schema nicht erreichbar.", exc)
+        self.assertIn("App-Modul nicht importierbar", text)
+        self.assertIn("LEARN_SQL_HOME", text)
+        self.assertIn(str(home), text)
+        self.assertIn("app.py", text)
+        self.assertIn("8081", text)
+        self.assertIn("31512", text)
+
+    def test_run_sql_as_ids_is_compact(self):
+        mcp = self.mcp
+        with patch.object(mcp, "sandbox_sql", side_effect=ok_sandbox_sql) as mocked:
+            reply = mcp_call(mcp, "run_sql", {"sql": "SELECT id FROM orders", "as_ids": "id"})
+        self.assertFalse(mcp_is_error(reply))
+        payload = mcp_payload(reply)
+        self.assertEqual(payload["ids"], [1, 3])
+        self.assertIsNone(payload.get("rows"))
+        self.assertEqual(mocked.call_args.kwargs.get("as_ids") or mocked.call_args[1].get("as_ids"), "id")
+
+    def test_table_rows_shape(self):
+        mcp = self.mcp
+        with patch.object(mcp, "sandbox_table", side_effect=ok_sandbox_table):
+            reply = mcp_call(mcp, "table_rows", {"table": "orders", "columns": ["id"]})
+        payload = mcp_payload(reply)
+        self.assertEqual(payload["name"], "orders")
+        self.assertEqual(payload["columns"], ["id"])
+        self.assertTrue(payload["rows"])
+        self.assertEqual(payload["build"], mcp.BUILD)
+
+    def test_exercise_context_has_contract(self):
+        mcp = self.mcp
+        with patch.object(mcp, "sandbox_schema", return_value={"ok": False, "error": "offline"}):
+            reply = mcp_call(mcp, "exercise_context", {"example": "challenge-2"})
+        payload = mcp_payload(reply)
+        self.assertIn("challenge-2", (payload.get("example_lesson") or {}).get("id", "challenge-2"))
+        self.assertGreaterEqual(len(payload["minimal_valid"]["steps"]), 3)
+        self.assertGreaterEqual(len(payload["minimal_valid"]["quiz"]), 4)
+        self.assertIn("required", payload["step_types"]["predict"])
+        self.assertIn("ordered", payload["field_semantics"])
+        self.assertEqual(payload["table"]["columns"], ["id", "status"])
+        self.assertIn("ch8", payload["path_ids"])
+        self.assertIn("DROP SCHEMA", payload["reset"])
+        self.assertIn("learn CASCADE", payload["reset"])
+
+    def test_validate_rejects_unknown_type_and_bad_quiz(self):
+        mcp = self.mcp
+        lesson = copy.deepcopy(VALID_PLAYGROUND_LESSON)
+        lesson["id"] = "ws-bad-type"
+        lesson["steps"][2]["type"] = "challengee"
+        lesson["quiz"][0]["correct"] = 4
+        with patch.object(mcp, "sandbox_sql", side_effect=ok_sandbox_sql):
+            reply = mcp_call(mcp, "validate_exercise", {"lesson": lesson})
+        self.assertTrue(mcp_is_error(reply))
+        payload = mcp_payload(reply)
+        blob = " ".join(payload.get("errors") or [])
+        self.assertIn("unbekannter type", blob)
+        self.assertIn("correct=4", blob)
+
+    def test_validate_reports_expected_ids(self):
+        mcp = self.mcp
+        lesson = copy.deepcopy(VALID_PLAYGROUND_LESSON)
+        lesson["id"] = "ws-predict-ids"
+        lesson["steps"][1] = {
+            "type": "predict",
+            "title": "Welche id?",
+            "text": "Markiere.",
+            "sql": "SELECT id FROM orders WHERE status = 'offen'",
+            "table": {
+                "name": "orders",
+                "label": "Aufträge",
+                "columns": ["id"],
+                "rows": [{"id": 1}, {"id": 3}],
+            },
+            "id_field": "id",
+            "expected_ids": [9, 9],
+        }
+        with patch.object(mcp, "sandbox_sql", side_effect=ok_sandbox_sql):
+            with patch.object(mcp, "sandbox_table", side_effect=ok_sandbox_table):
+                reply = mcp_call(mcp, "validate_exercise", {"lesson": lesson})
+        self.assertTrue(mcp_is_error(reply))
+        payload = mcp_payload(reply)
+        blob = " ".join(payload.get("errors") or [])
+        self.assertIn("richtig=[1, 3]", blob)
+
+    def test_save_practice_reachable_true(self):
+        mcp = self.mcp
+        live = {
+            "home": "/tmp/live",
+            "workshop_dir": None,
+            "flaskPid": 31512,
+            "appPort": 8081,
+            "pid_alive": True,
+            "http_ok": True,
+            "app_url": "http://127.0.0.1:8081",
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            live["home"] = tmp
+            live["workshop_dir"] = tmp
+            with patch.object(mcp, "live_install", return_value=live):
+                with patch.object(mcp, "sandbox_sql", side_effect=ok_sandbox_sql):
+                    with patch.object(mcp, "http_get", return_value=(200, "http://127.0.0.1:8081/playground/ws-mcp-del")):
+                        reply = mcp_call(mcp, "save_practice", {"lesson": VALID_PLAYGROUND_LESSON})
+            self.assertFalse(mcp_is_error(reply))
+            payload = mcp_payload(reply)
+            self.assertTrue(payload["reachable"])
+            self.assertIn("http://127.0.0.1:8081/playground/ws-mcp-del", payload["url"])
+            self.assertTrue((Path(tmp) / "ws-mcp-del.json").is_file())
+
+    def test_save_practice_unreachable_is_error(self):
+        mcp = self.mcp
+        with tempfile.TemporaryDirectory() as tmp:
+            live = {
+                "home": tmp,
+                "workshop_dir": tmp,
+                "flaskPid": 31512,
+                "appPort": 8081,
+                "pid_alive": True,
+                "http_ok": True,
+                "app_url": "http://127.0.0.1:8081",
+            }
+            with patch.object(mcp, "live_install", return_value=live):
+                with patch.object(mcp, "sandbox_sql", side_effect=ok_sandbox_sql):
+                    with patch.object(mcp, "http_get", return_value=(404, "http://127.0.0.1:8081/playground/ws-mcp-del")):
+                        reply = mcp_call(mcp, "save_practice", {"lesson": VALID_PLAYGROUND_LESSON})
+            self.assertTrue(mcp_is_error(reply))
+            payload = mcp_payload(reply)
+            self.assertEqual(payload.get("reachable"), False)
+            self.assertIn("31512", payload.get("error") or "")
+
+    def test_connect_error_is_actionable(self):
+        mcp = self.mcp
+        failed = {
+            "ok": False,
+            "error": "Verbindung fehlgeschlagen",
+            "pg_error": 'connection to server at "db" (13.248.169.48), port 5432 failed: timeout expired',
+        }
+        with patch.object(mcp, "sandbox_sql", return_value=failed):
+            reply = mcp_call(mcp, "run_sql", {"sql": "SELECT 1"})
+        self.assertTrue(mcp_is_error(reply))
+        text = reply["result"]["content"][0]["text"]
+        self.assertIn("LEARN_SQL_HOME", text)
+        self.assertIn("DB", text)
+
+    def test_sql_tools_do_not_import_flask(self):
+        src = (REPO / "mcp" / "learnsql_mcp.py").read_text(encoding="utf-8")
+        self.assertNotIn("import app as flask_app", src)
+        self.assertNotIn("test_client", src)
+        listed = self.mcp.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+        names = {t["name"]: t for t in listed["result"]["tools"]}
+        for tool in ("sample_rows", "table_rows"):
+            table = names[tool]["inputSchema"]["properties"]["table"]
+            self.assertNotIn("enum", table, msg=tool)
+            self.assertIn("orders", table["description"])
+
+
+class WorkshopRuntimeTests(unittest.TestCase):
     def test_sitecustomize_adds_app_dir(self):
         import importlib.util
 

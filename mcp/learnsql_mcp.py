@@ -3,9 +3,13 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import os
+import re
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -16,83 +20,550 @@ sys.path.insert(0, str(APP))
 from install_mcp import apply_runtime_env  # noqa: E402
 
 apply_runtime_env()
-os.environ.setdefault("DB_HOST", os.environ.get("DB_HOST", "127.0.0.1"))
+os.environ.setdefault("DB_HOST", "127.0.0.1")
 
-from lessons.academy_data import ACADEMY, lesson_by_id  # noqa: E402
+from learn_db import (  # noqa: E402
+    CORE_SANDBOX,
+    describe_target,
+    run_sql,
+    table_block,
+)
+from lessons.academy_data import ACADEMY, PATH_IDS, lesson_by_id  # noqa: E402
 from lessons.knowledge import ARTICLES, article_by_slug, knowledge_cards  # noqa: E402
 from lessons.workshop import (  # noqa: E402
+    SAFE_ID,
     delete_workshop_lesson,
     save_workshop_lesson,
     workshop_by_id,
+    workshop_dir,
     workshop_lessons,
 )
 
 PROTOCOL = "2024-11-05"
+BUILD = "1.1.0"
 
 STEP_TYPES = [
     "look", "inspect", "explain", "demo", "predict", "predict-cols",
     "build", "fill", "write", "apply", "challenge", "mcq",
 ]
 
+FIELD_SEMANTICS = {
+    "ordered": (
+        "true: die Prüfung ist sortierungssensitiv (ORDER BY muss zur Musterlösung passen). "
+        "Ohne ordered darf die Zeilenreihenfolge abweichen."
+    ),
+    "strict_columns": (
+        "true: Extra-Spalten in der Schüler-Abfrage sind falsch. "
+        "Default: streng, außer die Musterlösung ist SELECT *."
+    ),
+    "visualize": (
+        "Nur demo/predict: where (Zeilen abdunkeln, die nicht zu match_column/match_value passen), "
+        "columns (nur keep_columns hell), inner (Aufträge ohne Kunde abdunkeln), all (nichts abdunkeln)."
+    ),
+    "execute": "Nach richtigem predict die SQL ausführen und das Ergebnis darunter zeigen.",
+    "id_field": "Spalte, deren Werte Zeilenklicks und expected_ids identifizieren. Default: id.",
+    "cta": "Beschriftung des Weiter-Knopfs im look-Step.",
+    "expected_ids": (
+        "Werte von id_field der Zeilen, die im predict-Step markiert werden müssen. "
+        "Optional: validate_exercise / save_practice füllen sie aus sql + id_field."
+    ),
+    "match_column": "Zusammen mit visualize=where: Spalte, gegen die match_value verglichen wird.",
+    "match_value": "Wert in match_column, der die passenden Zeilen markiert (visualize=where).",
+    "keep_columns": "Spalten, die bei visualize=columns hell bleiben.",
+    "table": "Eingebetteter Sandbox-Ausschnitt {name, label, columns, rows} — nicht das SQL-Ergebnis.",
+}
+
+STEP_SPECS = {
+    "look": {
+        "required": ["title", "text"],
+        "optional": ["table", "tables", "note", "cta", "concepts"],
+    },
+    "inspect": {
+        "required": ["title", "text", "table", "interaction", "answer"],
+        "optional": ["feedback_ok", "feedback_bad", "concepts", "id_field"],
+    },
+    "explain": {
+        "required": ["title", "text", "sql"],
+        "optional": ["plain", "parts", "before_table", "after_table", "concepts"],
+    },
+    "demo": {
+        "required": ["title", "text", "sql"],
+        "optional": ["table", "visualize", "keep_columns", "match_column", "match_value", "id_field", "concepts"],
+    },
+    "predict": {
+        "required": ["title", "text", "sql", "table"],
+        "optional": ["expected_ids", "id_field", "execute", "feedback_ok", "feedback_bad", "concepts", "single"],
+    },
+    "predict-cols": {
+        "required": ["title", "text", "sql", "expected_columns"],
+        "optional": ["table", "feedback_ok", "feedback_bad", "concepts"],
+    },
+    "build": {
+        "required": ["title", "prompt", "pieces", "solution"],
+        "optional": ["distractors", "hints", "concepts"],
+    },
+    "fill": {
+        "required": ["title", "template", "solution"],
+        "optional": ["hints", "concepts"],
+    },
+    "write": {
+        "required": ["title", "prompt", "solution"],
+        "optional": ["placeholder", "hints", "concepts", "strict_columns", "ordered", "require", "forbid", "allow_write", "verify"],
+    },
+    "apply": {
+        "required": ["title", "prompt", "solution"],
+        "optional": ["placeholder", "hints", "concepts", "strict_columns", "ordered", "require", "forbid"],
+    },
+    "challenge": {
+        "required": ["title", "prompt", "solution"],
+        "optional": ["placeholder", "hints", "concepts", "strict_columns", "ordered"],
+    },
+    "mcq": {
+        "required": ["title", "question", "options"],
+        "optional": [],
+    },
+}
+
+LESSON_ENVELOPE = {
+    "id": {"required": True, "note": "ws-… (Buchstaben, Zahlen, Bindestrich). Nicht in PATH_IDS."},
+    "title": {"required": True, "note": "Kurzer Titel wie ein Kapitel."},
+    "goal": {"required": True, "note": "Ein Satz: was die Person danach kann."},
+    "minutes": {"required": True, "note": "Ganze Zahl, typisch 8."},
+    "concepts": {"required": True, "note": "SQL-Themen, z.B. SELECT, WHERE, JOIN."},
+    "model": {"required": True, "note": "Klauseln der Musterlösung in Reihenfolge."},
+    "steps": {"required": True, "note": "Mindestens 3, nicht nur look."},
+    "quiz": {"required": True, "note": "Mindestens 4 Fachfragen. correct ist ein 0-basierter Index."},
+}
+
+TABLE_SHAPE = {
+    "name": "orders",
+    "label": "Aufträge",
+    "columns": ["id", "status"],
+    "rows": [{"id": 1, "status": "offen"}],
+}
+
+RESET_NOTE = (
+    "Beim Zurücksetzen führt die App `DROP SCHEMA learn CASCADE` aus und baut "
+    "clients, orders, stock und order_items neu auf. Zusätzliche Tabellen in learn "
+    "sind danach weg."
+)
+
 INSTRUCTIONS = (
-    "Playground-Übungen folgen dem gleichen Schema wie der Lernpfad. "
+    "SQL-Playground-Übungen folgen dem gleichen Schema wie der Lernpfad. "
     "Den Inhalt denkst du dir aus — die Form bleibt.\n"
     "Ablauf: anschauen → verstehen/vorhersagen → selbst schreiben → Kurzcheck.\n"
     "Jede Übung braucht: id (ws-…), title, goal, minutes, concepts, model, "
     "steps (mindestens 3, nicht nur look) und quiz (mindestens 4 Fachfragen zum SQL-Thema).\n"
-    "Vor save_practice: step_schema lesen, bei Bedarf get_lesson als Vorbild "
-    "(zum Beispiel ch8 oder challenge-2), die Musterlösung mit run_sql prüfen.\n"
-    "Alte Übungen entfernen über delete_practice (eine id oder eine Liste).\n"
+    "Sandbox learn (Reset: DROP SCHEMA learn CASCADE — Extra-Tabellen verschwinden):\n"
+    "  clients      id, name, country (~4 Zeilen)\n"
+    "  orders       id, order_number, client_id, client, status, quantity, note, created_at (~24 Zeilen)\n"
+    "  stock        id, item, quantity, weight (~7 Zeilen)\n"
+    "  order_items  id, order_id, sku, qty (~28 Zeilen)\n"
+    "Zuerst `exercise_context` (Step-Schema, Live-Sandbox, Beispiel, Ziel-URL). "
+    "Tabellenzeilen für look/predict: `table_rows`. IDs: `run_sql` mit as_ids. "
+    "Prüfen mit `validate_exercise`, speichern mit `save_practice`. "
+    "`draft_exercise` ist nur ein Gerüst — nicht unverändert speichern. "
+    "Step-Typen im Detail: `step_schema`. "
+    "Vorbild über `get_lesson` (ch8 oder challenge-2). "
+    "Alte Übungen entfernen über `delete_practice` (eine id oder eine Liste).\n"
+    "Gespeicherte Übungen erscheinen im SQL-Playground unter /playground/{id} "
+    "(eine aktive Installation; save_practice prüft, ob die laufende App die Datei liest).\n"
     "Hints helfen, sind aber nicht die volle Lösung. Quiz fragt das SQL-Thema, nicht das MCP. "
     "Offizielle PATH_IDS nicht überschreiben."
 )
 
+MINIMAL_LESSON = {
+    "id": "ws-beispiel-offen",
+    "title": "Offene Aufträge finden",
+    "goal": "Du filterst Aufträge mit WHERE auf einen Status.",
+    "minutes": 8,
+    "concepts": ["SELECT", "WHERE"],
+    "model": ["SELECT", "FROM", "WHERE"],
+    "steps": [
+        {
+            "type": "look",
+            "title": "Die Auftragsliste",
+            "text": "Jede Zeile ist ein Auftrag. Offene erkennst du an status = 'offen'.",
+            "table": {
+                "name": "orders",
+                "label": "Aufträge",
+                "columns": ["id", "order_number", "client", "status"],
+                "rows": [
+                    {"id": 1, "order_number": 4711, "client": "Helio", "status": "offen"},
+                    {"id": 2, "order_number": 4712, "client": "Alpin", "status": "fertig"},
+                    {"id": 3, "order_number": 4713, "client": "Helio", "status": "offen"},
+                ],
+            },
+            "cta": "Vorhersagen",
+        },
+        {
+            "type": "predict",
+            "title": "Welche Zeilen bleiben?",
+            "text": "Markiere die Zeilen, die WHERE status = 'offen' behält.",
+            "sql": "SELECT id, order_number, client, status FROM orders WHERE status = 'offen' ORDER BY id;",
+            "table": {
+                "name": "orders",
+                "label": "Aufträge",
+                "columns": ["id", "order_number", "client", "status"],
+                "rows": [
+                    {"id": 1, "order_number": 4711, "client": "Helio", "status": "offen"},
+                    {"id": 2, "order_number": 4712, "client": "Alpin", "status": "fertig"},
+                    {"id": 3, "order_number": 4713, "client": "Helio", "status": "offen"},
+                ],
+            },
+            "id_field": "id",
+            "execute": True,
+            "feedback_ok": "Nur offene Aufträge bleiben.",
+            "feedback_bad": "fertig fällt durch WHERE raus.",
+        },
+        {
+            "type": "write",
+            "title": "Schreib die Abfrage",
+            "prompt": "Liste id und status aller offenen Aufträge, sortiert nach id.",
+            "placeholder": "SELECT …",
+            "solution": "SELECT id, status FROM orders WHERE status = 'offen' ORDER BY id;",
+            "hints": [
+                "Tabelle orders, Filter status = 'offen'.",
+                "ORDER BY id — die Prüfung achtet auf die Reihenfolge.",
+            ],
+            "concepts": ["SELECT", "WHERE"],
+            "strict_columns": True,
+            "ordered": True,
+        },
+    ],
+    "quiz": [
+        {
+            "q": "Was macht WHERE?",
+            "options": ["Spalten wählen", "Zeilen filtern", "Sortieren", "Tabellen verbinden"],
+            "correct": 1,
+            "explain": "WHERE entscheidet, welche Zeilen übrig bleiben.",
+        },
+        {
+            "q": "Warum ORDER BY, wenn ordered true ist?",
+            "options": [
+                "Postgres verlangt es immer.",
+                "Die Prüfung vergleicht dann die Reihenfolge.",
+                "WHERE sortiert selbst.",
+                "Es ersetzt SELECT.",
+            ],
+            "correct": 1,
+            "explain": "ordered: true macht die Bewertung sortierungssensitiv.",
+        },
+        {
+            "q": "Was passiert mit status = 'fertig'?",
+            "options": [
+                "Die Zeile bleibt.",
+                "Die Zeile fällt durch WHERE raus.",
+                "Sie wird NULL.",
+                "Ein Fehler.",
+            ],
+            "correct": 1,
+            "explain": "Der Filter behält nur 'offen'.",
+        },
+        {
+            "q": "Woran merkst du, dass die Abfrage stimmt?",
+            "options": [
+                "Der Text ist identisch mit der Musterlösung.",
+                "Das Ergebnis passt zur gestellten Frage.",
+                "Die Abfrage enthält SELECT *.",
+                "Es gibt kein WHERE.",
+            ],
+            "correct": 1,
+            "explain": "Die App vergleicht das Ergebnis, nicht den Wortlaut.",
+        },
+    ],
+}
+
+
+def sandbox_sql(sql, allow_write=False, as_ids=None):
+    """Patch point for tests — talks to Postgres, not Flask."""
+    return run_sql(sql, allow_write=allow_write, as_ids=as_ids)
+
+
+def sandbox_schema():
+    return fetch_schema()
+
+
+def sandbox_table(table, columns=None, where=None):
+    return table_block(table, columns=columns, where=where)
+
 
 def _ok_text(payload) -> dict:
+    if isinstance(payload, dict):
+        payload = dict(payload)
+        payload.setdefault("build", BUILD)
+    elif isinstance(payload, list):
+        payload = {"items": payload, "build": BUILD}
     text = payload if isinstance(payload, str) else json.dumps(payload, ensure_ascii=False, indent=2)
     return {"content": [{"type": "text", "text": text}]}
 
 
-def _err(message: str) -> dict:
-    return {"content": [{"type": "text", "text": message}], "isError": True}
+def _err(message: str, extra: dict | None = None) -> dict:
+    if extra is not None:
+        payload = dict(extra)
+        payload["error"] = message
+        payload.setdefault("build", BUILD)
+        text = json.dumps(payload, ensure_ascii=False, indent=2)
+    else:
+        text = f"{message}\nbuild = {BUILD}"
+    return {"content": [{"type": "text", "text": text}], "isError": True}
+
+
+def pid_alive(pid) -> bool:
+    try:
+        pid = int(pid)
+    except (TypeError, ValueError):
+        return False
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def http_get(url: str, timeout: float = 2.0):
+    try:
+        req = urllib.request.Request(url, method="GET")
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.status, resp.geturl()
+    except urllib.error.HTTPError as exc:
+        return int(exc.code), url
+    except Exception as exc:  # noqa: BLE001
+        return None, str(exc)
+
+
+def _read_runtime(home: Path) -> dict | None:
+    path = Path(home) / "runtime.json"
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def candidate_homes() -> list[Path]:
+    homes: list[Path] = []
+    env = (os.environ.get("LEARN_SQL_HOME") or "").strip()
+    if env:
+        base = Path(env).expanduser()
+        homes.append(base)
+        nested = base / base.name
+        if nested.is_dir():
+            homes.append(nested)
+    homes.append(ROOT)
+    unique = []
+    seen = set()
+    for home in homes:
+        try:
+            key = str(home.resolve())
+        except OSError:
+            key = str(home)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(home)
+    return unique
+
+
+def live_install() -> dict | None:
+    """Home + runtime of a Flask that is actually up. None if unknown."""
+    ranked = []
+    for home in candidate_homes():
+        rt = _read_runtime(home)
+        if not rt:
+            continue
+        port = rt.get("appPort") or rt.get("app_port")
+        pid = rt.get("flaskPid") or rt.get("flask_pid")
+        alive = pid_alive(pid)
+        url = f"http://127.0.0.1:{port}" if port else None
+        http_ok = False
+        if url:
+            status, _final = http_get(url)
+            http_ok = status is not None and int(status) < 500
+        ranked.append({
+            "home": str(home),
+            "workshop_dir": str(Path(home) / "workshop"),
+            "runtime_path": str(Path(home) / "runtime.json"),
+            "flaskPid": pid,
+            "appPort": port,
+            "pid_alive": alive,
+            "http_ok": http_ok,
+            "app_url": url,
+        })
+    live = [row for row in ranked if row["pid_alive"] or row["http_ok"]]
+    if live:
+        live.sort(key=lambda r: (not r["pid_alive"], not r["http_ok"]))
+        return live[0]
+    return ranked[0] if ranked else None
+
+
+def resolve_workshop() -> dict:
+    live = live_install()
+    env_dir = os.environ.get("WORKSHOP_DIR")
+    env_home = os.environ.get("LEARN_SQL_HOME")
+    if live and (live.get("pid_alive") or live.get("http_ok")):
+        return {
+            **live,
+            "source": "live-runtime",
+            "env_workshop": env_dir,
+            "env_home": env_home,
+        }
+    folder = Path(env_dir) if env_dir else workshop_dir()
+    return {
+        "home": str(Path(env_home).expanduser()) if env_home else str(ROOT),
+        "workshop_dir": str(folder),
+        "runtime_path": None,
+        "flaskPid": None,
+        "appPort": None,
+        "pid_alive": False,
+        "http_ok": False,
+        "app_url": None,
+        "source": "env" if env_dir else "default",
+        "env_workshop": env_dir,
+        "env_home": env_home,
+    }
+
+
+def environment_report(prefix: str, exc: BaseException | None = None) -> str:
+    app_py = APP / "app.py"
+    lessons_py = APP / "lessons" / "academy_data.py"
+    learn_db_py = APP / "learn_db.py"
+    env_home = os.environ.get("LEARN_SQL_HOME") or "(nicht gesetzt)"
+    target = resolve_workshop()
+    lines = [prefix]
+    if exc is not None:
+        name = getattr(exc, "name", "") or ""
+        if isinstance(exc, ModuleNotFoundError) and (
+            name == "app" or "named 'app'" in str(exc)
+        ):
+            lines.append("App-Modul nicht importierbar.")
+        else:
+            lines.append(f"{type(exc).__name__}: {exc}")
+    lines.append(f"  LEARN_SQL_HOME = {env_home}")
+    lines.append(f"  MCP_ROOT       = {ROOT}")
+    lines.append(f"  erwartet       = {app_py}  → {'ok' if app_py.is_file() else 'fehlt'}")
+    lines.append(f"  lessons        = {lessons_py}  → {'ok' if lessons_py.is_file() else 'fehlt'}")
+    lines.append(f"  learn_db       = {learn_db_py}  → {'ok' if learn_db_py.is_file() else 'fehlt'}")
+    lines.append(f"  WORKSHOP_DIR   = {target.get('workshop_dir')}")
+    lines.append(f"  DB             = {describe_target()}")
+    if target.get("app_url"):
+        state = "lebt" if target.get("pid_alive") or target.get("http_ok") else "antwortet nicht"
+        lines.append(
+            f"  Flask          = {target['app_url']} "
+            f"(PID {target.get('flaskPid')}, {state})"
+        )
+        env_home_raw = os.environ.get("LEARN_SQL_HOME")
+        if env_home_raw and target.get("home"):
+            try:
+                if Path(env_home_raw).resolve() != Path(target["home"]).resolve():
+                    lines.append(
+                        f"  laufendes Home = {target['home']}  → Installation inkonsistent. "
+                        "Konfiguration prüfen."
+                    )
+            except OSError:
+                pass
+    else:
+        lines.append("  Flask          = keine runtime.json mit appPort")
+    if not (APP / "app.py").is_file():
+        lines.append("  → App-Dateien fehlen unter MCP_ROOT. Falsche Installation geladen?")
+    return "\n".join(lines)
+
+
+def _looks_like_connect_error(text: str) -> bool:
+    t = (text or "").lower()
+    needles = (
+        "timeout expired",
+        "could not connect",
+        "connection refused",
+        "connection to server",
+        "no module named",
+        "name or service not known",
+        "temporär nicht verfügbar",
+        "failed to resolve",
+    )
+    return any(n in t for n in needles)
+
+
+def _sql_payload_or_err(result: dict, prefix: str):
+    if result.get("ok"):
+        return _ok_text(result)
+    blob = " ".join(str(result.get(k) or "") for k in ("error", "pg_error"))
+    if _looks_like_connect_error(blob):
+        return _err(
+            environment_report(f"{prefix}: {result.get('error') or 'keine Verbindung'}")
+        )
+    return _ok_text(result)
 
 
 def tool_schema(_args):
     try:
-        import app as flask_app
-        from flask import Flask
-        client = flask_app.app.test_client() if isinstance(flask_app.app, Flask) else None
-        if client:
-            res = client.get("/api/schema")
-            return _ok_text(res.get_json())
+        result = sandbox_schema()
     except Exception as exc:  # noqa: BLE001
-        return _err(f"Schema nicht erreichbar: {exc}")
-    return _err("Schema nicht erreichbar.")
+        return _err(environment_report("Schema nicht erreichbar.", exc))
+    return _sql_payload_or_err(result, "Schema nicht erreichbar")
 
 
 def tool_sample_rows(args):
     table = str(args.get("table") or "orders")
     try:
-        import app as flask_app
-        res = flask_app.app.test_client().post(
-            "/api/preview",
-            json={"schema": "learn", "table": table},
-        )
-        return _ok_text(res.get_json())
+        result = sandbox_table(table)
     except Exception as exc:  # noqa: BLE001
-        return _err(f"Vorschau fehlgeschlagen: {exc}")
+        return _err(environment_report("Vorschau fehlgeschlagen.", exc))
+    if not result.get("ok"):
+        return _sql_payload_or_err(result, "Vorschau fehlgeschlagen")
+    return _ok_text({
+        "ok": True,
+        "columns": result.get("columns"),
+        "rows": (result.get("rows") or [])[:8],
+        "name": result.get("name"),
+        "label": result.get("label"),
+        "sql": f"SELECT * FROM learn.{table} LIMIT 8",
+        "note": "Für den Step-table-Block table_rows verwenden — das ist copy-paste-fertig.",
+    })
 
 
 def tool_run_sql(args):
     sql = str(args.get("sql") or "")
     if not sql.strip():
         return _err("sql fehlt.")
+    as_ids = args.get("as_ids")
+    if as_ids is True:
+        as_ids = "id"
+    elif as_ids is False:
+        as_ids = None
+    elif as_ids is not None:
+        as_ids = str(as_ids).strip() or None
     try:
-        import app as flask_app
-        result = flask_app.run_sql(sql, allow_write=False)
-        return _ok_text(result)
+        result = sandbox_sql(sql, allow_write=False, as_ids=as_ids)
     except Exception as exc:  # noqa: BLE001
-        return _err(f"SQL fehlgeschlagen: {exc}")
+        return _err(environment_report("SQL fehlgeschlagen.", exc))
+    return _sql_payload_or_err(result, "SQL fehlgeschlagen")
+
+
+def tool_table_rows(args):
+    table = str(args.get("table") or "").strip()
+    if not table:
+        return _err("table fehlt.")
+    try:
+        result = sandbox_table(table, columns=args.get("columns"), where=args.get("where"))
+    except Exception as exc:  # noqa: BLE001
+        return _err(environment_report("table_rows fehlgeschlagen.", exc))
+    if not result.get("ok"):
+        return _sql_payload_or_err(result, "table_rows fehlgeschlagen")
+    return _ok_text({
+        "name": result.get("name"),
+        "label": result.get("label"),
+        "columns": result.get("columns"),
+        "rows": result.get("rows"),
+    })
 
 
 def tool_search_wissen(args):
@@ -142,23 +613,14 @@ def tool_list_lessons(_args):
     return _ok_text({"path": rows, "workshop": extra})
 
 
-def tool_step_schema(_args):
-    return _ok_text({
+def _step_schema_payload():
+    return {
         "ablauf": "anschauen → verstehen/vorhersagen → selbst schreiben → Kurzcheck",
         "rule": (
             "Inhalt selbst ausdenken, Form wie der Lernpfad. "
             "Roh-Entwurf von draft_exercise nicht unverändert speichern."
         ),
-        "lesson_fields": {
-            "id": "ws-… (Buchstaben, Zahlen, Bindestrich)",
-            "title": "Kurzer Titel wie ein Kapitel",
-            "goal": "Ein Satz: was die Person danach kann",
-            "minutes": 8,
-            "concepts": ["SELECT", "WHERE", "GROUP BY", "JOIN"],
-            "model": ["SELECT", "FROM", "WHERE"],
-            "steps": "mindestens 3, nicht nur look",
-            "quiz": "mindestens 4 Fachfragen zum SQL-Thema",
-        },
+        "lesson_fields": LESSON_ENVELOPE,
         "sequence": [
             {"phase": "anschauen", "types": ["look", "inspect"], "why": "Daten und Frage zeigen, bevor jemand SQL schreibt."},
             {"phase": "verstehen", "types": ["explain", "demo", "predict", "predict-cols"], "why": "SQL vorhersagen oder erklären, nicht nur abtippen."},
@@ -167,25 +629,14 @@ def tool_step_schema(_args):
         ],
         "types": STEP_TYPES,
         "fields": {
-            "look": ["title", "text", "table", "tables", "note", "cta", "concepts"],
-            "inspect": ["title", "text", "table", "interaction", "answer", "feedback_ok", "feedback_bad", "concepts"],
-            "explain": ["title", "text", "sql", "plain", "parts", "before_table", "after_table", "concepts"],
-            "demo": ["title", "text", "sql", "table", "visualize", "keep_columns", "concepts"],
-            "predict": ["title", "text", "sql", "table", "expected_ids", "id_field", "feedback_ok", "feedback_bad", "concepts"],
-            "predict-cols": ["title", "text", "sql", "table", "expected_columns", "feedback_ok", "feedback_bad", "concepts"],
-            "build": ["title", "prompt", "pieces", "distractors", "solution", "hints", "concepts"],
-            "fill": ["title", "template", "solution", "hints", "concepts"],
-            "write": ["title", "prompt", "placeholder", "solution", "hints", "concepts", "strict_columns", "ordered", "require", "forbid", "allow_write", "verify"],
-            "apply": ["title", "prompt", "placeholder", "solution", "hints", "concepts", "strict_columns", "ordered"],
-            "challenge": ["title", "prompt", "placeholder", "solution", "hints", "concepts", "strict_columns", "ordered"],
-            "mcq": ["title", "question", "options"],
+            name: {
+                "required": spec["required"],
+                "optional": spec["optional"],
+            }
+            for name, spec in STEP_SPECS.items()
         },
-        "table": {
-            "name": "orders",
-            "label": "Aufträge",
-            "columns": ["id", "status"],
-            "rows": [{"id": 1, "status": "offen"}],
-        },
+        "field_semantics": FIELD_SEMANTICS,
+        "table": TABLE_SHAPE,
         "quiz_item": {"q": "Frage", "options": ["A", "B", "C", "D"], "correct": 1, "explain": "Warum"},
         "hints": "Mindestens zwei. Der letzte Hint ist nicht die volle Lösung.",
         "geruest": _draft_payload({
@@ -195,8 +646,84 @@ def tool_step_schema(_args):
             "solution": "SELECT COUNT(*) FROM orders WHERE status = 'offen';",
             "concepts": ["GROUP BY"],
         }),
+        "minimal_valid": MINIMAL_LESSON,
         "id_prefix": "ws-",
-        "note": "Offizielle PATH_IDS nicht überschreiben. Speichern nur über save_practice. Vorbild: get_lesson mit ch8 oder challenge-2.",
+        "path_ids": list(PATH_IDS),
+        "note": (
+            "Offizielle PATH_IDS nicht überschreiben. Speichern nur über save_practice. "
+            "Vorbild: get_lesson mit ch8 oder challenge-2. "
+            + RESET_NOTE
+        ),
+    }
+
+
+def tool_step_schema(_args):
+    return _ok_text(_step_schema_payload())
+
+
+def _live_sandbox():
+    try:
+        result = sandbox_schema()
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "ok": False,
+            "error": str(exc),
+            "tables": CORE_SANDBOX,
+            "source": "fallback-core",
+        }
+    if result.get("ok"):
+        tables = []
+        for tbl in result.get("tables") or []:
+            tables.append({
+                "name": tbl.get("name"),
+                "label": tbl.get("label"),
+                "row_count": tbl.get("row_count"),
+                "columns": [c.get("name") for c in (tbl.get("columns") or [])],
+            })
+        return {"ok": True, "tables": tables, "source": "live"}
+    return {
+        "ok": False,
+        "error": result.get("error"),
+        "tables": CORE_SANDBOX,
+        "source": "fallback-core",
+    }
+
+
+def tool_exercise_context(args):
+    example_id = str(args.get("example") or "challenge-2").strip()
+    example = lesson_by_id(example_id) or workshop_by_id(example_id)
+    target = resolve_workshop()
+    return _ok_text({
+        "ablauf": "exercise_context → table_rows → run_sql(as_ids) → validate_exercise → save_practice",
+        "terminology": {
+            "name": "SQL-Playground",
+            "url_prefix": "/playground/",
+            "tool": "save_practice",
+            "folder": "workshop",
+            "legacy_redirect": "/werkstatt/ → /playground/",
+        },
+        "step_types": STEP_SPECS,
+        "field_semantics": FIELD_SEMANTICS,
+        "table": TABLE_SHAPE,
+        "lesson_envelope": LESSON_ENVELOPE,
+        "sandbox": _live_sandbox(),
+        "core_sandbox": CORE_SANDBOX,
+        "reset": RESET_NOTE,
+        "path_ids": list(PATH_IDS),
+        "workshop": {
+            "dir": target.get("workshop_dir"),
+            "app_url": target.get("app_url"),
+            "source": target.get("source"),
+            "pid_alive": target.get("pid_alive"),
+        },
+        "example_id": example_id,
+        "example_lesson": example,
+        "minimal_valid": MINIMAL_LESSON,
+        "tools": [
+            "exercise_context", "table_rows", "run_sql", "validate_exercise",
+            "save_practice", "get_lesson", "draft_exercise", "delete_practice",
+            "step_schema", "list_workshop",
+        ],
     })
 
 
@@ -321,27 +848,315 @@ def tool_draft_exercise(args):
     return _ok_text(_draft_payload(args))
 
 
-def tool_save_practice(args):
+def _ids_equal(left, right) -> bool:
+    def norm(seq):
+        return ["" if v is None else str(v) for v in (seq or [])]
+    return norm(left) == norm(right)
+
+
+def _row_cells(row: dict, columns: list[str]) -> dict:
+    return {c: row.get(c) for c in columns}
+
+
+def _embedded_tables(step: dict) -> list[dict]:
+    if isinstance(step.get("tables"), list) and step["tables"]:
+        return [t for t in step["tables"] if isinstance(t, dict)]
+    if isinstance(step.get("table"), dict):
+        return [step["table"]]
+    return []
+
+
+def _sql_fields(step: dict) -> list[tuple[str, str]]:
+    found = []
+    for key in ("sql", "solution", "verify"):
+        raw = step.get(key)
+        if isinstance(raw, str) and raw.strip():
+            found.append((key, raw))
+    return found
+
+
+def validate_lesson(lesson: dict, *, fill_ids: bool = False) -> dict:
+    """Structural + optional SQL checks. Mutates a copy when fill_ids is True."""
+    data = copy.deepcopy(lesson) if fill_ids else lesson
+    errors = []
+    warnings = []
+    steps_out = []
+    sql_checked = True
+
+    lid = str(data.get("id") or "").strip()
+    if not SAFE_ID.match(lid):
+        errors.append("id muss wie ws-having-1 aussehen (Buchstaben, Zahlen, Bindestrich).")
+    elif lid in PATH_IDS:
+        errors.append(f"{lid} ist eine offizielle PATH_ID und darf nicht überschrieben werden.")
+
+    steps = data.get("steps") or []
+    if not isinstance(steps, list) or len(steps) < 3:
+        errors.append("steps: mindestens 3 Schritte.")
+    elif all(str((s or {}).get("type") or "") == "look" for s in steps):
+        errors.append("steps: nicht nur look — es braucht verstehen/schreiben.")
+
+    quiz = data.get("quiz") or []
+    if not isinstance(quiz, list) or len(quiz) < 4:
+        errors.append("quiz: mindestens 4 Fachfragen.")
+    else:
+        for qi, item in enumerate(quiz):
+            if not isinstance(item, dict):
+                errors.append(f"quiz[{qi}]: kein Objekt.")
+                continue
+            options = item.get("options") or []
+            correct = item.get("correct")
+            if not isinstance(correct, int) or correct < 0 or correct >= len(options):
+                errors.append(
+                    f"quiz[{qi}]: correct={correct} liegt außerhalb von 0..{max(0, len(options) - 1)}."
+                )
+
+    for idx, step in enumerate(steps):
+        info = {"index": idx, "type": None, "ok": True, "notes": []}
+        if not isinstance(step, dict):
+            errors.append(f"steps[{idx}]: kein Objekt.")
+            info["ok"] = False
+            steps_out.append(info)
+            continue
+        stype = str(step.get("type") or "")
+        info["type"] = stype
+        if stype not in STEP_TYPES:
+            errors.append(
+                f"steps[{idx}]: unbekannter type {stype!r}. Erlaubt: {', '.join(STEP_TYPES)}."
+            )
+            info["ok"] = False
+            steps_out.append(info)
+            continue
+        spec = STEP_SPECS[stype]
+        missing = [f for f in spec["required"] if step.get(f) in (None, "", [])]
+        if missing:
+            errors.append(f"steps[{idx}] ({stype}): Pflichtfelder fehlen: {', '.join(missing)}.")
+            info["ok"] = False
+
+        for key, sql in _sql_fields(step):
+            try:
+                result = sandbox_sql(sql, allow_write=False)
+            except Exception as exc:  # noqa: BLE001
+                sql_checked = False
+                warnings.append(f"steps[{idx}].{key}: SQL nicht prüfbar ({exc}).")
+                info["notes"].append("sql_skipped")
+                continue
+            if not result.get("ok") and _looks_like_connect_error(
+                " ".join(str(result.get(k) or "") for k in ("error", "pg_error"))
+            ):
+                sql_checked = False
+                warnings.append(f"steps[{idx}].{key}: Datenbank nicht erreichbar.")
+                info["notes"].append("sql_skipped")
+                continue
+            if not result.get("ok"):
+                errors.append(f"steps[{idx}].{key}: {result.get('error') or 'SQL fehlgeschlagen'}.")
+                info["ok"] = False
+            else:
+                info["notes"].append(f"{key}_ok")
+                info[f"{key}_columns"] = result.get("columns")
+                info[f"{key}_row_count"] = len(result.get("rows") or [])
+
+            if stype == "predict" and key == "sql" and result.get("ok"):
+                id_field = str(step.get("id_field") or "id")
+                id_result = sandbox_sql(sql, allow_write=False, as_ids=id_field)
+                if id_result.get("ok"):
+                    actual = id_result.get("ids") or []
+                    expected = step.get("expected_ids")
+                    if expected is None:
+                        if fill_ids:
+                            step["expected_ids"] = actual
+                            info["notes"].append("expected_ids_filled")
+                        else:
+                            warnings.append(
+                                f"steps[{idx}]: expected_ids fehlt — wären {actual}."
+                            )
+                    elif not _ids_equal(expected, actual):
+                        errors.append(
+                            f"steps[{idx}]: expected_ids stimmen nicht. "
+                            f"angegeben={list(expected)} richtig={actual}."
+                        )
+                        info["ok"] = False
+                        info["actual_ids"] = actual
+                        info["given_ids"] = list(expected)
+                    else:
+                        info["notes"].append("expected_ids_ok")
+                        info["actual_ids"] = actual
+
+        for table in _embedded_tables(step):
+            name = str(table.get("name") or "").strip()
+            cols = list(table.get("columns") or [])
+            rows = list(table.get("rows") or [])
+            if not name:
+                errors.append(f"steps[{idx}]: table.name fehlt.")
+                info["ok"] = False
+                continue
+            try:
+                live = sandbox_table(name, columns=cols or None)
+            except Exception as exc:  # noqa: BLE001
+                sql_checked = False
+                warnings.append(f"steps[{idx}].table: nicht prüfbar ({exc}).")
+                continue
+            if not live.get("ok"):
+                if _looks_like_connect_error(str(live.get("error") or "")):
+                    sql_checked = False
+                    warnings.append(f"steps[{idx}].table: Datenbank nicht erreichbar.")
+                else:
+                    errors.append(f"steps[{idx}].table: {live.get('error')}.")
+                    info["ok"] = False
+                continue
+            live_rows = live.get("rows") or []
+            compare_cols = cols or list(live.get("columns") or [])
+            if len(rows) != len(live_rows):
+                errors.append(
+                    f"steps[{idx}].table {name}: {len(rows)} Zeilen eingebettet, "
+                    f"{len(live_rows)} in der DB."
+                )
+                info["ok"] = False
+                continue
+            diffs = []
+            for i, (emb, dbrow) in enumerate(zip(rows, live_rows)):
+                a = _row_cells(emb, compare_cols)
+                b = _row_cells(dbrow, compare_cols)
+                if a != b:
+                    diffs.append({"index": i, "embedded": a, "db": b})
+                if len(diffs) >= 5:
+                    break
+            if diffs:
+                errors.append(f"steps[{idx}].table {name}: Zeilen weichen von der DB ab.")
+                info["ok"] = False
+                info["table_diffs"] = diffs
+            else:
+                info["notes"].append("table_ok")
+
+        steps_out.append(info)
+
+    if fill_ids:
+        data["steps"] = steps
+    return {
+        "ok": not errors,
+        "sql_checked": sql_checked,
+        "errors": errors,
+        "warnings": warnings,
+        "steps": steps_out,
+        "lesson": data if fill_ids else None,
+        "id": lid,
+    }
+
+
+def _parse_lesson_args(args):
     data = args.get("lesson")
     if isinstance(data, str):
         try:
             data = json.loads(data)
         except json.JSONDecodeError as exc:
-            return _err(f"lesson ist kein JSON: {exc}")
+            return None, _err(f"lesson ist kein JSON: {exc}")
     if not data:
         data = _draft_payload(args)
+    if not isinstance(data, dict):
+        return None, _err("lesson muss ein Objekt sein.")
+    return data, None
+
+
+def tool_validate_exercise(args):
+    data, err = _parse_lesson_args(args)
+    if err:
+        return err
+    report = validate_lesson(data, fill_ids=True)
+    payload = {
+        "ok": report["ok"],
+        "sql_checked": report["sql_checked"],
+        "errors": report["errors"],
+        "warnings": report["warnings"],
+        "steps": report["steps"],
+        "id": report["id"],
+        "filled_expected_ids": bool(
+            report.get("lesson")
+            and any("expected_ids_filled" in (s.get("notes") or []) for s in report["steps"])
+        ),
+    }
+    if not report["sql_checked"] and not report["errors"]:
+        payload["ok"] = False
+        payload["errors"] = [
+            environment_report("validate_exercise: SQL nicht prüfbar. Datenbank prüfen.")
+        ]
+        return _err(payload["errors"][0], extra=payload)
+    if not report["ok"]:
+        return _err("Übung ist ungültig.", extra=payload)
+    return _ok_text(payload)
+
+
+def _absolute_url(app_url: str | None, lid: str) -> str:
+    path = f"/playground/{lid}"
+    if app_url:
+        return app_url.rstrip("/") + path
+    return path
+
+
+def tool_save_practice(args):
+    data, err = _parse_lesson_args(args)
+    if err:
+        return err
+    report = validate_lesson(data, fill_ids=True)
+    if report["errors"]:
+        return _err("Übung nicht gespeichert — validate_exercise ist rot.", extra={
+            "ok": False,
+            "errors": report["errors"],
+            "warnings": report["warnings"],
+            "steps": report["steps"],
+        })
+    data = report["lesson"] or data
+    target = resolve_workshop()
+    folder = Path(target["workshop_dir"])
     try:
-        path = save_workshop_lesson(data)
+        path = save_workshop_lesson(data, folder=folder)
     except ValueError as exc:
         return _err(str(exc))
-    return _ok_text({"saved": str(path), "id": data.get("id"), "url": f"/playground/{data.get('id')}"})
+    lid = str(data.get("id") or "")
+    url = _absolute_url(target.get("app_url"), lid)
+    reachable = None
+    http_status = None
+    if target.get("app_url") and (target.get("pid_alive") or target.get("http_ok") or target.get("appPort")):
+        http_status, _final = http_get(url)
+        reachable = http_status == 200
+        if not reachable:
+            return _err(
+                "Übung gespeichert, aber die laufende App liest sie nicht. "
+                f"geschrieben = {path}  "
+                f"App = {target.get('app_url')} (PID {target.get('flaskPid')})  "
+                f"HTTP = {http_status!r}  "
+                f"workshop der App = {target.get('workshop_dir')}  "
+                f"LEARN_SQL_HOME = {os.environ.get('LEARN_SQL_HOME') or '(nicht gesetzt)'}. "
+                "Installation inkonsistent — die Datei liegt nicht dort, wo Flask liest.",
+                extra={
+                    "saved": str(path),
+                    "id": lid,
+                    "url": url,
+                    "reachable": False,
+                    "http_status": http_status,
+                    "workshop_dir": str(folder),
+                    "app_url": target.get("app_url"),
+                    "flaskPid": target.get("flaskPid"),
+                },
+            )
+    return _ok_text({
+        "saved": str(path),
+        "id": lid,
+        "url": url,
+        "reachable": reachable,
+        "http_status": http_status,
+        "workshop_dir": str(folder),
+        "app_url": target.get("app_url"),
+        "sql_checked": report["sql_checked"],
+        "warnings": report["warnings"],
+    })
 
 
 def tool_list_workshop(_args):
-    return _ok_text([
-        {"id": l["id"], "title": l["title"], "steps": len(l.get("steps") or [])}
-        for l in workshop_lessons()
-    ])
+    return _ok_text({
+        "exercises": [
+            {"id": l["id"], "title": l["title"], "steps": len(l.get("steps") or [])}
+            for l in workshop_lessons()
+        ]
+    })
 
 
 def tool_delete_practice(args):
@@ -378,131 +1193,284 @@ def tool_list_cards(args):
     cards = knowledge_cards()
     if topic:
         cards = [c for c in cards if c.get("topic") == topic or c.get("slug") == topic]
-    return _ok_text(cards[:40])
+    return _ok_text({"cards": cards[:40]})
 
 
-TOOLS = {
-    "schema": {
-        "description": "Tabellen und Spalten im Schema learn.",
-        "inputSchema": {"type": "object", "properties": {}},
-        "fn": tool_schema,
-    },
-    "sample_rows": {
-        "description": "Erste Zeilen einer learn-Tabelle.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"table": {"type": "string", "description": "orders, clients, stock oder order_items"}},
-        },
-        "fn": tool_sample_rows,
-    },
-    "run_sql": {
-        "description": "SELECT/WITH/EXPLAIN gegen learn, damit erwartete Ergebnisse stimmen.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"sql": {"type": "string"}},
-            "required": ["sql"],
-        },
-        "fn": tool_run_sql,
-    },
-    "search_wissen": {
-        "description": "Artikel der PostgreSQL-Bibel suchen.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"q": {"type": "string"}},
-            "required": ["q"],
-        },
-        "fn": tool_search_wissen,
-    },
-    "get_article": {
-        "description": "Einen Bibel-Artikel vollständig lesen.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"slug": {"type": "string"}},
-            "required": ["slug"],
-        },
-        "fn": tool_get_article,
-    },
-    "list_lessons": {
-        "description": "Offizielle Kapitel und SQL-Playground-Übungen.",
-        "inputSchema": {"type": "object", "properties": {}},
-        "fn": tool_list_lessons,
-    },
-    "step_schema": {
-        "description": "Übungsdesign und JSON-Form der Schritte — vor dem Anlegen lesen.",
-        "inputSchema": {"type": "object", "properties": {}},
-        "fn": tool_step_schema,
-    },
-    "get_lesson": {
-        "description": "Eine offizielle oder Playground-Übung als Vorbild laden (z.B. ch8).",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"id": {"type": "string", "description": "ch8, challenge-2 oder eine ws-…-id"}},
-            "required": ["id"],
-        },
-        "fn": tool_get_lesson,
-    },
-    "draft_exercise": {
-        "description": "Entwurf im Übungsdesign (anschauen → verstehen → schreiben → Kurzcheck). Inhalt selbst wählen, Form aus step_schema. Nicht unverändert speichern.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "id": {"type": "string"},
-                "title": {"type": "string"},
-                "prompt": {"type": "string"},
-                "solution": {"type": "string"},
-                "goal": {"type": "string"},
-                "look": {"type": "string"},
-                "hints": {"type": "array", "items": {"type": "string"}},
-                "concepts": {"type": "array", "items": {"type": "string"}},
-            },
-        },
-        "fn": tool_draft_exercise,
-    },
-    "save_practice": {
-        "description": "Übung in den SQL-Playground schreiben (data/workshop). lesson folgt dem Übungsdesign aus step_schema. Vorher run_sql auf die Lösung. Nicht in den offiziellen Pfad.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "lesson": {"type": "object"},
-                "id": {"type": "string"},
-                "title": {"type": "string"},
-                "prompt": {"type": "string"},
-                "solution": {"type": "string"},
-            },
-        },
-        "fn": tool_save_practice,
-    },
-    "list_workshop": {
-        "description": "Gespeicherte SQL-Playground-Übungen.",
-        "inputSchema": {"type": "object", "properties": {}},
-        "fn": tool_list_workshop,
-    },
-    "delete_practice": {
-        "description": "Eine oder mehrere Playground-Übungen löschen. id ist eine ws-…-id oder eine Liste. Offizielle Kapitel bleiben.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "description": "Eine ws-…-id oder eine Liste von ids.",
-                },
-                "ids": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Mehrere ws-…-ids auf einmal.",
+LESSON_OBJECT_SCHEMA = {
+    "type": "object",
+    "description": (
+        "Vollständige Playground-Übung. Wenn gesetzt, werden id/title/prompt/solution ignoriert. "
+        "Form: exercise_context / step_schema."
+    ),
+    "properties": {
+        "id": {"type": "string", "description": "ws-… Slug, wird zu /playground/{id}."},
+        "title": {"type": "string", "description": "Kurzer Titel wie ein Kapitel."},
+        "goal": {"type": "string", "description": "Ein Satz: was die Person danach kann."},
+        "minutes": {"type": "integer", "description": "Dauer in Minuten."},
+        "concepts": {"type": "array", "items": {"type": "string"}},
+        "model": {"type": "array", "items": {"type": "string"}},
+        "steps": {
+            "type": "array",
+            "description": "Mindestens 3 Schritte, nicht nur look.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": STEP_TYPES,
+                        "description": "Schritttyp. Unbekannte Typen rendert das Frontend nicht.",
+                    }
                 },
             },
         },
-        "fn": tool_delete_practice,
-    },
-    "list_cards": {
-        "description": "Karteikarten der Bibel, optional nach Thema (lesen, filtern, …).",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"topic": {"type": "string"}},
+        "quiz": {
+            "type": "array",
+            "description": "Mindestens 4 Fachfragen. correct ist 0-basiert.",
+            "items": {"type": "object"},
         },
-        "fn": tool_list_cards,
     },
 }
+
+
+def _table_names() -> list[str]:
+    return [t["name"] for t in CORE_SANDBOX]
+
+
+def _tools():
+    tables = _table_names()
+    table_desc = ", ".join(tables)
+    sample_table = {
+        "type": "string",
+        "description": (
+            f"Tabelle in learn, z.B. {table_desc}. "
+            "Weitere Namen stehen in schema / exercise_context (kein festes Enum — Extra-Tabellen sind erlaubt)."
+        ),
+    }
+    return {
+        "schema": {
+            "description": "Tabellen, Spalten und Zeilenzahlen im Schema learn (live).",
+            "inputSchema": {"type": "object", "properties": {}},
+            "fn": tool_schema,
+        },
+        "sample_rows": {
+            "description": (
+                f"Erste Zeilen einer learn-Tabelle ({table_desc}). "
+                "Für den Step-table-Block lieber table_rows nutzen."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {"table": sample_table},
+            },
+            "fn": tool_sample_rows,
+        },
+        "table_rows": {
+            "description": (
+                "Zeilen einer learn-Tabelle im Step-table-Format "
+                "{name, label, columns, rows} — copy-paste in look/predict."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "table": {**sample_table, "description": (
+                        f"Tabellenname in learn, z.B. {table_desc}. "
+                        "Live-Liste: schema oder exercise_context."
+                    )},
+                    "columns": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Optionale Spaltenliste. Default: alle.",
+                    },
+                    "where": {
+                        "type": "string",
+                        "description": "Optionale WHERE-Klausel ohne das Wort WHERE, z.B. status = 'offen'.",
+                    },
+                },
+                "required": ["table"],
+            },
+            "fn": tool_table_rows,
+        },
+        "run_sql": {
+            "description": (
+                "SELECT/WITH/EXPLAIN gegen learn, damit erwartete Ergebnisse stimmen. "
+                "as_ids: Spaltenname — Antwort ist eine flache ID-Liste für expected_ids."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "sql": {"type": "string", "description": "Lesende Abfrage gegen learn."},
+                    "as_ids": {
+                        "description": (
+                            "Spaltenname (z.B. id). Liefert ids: [1,3,4] statt Zeilenobjekte. "
+                            "true steht für die Spalte id."
+                        )
+                    },
+                },
+                "required": ["sql"],
+            },
+            "fn": tool_run_sql,
+        },
+        "search_wissen": {
+            "description": "Artikel der PostgreSQL-Bibel suchen.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"q": {"type": "string"}},
+                "required": ["q"],
+            },
+            "fn": tool_search_wissen,
+        },
+        "get_article": {
+            "description": "Einen Bibel-Artikel vollständig lesen.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"slug": {"type": "string"}},
+                "required": ["slug"],
+            },
+            "fn": tool_get_article,
+        },
+        "list_lessons": {
+            "description": "Offizielle Kapitel und SQL-Playground-Übungen.",
+            "inputSchema": {"type": "object", "properties": {}},
+            "fn": tool_list_lessons,
+        },
+        "exercise_context": {
+            "description": (
+                "Alles zum Schreiben einer Playground-Übung in einem Call: "
+                "Step-Typen mit Pflicht/Optional und Feldsemantik, table-Struktur, "
+                "Live-Sandbox, PATH_IDS, Reset, Ziel-URL, Beispiel-Lesson."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "example": {
+                        "type": "string",
+                        "description": "Vorbild-id, Standard challenge-2.",
+                    }
+                },
+            },
+            "fn": tool_exercise_context,
+        },
+        "step_schema": {
+            "description": "Übungsdesign und JSON-Form der Schritte — vor dem Anlegen lesen.",
+            "inputSchema": {"type": "object", "properties": {}},
+            "fn": tool_step_schema,
+        },
+        "get_lesson": {
+            "description": "Eine offizielle oder Playground-Übung als Vorbild laden (z.B. ch8).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"id": {"type": "string", "description": "ch8, challenge-2 oder eine ws-…-id"}},
+                "required": ["id"],
+            },
+            "fn": tool_get_lesson,
+        },
+        "draft_exercise": {
+            "description": (
+                "Entwurf im Übungsdesign (anschauen → verstehen → schreiben → Kurzcheck). "
+                "Inhalt selbst wählen. Nicht unverändert speichern — validate_exercise nutzen."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string", "description": "ws-… Slug für den Entwurf."},
+                    "title": {"type": "string", "description": "Titel der Übung."},
+                    "prompt": {"type": "string", "description": "Aufgabenstellung für den write-Step."},
+                    "solution": {"type": "string", "description": "Muster-SQL."},
+                    "goal": {"type": "string"},
+                    "look": {"type": "string", "description": "Text für den look-Step."},
+                    "hints": {"type": "array", "items": {"type": "string"}},
+                    "concepts": {"type": "array", "items": {"type": "string"}},
+                },
+            },
+            "fn": tool_draft_exercise,
+        },
+        "validate_exercise": {
+            "description": (
+                "Dry-Run: SQL, expected_ids, eingebettete table-Blöcke, id, PATH_IDS, "
+                "Step-/Quiz-Mindestzahl. Schreibt nichts."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "lesson": LESSON_OBJECT_SCHEMA,
+                    "id": {"type": "string", "description": "Nur wenn lesson fehlt: Draft-Felder wie bei save_practice."},
+                    "title": {"type": "string"},
+                    "prompt": {"type": "string"},
+                    "solution": {"type": "string"},
+                },
+            },
+            "fn": tool_validate_exercise,
+        },
+        "save_practice": {
+            "description": (
+                "Übung in den SQL-Playground schreiben (workshop/). "
+                "Entweder vollständige lesson oder Draft-Felder id/title/prompt/solution — "
+                "lesson gewinnt. Validiert intern. Erfolg nur, wenn die laufende App die URL sieht."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "lesson": LESSON_OBJECT_SCHEMA,
+                    "id": {
+                        "type": "string",
+                        "description": "Nur ohne lesson: ws-… für den Draft. Wird ignoriert, wenn lesson gesetzt ist.",
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "Nur ohne lesson. Wird ignoriert, wenn lesson gesetzt ist.",
+                    },
+                    "prompt": {
+                        "type": "string",
+                        "description": "Nur ohne lesson: Aufgabenstellung. Wird ignoriert, wenn lesson gesetzt ist.",
+                    },
+                    "solution": {
+                        "type": "string",
+                        "description": "Nur ohne lesson: Muster-SQL. Wird ignoriert, wenn lesson gesetzt ist.",
+                    },
+                },
+            },
+            "fn": tool_save_practice,
+        },
+        "list_workshop": {
+            "description": "Gespeicherte SQL-Playground-Übungen.",
+            "inputSchema": {"type": "object", "properties": {}},
+            "fn": tool_list_workshop,
+        },
+        "delete_practice": {
+            "description": "Eine oder mehrere Playground-Übungen löschen. id ist eine ws-…-id oder eine Liste. Offizielle Kapitel bleiben.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "description": "Eine ws-…-id oder eine Liste von ids.",
+                    },
+                    "ids": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Mehrere ws-…-ids auf einmal.",
+                    },
+                },
+            },
+            "fn": tool_delete_practice,
+        },
+        "list_cards": {
+            "description": "Karteikarten der Bibel, optional nach Thema (lesen, filtern, …).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"topic": {"type": "string"}},
+            },
+            "fn": tool_list_cards,
+        },
+    }
+
+
+TOOLS = _tools()
+
+
+def instruction_tool_names() -> list[str]:
+    return sorted({
+        name for name in re.findall(r"`([a-z][a-z0-9_]+)`", INSTRUCTIONS)
+        if name in TOOLS
+    })
 
 
 def handle(msg: dict):
@@ -515,15 +1483,16 @@ def handle(msg: dict):
             "result": {
                 "protocolVersion": PROTOCOL,
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "learnsql", "version": "1.0.0"},
+                "serverInfo": {"name": "learnsql", "version": BUILD},
                 "instructions": INSTRUCTIONS,
             },
         }
     if method == "notifications/initialized":
         return None
     if method == "tools/list":
+        specs = _tools()
         tools = []
-        for name, spec in TOOLS.items():
+        for name, spec in specs.items():
             tools.append({
                 "name": name,
                 "description": spec["description"],
@@ -534,7 +1503,7 @@ def handle(msg: dict):
         params = msg.get("params") or {}
         name = params.get("name")
         args = params.get("arguments") or {}
-        spec = TOOLS.get(name)
+        spec = _tools().get(name)
         if not spec:
             return {
                 "jsonrpc": "2.0",
