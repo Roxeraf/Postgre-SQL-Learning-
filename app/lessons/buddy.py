@@ -1,13 +1,15 @@
 """Teaching copy, learner context for Claude, and in-app help packs.
 
-The app does not call a language model. Claude Desktop / Claude Code reads
-this context through MCP (`buddy_context`, `help_with`, `coach_sql`).
+The app has no model of its own. The in-app buddy runs the local Claude Code
+CLI (see `app/claude_cli.py`); Claude Desktop reads the same context through
+MCP (`buddy_context`, `help_with`, `coach_sql`).
 """
 
 from __future__ import annotations
 
 import copy
 import json
+import os
 import re
 import time
 from pathlib import Path
@@ -175,7 +177,12 @@ def save_learner_context(data: dict) -> dict:
     }
     path = learner_context_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    # Write atomically: the debounced browser sync and the chat request both
+    # land here, and the MCP server reads the file concurrently. A torn read
+    # makes load_learner_context() return None and the buddy loses the learner.
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
     return payload
 
 

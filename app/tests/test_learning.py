@@ -1303,5 +1303,255 @@ class BuddyAndExplainTests(unittest.TestCase):
         self.assertIn("FROM", tokens)
 
 
+class ClaudeBuddyChatTests(unittest.TestCase):
+    """The in-app buddy runs the local `claude` CLI; none of this needs one."""
+
+    CANNED = [
+        json.dumps({"type": "active_goal", "value": None}),
+        # ~25 KB of housekeeping the CLI emits before anything useful.
+        json.dumps({"type": "system", "subtype": "commands_changed", "commands": ["x" * 400]}),
+        json.dumps({
+            "type": "system", "subtype": "init", "session_id": "sess-1",
+            "model": "claude-sonnet-5",
+            "mcp_servers": [{"name": "learnsql", "status": "connected"}],
+        }),
+        json.dumps({"type": "stream_event", "event": {
+            "type": "content_block_delta",
+            "delta": {"type": "text_delta", "text": "Weil WHERE "}}}),
+        json.dumps({"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "name": "ToolSearch"},
+            {"type": "tool_use", "name": "mcp__learnsql__buddy_context"}]}}),
+        # subagent chatter must not reach the learner
+        json.dumps({"type": "assistant", "parent_tool_use_id": "t1", "message": {"content": [
+            {"type": "tool_use", "name": "mcp__learnsql__run_sql"}]}}),
+        "das ist kein json",
+        json.dumps({"type": "stream_event", "event": {
+            "type": "content_block_delta",
+            "delta": {"type": "text_delta", "text": "filtert."}}}),
+        json.dumps({
+            "type": "result", "subtype": "success", "is_error": False,
+            "result": "Weil WHERE filtert.", "session_id": "sess-1",
+            "total_cost_usd": 0.01, "permission_denials": [],
+        }),
+    ]
+
+    def _fake_proc(self, lines, rc=0, stderr=""):
+        import io
+
+        class FakeProc:
+            pid = 4242
+
+            def __init__(self):
+                self.stdout = io.StringIO("".join(line + "\n" for line in lines))
+                self.stderr = io.StringIO(stderr)
+                self.returncode = rc
+
+            def poll(self):
+                return self.returncode
+
+            def wait(self, timeout=None):
+                return self.returncode
+
+        return FakeProc()
+
+    def test_iter_events_keeps_only_what_the_drawer_needs(self):
+        import claude_cli
+
+        events = list(claude_cli.iter_events(self.CANNED))
+        names = [name for name, _ in events]
+        self.assertEqual(names, ["init", "delta", "tool", "delta", "done"])
+
+        payloads = dict(zip(names, [p for _, p in events]))
+        self.assertTrue(payloads["init"]["mcp_ok"])
+        self.assertEqual(payloads["init"]["session_id"], "sess-1")
+        # ToolSearch is Claude Code plumbing, not buddy progress.
+        self.assertEqual([p["name"] for n, p in events if n == "tool"], ["buddy_context"])
+        self.assertEqual(payloads["done"]["session_id"], "sess-1")
+        self.assertTrue(payloads["done"]["ok"])
+
+    def test_allowed_tools_match_the_mcp_server(self):
+        """Adding a 21st MCP tool must not silently stay unreachable."""
+        import claude_cli
+
+        sys.path.insert(0, str(REPO / "mcp"))
+        import learnsql_mcp as mcp
+
+        listed = mcp.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+        names = {t["name"] for t in listed["result"]["tools"]}
+        self.assertEqual(set(claude_cli.ALLOWED_TOOLS), names)
+
+    def test_argv_is_locked_down(self):
+        import claude_cli
+
+        argv = claude_cli.build_argv(
+            "Frage", mcp_path="/tmp/m.json", cli_path="/x/claude", version=(2, 1, 270)
+        )
+        self.assertEqual(argv[0], "/x/claude")
+        self.assertEqual(argv[argv.index("-p") + 1], "Frage")
+        self.assertEqual(argv[argv.index("--output-format") + 1], "stream-json")
+        for flag in ("--verbose", "--include-partial-messages", "--strict-mcp-config"):
+            self.assertIn(flag, argv)
+        # --bare would refuse the OAuth login and demand an API key.
+        self.assertNotIn("--bare", argv)
+        self.assertNotIn("--resume", argv)
+
+        allowed = argv[argv.index("--allowedTools") + 1:argv.index("--disallowedTools")]
+        self.assertIn("mcp__learnsql__buddy_context", allowed)
+        self.assertIn("mcp__learnsql__save_practice", allowed)
+        self.assertNotIn("Bash", allowed)
+        self.assertIn("Bash", argv)  # ...but it is explicitly denied
+        self.assertIn("Write", argv)
+
+        resumed = claude_cli.build_argv(
+            "Frage", mcp_path="/tmp/m.json", session_id="abc-123",
+            cli_path="/x/claude", version=(2, 1, 270),
+        )
+        self.assertEqual(resumed[resumed.index("--resume") + 1], "abc-123")
+
+    def test_old_cli_does_not_get_unknown_flags(self):
+        """An unknown option makes the CLI exit before emitting any JSON."""
+        import claude_cli
+
+        old = claude_cli.build_argv("F", cli_path="/x/claude", version=(2, 1, 100))
+        self.assertNotIn("--permission-prompts", old)
+        new = claude_cli.build_argv("F", cli_path="/x/claude", version=(2, 1, 270))
+        self.assertIn("--permission-prompts", new)
+
+    def test_child_env_drops_inherited_claude_and_api_keys(self):
+        import claude_cli
+
+        dirty = {
+            "CLAUDE_CODE_SESSION_ID": "parent-session",
+            "CLAUDECODE": "1",
+            "ANTHROPIC_API_KEY": "sk-should-not-survive",
+            "PATH": os.environ.get("PATH", ""),
+        }
+        with patch.dict(os.environ, dirty, clear=False):
+            env = claude_cli.build_env()
+        self.assertEqual([k for k in env if k.startswith("CLAUDE")], [])
+        # The point of the feature is the subscription, not a billed API key.
+        self.assertNotIn("ANTHROPIC_API_KEY", env)
+        self.assertEqual(env.get("MCP_TIMEOUT"), "60000")
+
+    def test_mcp_config_points_at_the_apps_own_workshop(self):
+        """Otherwise buddy_context reads a different .learner-context.json."""
+        import claude_cli
+        from lessons.workshop import workshop_dir
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict(os.environ, {"WORKSHOP_DIR": tmp}, clear=False):
+                path = claude_cli.mcp_config_path(Path(tmp))
+                self.assertIsNotNone(path)
+                data = json.loads(Path(path).read_text(encoding="utf-8"))
+                entry = data["mcpServers"]["learnsql"]
+                self.assertTrue(entry["args"][-1].endswith("learnsql_mcp.py"))
+                self.assertEqual(entry["env"]["WORKSHOP_DIR"], str(workshop_dir()))
+
+    def test_mcp_child_runs_on_this_interpreter(self):
+        """A venv's python symlinks out to the system one.
+
+        install_mcp does Path(sys.executable).resolve(), which follows that
+        symlink to an interpreter without psycopg2 — every run_sql then dies
+        with "psycopg2 ist nicht installiert".
+        """
+        import claude_cli
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = claude_cli.mcp_config_path(Path(tmp))
+            entry = json.loads(Path(path).read_text(encoding="utf-8"))["mcpServers"]["learnsql"]
+        self.assertEqual(entry["command"], sys.executable)
+
+    def test_chat_route_streams_sse(self):
+        import app as flask_app
+        import claude_cli
+
+        status = {"available": True, "path": "/x/claude", "version": "2.1.270", "parsed": (2, 1, 270)}
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict(os.environ, {"WORKSHOP_DIR": tmp}, clear=False):
+                with patch.object(flask_app, "claude_status", return_value=status):
+                    with patch.object(flask_app, "spawn", return_value=self._fake_proc(self.CANNED)):
+                        with patch.object(flask_app, "terminate", return_value=None):
+                            client = flask_app.app.test_client()
+                            res = client.post("/api/buddy/chat", json={
+                                "question": "Warum WHERE?",
+                                "chat_id": "testchat1234",
+                                "context": {"page": "learn", "lesson_id": "ch3", "step": 2},
+                            })
+                            body = res.get_data(as_text=True)
+
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.headers["Content-Type"].split(";")[0], "text/event-stream")
+        for marker in ("event: start", "event: init", "event: delta", "event: done"):
+            self.assertIn(marker, body)
+        self.assertIn("Weil WHERE ", body)
+        # None of the CLI's housekeeping may reach the browser.
+        self.assertNotIn("commands_changed", body)
+        self.assertNotIn("ToolSearch", body)
+        self.assertNotIn("das ist kein json", body)
+
+    def test_chat_without_cli_is_a_clean_503(self):
+        import app as flask_app
+
+        with patch.object(flask_app, "claude_status", return_value={"available": False}):
+            client = flask_app.app.test_client()
+            res = client.post("/api/buddy/chat", json={
+                "question": "Hallo", "chat_id": "testchat1234",
+            })
+        self.assertEqual(res.status_code, 503)
+        self.assertEqual(res.get_json()["code"], "no_cli")
+
+    def test_chat_rejects_a_bogus_chat_id(self):
+        import app as flask_app
+
+        client = flask_app.app.test_client()
+        res = client.post("/api/buddy/chat", json={"question": "Hi", "chat_id": "../../etc"})
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.get_json()["code"], "bad_id")
+
+    def test_stale_session_is_explained_not_dumped(self):
+        import claude_cli
+
+        info = claude_cli.explain_failure(1, "No conversation found with session ID: dead", resumed=True)
+        self.assertEqual(info["code"], "stale_session")
+        auth = claude_cli.explain_failure(1, "Invalid API key · Please run /login", resumed=False)
+        self.assertEqual(auth["code"], "auth")
+        self.assertIn("anmelden", auth["text"])
+        old = claude_cli.explain_failure(1, "error: unknown option '--permission-prompts'", resumed=False)
+        self.assertEqual(old["code"], "old_cli")
+
+    def test_drawer_shows_chat_or_install_hint_and_never_the_clipboard(self):
+        import app as flask_app
+
+        client = flask_app.app.test_client()
+        for available, present, absent in (
+            (True, "buddy-send", "Claude Code nicht gefunden"),
+            (False, "Claude Code nicht gefunden", "buddy-send"),
+        ):
+            with patch.object(flask_app, "claude_status", return_value={"available": available}):
+                html = client.get("/learn/ch0").get_data(as_text=True)
+            self.assertIn(present, html)
+            self.assertNotIn(absent, html)
+            # The copy-the-prompt workaround is gone for good.
+            self.assertNotIn("Prompt für Claude kopieren", html)
+            self.assertNotIn("buddy-preview", html)
+            self.assertNotIn("buddy-copy", html)
+
+
+class DocsMatchRealityTests(unittest.TestCase):
+    """The app used to call no model at all. It does now — say so."""
+
+    STALE = (
+        "Die App ruft kein LLM auf",
+        "Die App ruft kein Sprachmodell auf",
+        "Prompt für Claude kopieren",
+    )
+
+    def test_docs_do_not_claim_the_app_calls_no_model(self):
+        for name in ("README.md", "mcp/ANLEITUNG.md"):
+            text = (REPO / name).read_text(encoding="utf-8")
+            for phrase in self.STALE:
+                self.assertNotIn(phrase, text, f"{name} still claims: {phrase}")
+
+
 if __name__ == "__main__":
     unittest.main()

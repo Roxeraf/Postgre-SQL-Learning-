@@ -657,24 +657,49 @@ function formatBuddyHere(state) {
   return "Übersicht. Öffne ein Kapitel, dann erklärt Claude genau diesen Schritt.";
 }
 
-function buildBuddyPrompt(ask) {
+const BUDDY_TOOL_LABELS = {
+  buddy_context: "schaut, wo du gerade bist",
+  help_with: "sucht die passende Erklärung",
+  coach_sql: "sieht sich deine Query an",
+  search_path: "durchsucht den Lernpfad",
+  search_wissen: "blättert in der Bibel",
+  get_article: "liest einen Bibel-Artikel",
+  get_lesson: "liest ein Kapitel",
+  list_lessons: "sieht sich den Lernpfad an",
+  list_cards: "sieht sich die Karteikarten an",
+  schema: "sieht sich die Tabellen an",
+  sample_rows: "holt Beispielzeilen",
+  table_rows: "holt Zeilen aus einer Tabelle",
+  run_sql: "probiert SQL in der Sandbox",
+  exercise_context: "bereitet eine Übung vor",
+  step_schema: "prüft den Aufbau der Übung",
+  draft_exercise: "entwirft eine Übung",
+  validate_exercise: "prüft die Übung",
+  save_practice: "legt eine Übung im Playground an",
+  list_workshop: "sieht sich die Playground-Übungen an",
+  delete_practice: "löscht eine Übung",
+};
+
+// First turn carries the full situation; later turns ride on the resumed
+// session and only mention where the learner has moved to.
+function buildBuddyMessage(ask, firstTurn) {
   const state = { ...pageBuddyDefaults(), ...buddyState };
   const question = (ask || document.getElementById("buddy-ask")?.value || "").trim();
-  const lines = [
-    "Ich lerne PostgreSQL in plx.learnSQL (MCP learnsql).",
-    "",
-    `Wo ich bin: ${formatBuddyHere(state)}`,
-  ];
-  if (state.prompt) lines.push(`Aufgabe: ${state.prompt}`);
-  if (state.last_sql) {
-    lines.push("Meine letzte Query:");
-    lines.push(state.last_sql);
+  const lines = [];
+  if (firstTurn) {
+    lines.push(`Wo ich bin: ${formatBuddyHere(state)}`);
+    if (state.prompt) lines.push(`Aufgabe: ${state.prompt}`);
+    if (state.last_sql) {
+      lines.push("Meine letzte Query:");
+      lines.push(state.last_sql);
+    }
+    if (state.last_coach) lines.push(`Letzter Hinweis der App: ${state.last_coach}`);
+    lines.push("");
+  } else {
+    lines.push(`(Ich bin jetzt bei: ${formatBuddyHere(state)})`);
+    lines.push("");
   }
-  if (state.last_coach) lines.push(`Letzter Hinweis der App: ${state.last_coach}`);
-  lines.push("");
   lines.push(`Frage: ${question || "Erklär mir, wo ich stehe, ohne die Lösung zu verraten."}`);
-  lines.push("");
-  lines.push("Bitte zuerst buddy_context lesen, dann help_with (und coach_sql falls SQL da ist). Lösung nicht vorgeben, außer ich frage danach.");
   return lines.join("\n");
 }
 
@@ -720,6 +745,289 @@ function closeBuddy() {
   fab?.setAttribute("aria-expanded", "false");
 }
 
+// --- buddy chat over SSE ----------------------------------------------------
+// The app runs the local `claude` CLI; these helpers drive one turn of it.
+
+let buddyCtrl = null;
+let buddyLog = [];
+let buddyTurns = 0;
+
+function buddyChatId() {
+  let id = "";
+  try {
+    id = window.localStorage.getItem("learnsql-buddy-chat") || "";
+  } catch {
+    id = "";
+  }
+  if (!/^[A-Za-z0-9_-]{8,64}$/.test(id)) {
+    id = "c" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    try {
+      window.localStorage.setItem("learnsql-buddy-chat", id);
+    } catch {
+      /* private mode — a per-tab id is fine */
+    }
+  }
+  return id;
+}
+
+function buddyMarkdown(text) {
+  if (!window.marked) return null;
+  try {
+    // marked does not sanitize and we assign to innerHTML, so drop raw HTML.
+    const renderer = new window.marked.Renderer();
+    renderer.html = () => "";
+    return window.marked.parse(text, { mangle: false, headerIds: false, renderer });
+  } catch {
+    return null;
+  }
+}
+
+function buddyScroll() {
+  const box = document.getElementById("buddy-chat");
+  if (box) box.scrollTop = box.scrollHeight;
+}
+
+function buddyBubble(role, text) {
+  const box = document.getElementById("buddy-chat");
+  if (!box) return null;
+  const el = document.createElement("div");
+  el.className = "buddy-msg buddy-msg-" + role;
+  el.textContent = text;
+  box.appendChild(el);
+  buddyScroll();
+  return el;
+}
+
+function buddyRender(el, text) {
+  const html = buddyMarkdown(text);
+  if (html === null) {
+    el.textContent = text;
+    return;
+  }
+  el.innerHTML = html;
+  // Same treatment lesson bodies get (see renderSections).
+  el.querySelectorAll("pre code").forEach((code) => {
+    code.innerHTML = colorizeSql(code.textContent);
+  });
+}
+
+function buddyNote(kind, text) {
+  const box = document.getElementById("buddy-chat");
+  if (!box) return;
+  const el = document.createElement("p");
+  el.className = "buddy-note buddy-note-" + kind;
+  el.textContent = text;
+  box.appendChild(el);
+  buddyScroll();
+}
+
+function buddyActivity(text) {
+  const el = document.getElementById("buddy-activity");
+  if (!el) return;
+  el.hidden = !text;
+  el.textContent = text || "";
+}
+
+function buddyError(text) {
+  const el = document.getElementById("buddy-error");
+  if (!el) return;
+  el.hidden = !text;
+  el.textContent = text || "";
+}
+
+function buddyBusy(busy) {
+  const send = document.getElementById("buddy-send");
+  const stop = document.getElementById("buddy-stop");
+  const chat = document.getElementById("buddy-chat");
+  if (send) send.disabled = busy;
+  if (stop) stop.hidden = !busy;
+  if (chat) chat.setAttribute("aria-busy", busy ? "true" : "false");
+  if (!busy) buddyActivity("");
+}
+
+function buddyPersist() {
+  try {
+    window.sessionStorage.setItem(
+      "learnsql-buddy-log",
+      JSON.stringify(buddyLog.slice(-40)),
+    );
+  } catch {
+    /* nothing worth failing a chat over */
+  }
+}
+
+function buddyRestore() {
+  let raw = "";
+  try {
+    raw = window.sessionStorage.getItem("learnsql-buddy-log") || "";
+  } catch {
+    raw = "";
+  }
+  if (!raw) return;
+  try {
+    buddyLog = JSON.parse(raw) || [];
+  } catch {
+    buddyLog = [];
+    return;
+  }
+  buddyTurns = buddyLog.filter((m) => m.role === "user").length;
+  buddyLog.forEach((msg) => {
+    const el = buddyBubble(msg.role === "user" ? "user" : "claude", "");
+    if (!el) return;
+    if (msg.role === "user") el.textContent = msg.text;
+    else buddyRender(el, msg.text);
+  });
+}
+
+function buddyReset() {
+  buddyStop();
+  buddyLog = [];
+  buddyTurns = 0;
+  const box = document.getElementById("buddy-chat");
+  if (box) box.innerHTML = "";
+  buddyError("");
+  document.getElementById("buddy-reset").hidden = true;
+  try {
+    window.sessionStorage.removeItem("learnsql-buddy-log");
+  } catch {
+    /* ignore */
+  }
+  postJson("/api/buddy/reset", { chat_id: buddyChatId() });
+}
+
+function buddyStop() {
+  if (buddyCtrl) {
+    buddyCtrl.abort();
+    buddyCtrl = null;
+  }
+  buddyBusy(false);
+}
+
+function buddyHandle(block, ctx) {
+  if (!block || block.startsWith(":")) return;
+  let name = "";
+  let raw = "";
+  block.split("\n").forEach((line) => {
+    if (line.startsWith("event:")) name = line.slice(6).trim();
+    else if (line.startsWith("data:")) raw += line.slice(5).trim();
+  });
+  if (!name) return;
+  let data = {};
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch {
+    return;
+  }
+
+  if (name === "start") {
+    buddyActivity("Claude startet …");
+  } else if (name === "init") {
+    buddyActivity("Claude denkt nach …");
+    if (data.mcp_ok === false) {
+      buddyNote("warn", "Claude sieht deinen Lernstand gerade nicht (learnsql nicht verbunden).");
+    }
+  } else if (name === "tool") {
+    const label = BUDDY_TOOL_LABELS[data.name] || "benutzt " + data.name;
+    buddyActivity("Claude " + label + " …");
+    ctx.tools.add(data.name);
+  } else if (name === "delta") {
+    ctx.text += data.text || "";
+    if (!ctx.bubble) ctx.bubble = buddyBubble("claude", "");
+    if (ctx.bubble && !ctx.pending) {
+      // One render per frame — re-parsing markdown per token is what makes
+      // streaming UIs stutter.
+      ctx.pending = true;
+      window.requestAnimationFrame(() => {
+        ctx.pending = false;
+        buddyRender(ctx.bubble, ctx.text);
+        buddyScroll();
+      });
+    }
+  } else if (name === "notice") {
+    buddyNote(data.kind || "info", data.text || "");
+  } else if (name === "done") {
+    ctx.done = true;
+    const text = data.text || ctx.text;
+    if (!ctx.bubble) ctx.bubble = buddyBubble("claude", "");
+    if (ctx.bubble) buddyRender(ctx.bubble, text);
+    buddyLog.push({ role: "claude", text });
+    buddyPersist();
+    if (ctx.tools.has("save_practice") || ctx.tools.has("delete_practice")) {
+      buddyNote("info", "Der SQL-Playground hat sich geändert.");
+    }
+    const reset = document.getElementById("buddy-reset");
+    if (reset) reset.hidden = false;
+  } else if (name === "error") {
+    ctx.done = true;
+    buddyError(data.text || "Etwas ist schiefgelaufen.");
+  }
+}
+
+async function buddySend(ask) {
+  if (buddyCtrl) return;
+  const box = document.getElementById("buddy-ask");
+  const question = (ask || box?.value || "").trim();
+  if (!question) return;
+
+  buddyError("");
+  buddyBubble("user", question);
+  buddyLog.push({ role: "user", text: question });
+  buddyPersist();
+  if (box) box.value = "";
+
+  const firstTurn = buddyTurns === 0;
+  buddyTurns += 1;
+  const message = buildBuddyMessage(question, firstTurn);
+  syncBuddyContext({ question });
+
+  buddyCtrl = new AbortController();
+  buddyBusy(true);
+  const ctx = { text: "", bubble: null, tools: new Set(), done: false, pending: false };
+
+  try {
+    const res = await fetch("/api/buddy/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: message,
+        chat_id: buddyChatId(),
+        context: { ...pageBuddyDefaults(), ...buddyState, question },
+      }),
+      signal: buddyCtrl.signal,
+    });
+    if (!res.ok) {
+      let payload = {};
+      try {
+        payload = await res.json();
+      } catch {
+        payload = {};
+      }
+      buddyError(payload.error || `Fehler ${res.status}.`);
+      return;
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let cut;
+      while ((cut = buffer.indexOf("\n\n")) >= 0) {
+        buddyHandle(buffer.slice(0, cut), ctx);
+        buffer = buffer.slice(cut + 2);
+      }
+    }
+    if (!ctx.done) buddyError("Abgebrochen — die Antwort kam nicht zu Ende.");
+  } catch (err) {
+    if (err && err.name === "AbortError") buddyNote("info", "Abgebrochen.");
+    else buddyError("Claude ist nicht erreichbar.");
+  } finally {
+    buddyCtrl = null;
+    buddyBusy(false);
+  }
+}
+
 function initBuddy() {
   document.getElementById("buddy-close")?.addEventListener("click", closeBuddy);
   document.addEventListener("click", (e) => {
@@ -731,27 +1039,27 @@ function initBuddy() {
   document.getElementById("buddy-chips")?.addEventListener("click", (e) => {
     const chip = e.target.closest(".js-buddy-chip");
     if (!chip) return;
+    const ask = chip.getAttribute("data-ask") || "";
     const box = document.getElementById("buddy-ask");
-    if (box) box.value = chip.getAttribute("data-ask") || "";
+    if (box) box.value = ask;
+    buddySend(ask);
   });
-  document.getElementById("buddy-copy")?.addEventListener("click", async () => {
-    const text = buildBuddyPrompt();
-    const preview = document.getElementById("buddy-preview");
-    const msg = document.getElementById("buddy-copy-msg");
-    if (preview) {
-      preview.hidden = false;
-      preview.textContent = text;
+  document.getElementById("buddy-send")?.addEventListener("click", () => buddySend());
+  document.getElementById("buddy-stop")?.addEventListener("click", buddyStop);
+  document.getElementById("buddy-reset")?.addEventListener("click", buddyReset);
+  document.getElementById("buddy-ask")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      buddySend();
     }
-    await copyText(text);
-    if (msg) {
-      msg.hidden = false;
-      window.setTimeout(() => { msg.hidden = true; }, 2800);
-    }
-    syncBuddyContext({ question: document.getElementById("buddy-ask")?.value || "" });
+  });
+  window.addEventListener("beforeunload", () => {
+    if (buddyCtrl) buddyCtrl.abort();
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && document.body.classList.contains("buddy-open")) closeBuddy();
   });
+  buddyRestore();
   syncBuddyContext();
 }
 

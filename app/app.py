@@ -1,12 +1,16 @@
 import json
 import os
 import re
+import queue
+import subprocess
 import sys
+import threading
+import time
 from collections import Counter
 from pathlib import Path
 
 import psycopg2
-from flask import Flask, jsonify, redirect, render_template, request
+from flask import Flask, Response, jsonify, redirect, render_template, request
 
 
 def ensure_app_on_path() -> Path:
@@ -64,11 +68,25 @@ from learn_db import (  # noqa: E402
     run_sql,
     _format_restore_error,
 )
-from lessons.workshop import delete_workshop_lesson, workshop_by_id, workshop_lessons  # noqa: E402
+from lessons.workshop import (  # noqa: E402
+    delete_workshop_lesson,
+    workshop_by_id,
+    workshop_dir,
+    workshop_lessons,
+)
 from lessons.buddy import (  # noqa: E402
     enrich_lesson,
     load_learner_context,
     save_learner_context,
+)
+from claude_cli import (  # noqa: E402
+    build_argv,
+    claude_status,
+    explain_failure,
+    iter_events,
+    mcp_config_path,
+    spawn,
+    terminate,
 )
 from sql_coach import (  # noqa: E402
     diagnose_structure,
@@ -411,6 +429,7 @@ def inject_nav():
         "academy": ACADEMY,
         "academy_lessons": ACADEMY["lessons"],
         "mcp_status": load_mcp_status(),
+        "claude_cli": claude_status(),
     }
 
 
@@ -864,6 +883,213 @@ def api_buddy_context():
     if not ctx:
         return jsonify({"ok": False, "error": "Noch kein Standort."})
     return jsonify({"ok": True, "context": ctx})
+
+
+# --- Claude buddy chat -------------------------------------------------------
+# One `claude -p` subprocess per turn, streamed to the drawer as SSE.
+# Single-seat by construction: one machine, one Claude login, one learner.
+
+MAX_RUNS = int(os.environ.get("BUDDY_MAX_RUNS", "2"))
+RUN_SECONDS = int(os.environ.get("BUDDY_TIMEOUT", "180"))
+FIRST_EVENT_SECONDS = 90
+HEARTBEAT_SECONDS = 12
+MAX_REPLY_CHARS = 400_000
+MAX_LINE_CHARS = 2_000_000
+
+CHAT_ID_RE = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
+
+_sessions: dict[str, str] = {}
+_busy: dict[str, float] = {}
+_chat_lock = threading.Lock()
+
+
+def _sse(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+def _pump(stream, queue_out, tag):
+    """Read a pipe on its own thread so the generator keeps its own clock."""
+    try:
+        for line in stream:
+            if len(line) > MAX_LINE_CHARS:
+                continue
+            # Never block forever: if the reader is gone the queue stays full,
+            # and an unbounded put() would strand this thread for good.
+            try:
+                queue_out.put((tag, line), timeout=RUN_SECONDS)
+            except queue.Full:
+                return
+    except (OSError, ValueError):
+        pass
+    finally:
+        try:
+            queue_out.put((tag, None), timeout=5)
+        except queue.Full:
+            pass
+
+
+def _claim(chat_id: str) -> bool:
+    now = time.monotonic()
+    with _chat_lock:
+        # A client that vanishes before the response generator starts would
+        # otherwise stay "busy" forever and lock itself out.
+        for key, started in list(_busy.items()):
+            if now - started > RUN_SECONDS + 30:
+                _busy.pop(key, None)
+        if chat_id in _busy or len(_busy) >= MAX_RUNS:
+            return False
+        _busy[chat_id] = now
+        return True
+
+
+def _release(chat_id: str) -> None:
+    with _chat_lock:
+        _busy.pop(chat_id, None)
+
+
+def _run_once(question, chat_id, session_id, status, work_dir, mcp_path, state):
+    """Yield SSE strings for one CLI invocation.
+
+    Sets state["retry"] when the run died only because the resumed session was
+    gone, so the caller can start over once without a stale --resume.
+    """
+    state["session_id"] = session_id
+    argv = build_argv(
+        question,
+        mcp_path=mcp_path,
+        session_id=session_id,
+        cli_path=status.get("path"),
+        version=status.get("parsed"),
+    )
+    try:
+        proc = spawn(argv, cwd=work_dir)
+    except OSError as exc:
+        yield _sse("error", {"code": "spawn", "text": f"Claude Code liess sich nicht starten: {exc}"})
+        return
+
+    lines: "queue.Queue" = queue.Queue(maxsize=4000)
+    threading.Thread(target=_pump, args=(proc.stdout, lines, "out"), daemon=True).start()
+    threading.Thread(target=_pump, args=(proc.stderr, lines, "err"), daemon=True).start()
+
+    errors: list[str] = []
+    open_pipes = 2
+    started = time.monotonic()
+    try:
+        while open_pipes:
+            budget = FIRST_EVENT_SECONDS if not state.get("init") else RUN_SECONDS
+            if time.monotonic() - started > budget:
+                yield _sse("error", {"code": "timeout", "text": "Claude hat zu lange gebraucht."})
+                return
+            try:
+                tag, line = lines.get(timeout=HEARTBEAT_SECONDS)
+            except queue.Empty:
+                # A Flask generator only notices a closed tab when it writes.
+                yield ": ping\n\n"
+                continue
+            if line is None:
+                open_pipes -= 1
+                continue
+            if tag == "err":
+                errors.append(line)
+                continue
+            for name, payload in iter_events([line], state):
+                yield _sse(name, payload)
+            if state.get("chars", 0) > MAX_REPLY_CHARS:
+                yield _sse("error", {"code": "too_long", "text": "Antwort zu lang, abgebrochen."})
+                return
+
+        proc.wait(timeout=10)
+        if not state.get("done"):
+            detail = "".join(errors)[-2000:]
+            info = explain_failure(proc.returncode, detail, resumed=bool(session_id))
+            if info["code"] == "stale_session":
+                state["retry"] = True
+                return
+            app.logger.warning("buddy run failed: %s | %s", info["code"], detail[-400:])
+            yield _sse("error", info)
+    except GeneratorExit:
+        raise
+    except (OSError, subprocess.SubprocessError) as exc:
+        yield _sse("error", {"code": "io", "text": str(exc)[:300]})
+    finally:
+        terminate(proc)
+        if state.get("session_id"):
+            _sessions[chat_id] = state["session_id"]
+
+
+@app.route("/api/buddy/chat", methods=["POST"])
+def api_buddy_chat():
+    data = request.get_json(force=True, silent=True) or {}
+    question = str(data.get("question") or "").strip()[:4000]
+    if not question:
+        return jsonify({"ok": False, "code": "empty", "error": "Keine Frage."}), 400
+
+    chat_id = str(data.get("chat_id") or "").strip()
+    if not CHAT_ID_RE.match(chat_id):
+        return jsonify({"ok": False, "code": "bad_id", "error": "Ungueltige Chat-Kennung."}), 400
+
+    context = data.get("context")
+    if isinstance(context, dict):
+        save_learner_context(context)
+
+    status = claude_status()
+    if not status.get("available"):
+        return jsonify({
+            "ok": False,
+            "code": "no_cli",
+            "error": "Claude Code wurde auf diesem Rechner nicht gefunden.",
+        }), 503
+
+    if not _claim(chat_id):
+        return jsonify({
+            "ok": False,
+            "code": "busy",
+            "error": "Es laeuft schon eine Antwort. Kurz warten.",
+        }), 409
+
+    session_id = _sessions.get(chat_id)
+    work_dir = workshop_dir()
+    work_dir.mkdir(parents=True, exist_ok=True)
+    mcp_path = mcp_config_path(work_dir)
+
+    def stream():
+        try:
+            yield _sse("start", {"resumed": bool(session_id)})
+            state: dict = {}
+            yield from _run_once(
+                question, chat_id, session_id, status, work_dir, mcp_path, state
+            )
+            if state.get("retry"):
+                # The stored transcript was gone. Start over once, without --resume.
+                _sessions.pop(chat_id, None)
+                yield _sse("notice", {
+                    "kind": "new_session",
+                    "text": "Das alte Gespräch war weg — Claude fängt neu an.",
+                })
+                yield from _run_once(
+                    question, chat_id, None, status, work_dir, mcp_path, {}
+                )
+        finally:
+            _release(chat_id)
+
+    return Response(
+        stream(),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+@app.route("/api/buddy/reset", methods=["POST"])
+def api_buddy_reset():
+    data = request.get_json(force=True, silent=True) or {}
+    chat_id = str(data.get("chat_id") or "").strip()
+    if CHAT_ID_RE.match(chat_id):
+        _sessions.pop(chat_id, None)
+    return jsonify({"ok": True})
 
 
 if __name__ == "__main__":

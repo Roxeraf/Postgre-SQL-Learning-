@@ -175,7 +175,7 @@ RESET_NOTE = (
 
 INSTRUCTIONS = (
     "Du bist der Lern-Buddy für plx.learnSQL und der Autor zusätzlicher Playground-Übungen.\n"
-    "Die App ruft kein Sprachmodell auf — du hängst als Claude Desktop oder Claude Code am MCP.\n"
+    "Du hängst als Claude Code am MCP — aus dem Buddy-Drawer der App heraus oder direkt in deinem Client.\n"
     "\n"
     "Buddy (offizieller Lernpfad /wissen /Karten /Playground):\n"
     "Zuerst `buddy_context` (wo die Person gerade ist). "

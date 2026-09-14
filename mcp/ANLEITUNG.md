@@ -4,10 +4,19 @@ Claude kennt das Lager (`orders`, `clients`, `stock`, `order_items`), den **offi
 
 Zwei Rollen:
 
-1. **Lern-Buddy** überall in der App (Kapitel, Bibel, Karten, Playground). In der App **Claude** antippen, Prompt kopieren, in Claude Code oder Claude Desktop einfügen. Claude liest `buddy_context` (Kapitel, Schritt, letzte Query).
+1. **Lern-Buddy** überall in der App (Kapitel, Bibel, Karten, Playground). In der App **Claude** antippen und direkt fragen — die App startet dafür im Hintergrund die `claude`-Kommandozeile mit genau diesem MCP. Claude liest `buddy_context` (Kapitel, Schritt, letzte Query). Dieselben Werkzeuge hast du auch in Claude Desktop, wenn du lieber dort arbeitest.
 2. **Zusatzübungen** in den SQL-Playground schreiben. Der offizielle Lernpfad bleibt unverändert. Übungen brauchen jetzt eine richtige Erklärung: `explain` mit Alltagssprache (`plain`) und antippenbaren SQL-Teilen (`parts`), plus `teach` an den Schreib-Schritten.
 
-Die App ruft kein Sprachmodell auf. Claude hängt nur als Client am MCP.
+Die App enthält kein Modell und keinen API-Key. Sie startet die lokale Claude-Code-Kommandozeile
+(dein normales Abo) und reicht ihr denselben MCP-Server durch. Claude Desktop bleibt daneben der
+zweite Weg — beide sehen dieselben Daten.
+
+## Der Buddy in der App
+
+- Nur `learnsql`-Werkzeuge: keine Datei-, Shell- oder Web-Zugriffe.
+- Ein Lauf gleichzeitig. **Stopp** bricht ab, **Neues Gespräch** vergisst den Verlauf.
+- Steht dort „Claude Code nicht gefunden": `npm install -g @anthropic-ai/claude-code`, einmal
+  `claude` starten und anmelden, App neu starten. Eigener Pfad über `CLAUDE_CLI`.
 
 **Voraussetzung:** plx.learnSQL (oder Docker) muss laufen, bevor Claude SQL-Werkzeuge nutzt.
 Bibel lesen, Standort (`buddy_context`) und Übungen speichern geht auch ohne Datenbank.
@@ -27,6 +36,7 @@ Kopieren und anpassen:
 Danach in der App **SQL-Playground** öffnen und die neue Karte anklicken. Überflüssige Karten löschst du am Knopf auf der Karte oder lässt Claude `delete_practice` nutzen.
 
 Als Buddy: zuerst `buddy_context`, Fragen mit `help_with` / `search_path`, SQL mit `coach_sql`.
+(Der Buddy in der App bekommt das schon über seinen Systemprompt mit.)
 
 Als Übungsautor: zuerst `exercise_context` (Übungsdesign, Live-Sandbox, Beispiel, Ziel-URL).
 Tabellenzeilen kommen über `table_rows`, IDs über `run_sql` mit `as_ids`.

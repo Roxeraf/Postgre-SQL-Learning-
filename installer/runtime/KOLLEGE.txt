@@ -17,8 +17,19 @@ SELECT, INSERT, UPDATE und DELETE machst du in der App (Kapitel und
 SQL-Playground). Wenn Beispieldaten durcheinandergeraten:
 in der Seitenleiste "Datenbank zurücksetzen".
 
-Werkstatt und Claude
---------------------
+Der Claude-Buddy in der App
+---------------------------
+In der App unten rechts auf "Claude" tippen, Frage eintippen, Antwort
+kommt direkt im Fenster. Dafür muss Claude Code auf diesem Rechner
+installiert und angemeldet sein — es zählt dein normales Claude-Abo,
+ein API-Key ist nicht nötig.
+
+Steht dort "Claude Code nicht gefunden", ist es noch nicht eingerichtet.
+Dann hilft die IT weiter, oder du nutzt Claude Desktop wie unten
+beschrieben.
+
+SQL-Playground und Claude
+-------------------------
 Claude kennt das Lager und die Bibel und kann dir zusätzliche Übungen
 bauen. Der offizielle Lernpfad bleibt unverändert. Die Übungen liegen
 in der App unter "Werkstatt".
