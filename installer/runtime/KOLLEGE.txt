@@ -51,5 +51,6 @@ Beenden: Rechtsklick auf das Symbol in der Taskleiste
 (unten rechts, ggf. bei "^" ausgeblendete Symbole) → Beenden.
 
 Deinstallation: Windows-Einstellungen → Apps → plx.learnSQL.
+Das entfernt den Programmordner inkl. Datenbank, Logs und Playground.
 Der Eintrag "learnsql" in Claude wird mit entfernt, andere
 MCP-Server bleiben.

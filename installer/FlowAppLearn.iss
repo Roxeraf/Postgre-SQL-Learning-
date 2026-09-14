@@ -1,5 +1,5 @@
 #define MyAppName "plx.learnSQL"
-#define MyAppVersion "1.0.1"
+#define MyAppVersion "1.0.2"
 #define MyAppPublisher "plx.learnSQL"
 
 [Setup]
@@ -49,11 +49,72 @@ Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Fil
 [UninstallRun]
 Filename: "{app}\Stop-FlowAppLearn.bat"; Flags: runhidden waituntilterminated; RunOnceId: "StopFlowAppLearn"
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Remove-LearnSqlMcp.ps1"" -HomeDir ""{app}"""; Flags: runhidden waituntilterminated; RunOnceId: "RemoveLearnSqlMcp"
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Clear-LearnSqlLeftovers.ps1"" -HomeDir ""{app}"""; Flags: runhidden waituntilterminated; RunOnceId: "ClearLearnSqlLeftovers"
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\data"
 Type: filesandordirs; Name: "{app}\logs"
 Type: filesandordirs; Name: "{app}\workshop"
+Type: filesandordirs; Name: "{app}\app\__pycache__"
+Type: filesandordirs; Name: "{app}\mcp\__pycache__"
 Type: files; Name: "{app}\runtime.json"
 Type: files; Name: "{app}\mcp-status.json"
+Type: dirifempty; Name: "{app}"
+
+[Code]
+function InstallDirLooksLikeOurs: Boolean;
+var
+  Dir: String;
+begin
+  Dir := RemoveBackslash(ExpandConstant('{app}'));
+  Result := CompareText(ExtractFileName(Dir), 'plx.learnSQL') = 0;
+end;
+
+procedure DeletePycacheDirs(const Dir: String);
+var
+  FindRec: TFindRec;
+  Path: String;
+begin
+  if not DirExists(Dir) then
+    Exit;
+  if FindFirst(Dir + '\*', FindRec) then
+  begin
+    try
+      repeat
+        if (FindRec.Name <> '.') and (FindRec.Name <> '..') then
+        begin
+          Path := Dir + '\' + FindRec.Name;
+          if FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY <> 0 then
+          begin
+            if CompareText(FindRec.Name, '__pycache__') = 0 then
+              DelTree(Path, True, True, True)
+            else
+              DeletePycacheDirs(Path);
+          end;
+        end;
+      until not FindNext(FindRec);
+    finally
+      FindClose(FindRec);
+    end;
+  end;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  AppDir: String;
+begin
+  if CurUninstallStep = usPostUninstall then
+  begin
+    AppDir := ExpandConstant('{app}');
+    DelTree(AppDir + '\data', True, True, True);
+    DelTree(AppDir + '\logs', True, True, True);
+    DelTree(AppDir + '\workshop', True, True, True);
+    DeleteFile(AppDir + '\runtime.json');
+    DeleteFile(AppDir + '\mcp-status.json');
+    DeletePycacheDirs(AppDir);
+    { Default install is %LOCALAPPDATA%\plx.learnSQL — wipe leftovers so the folder vanishes. }
+    if InstallDirLooksLikeOurs then
+      DelTree(AppDir, True, True, True);
+  end;
+end;
 

@@ -38,8 +38,25 @@ Get-CimInstance Win32_Process |
 
 if ((Test-Path $PgCtl) -and (Test-Path $DataDir)) {
     & $PgCtl -D $DataDir stop -m fast 2>&1 | Out-Null
-    Write-Log "pg_ctl stop Exit $LASTEXITCODE"
+    Write-Log "pg_ctl stop -m fast Exit $LASTEXITCODE"
+    $pidFile = Join-Path $DataDir "postmaster.pid"
+    for ($i = 0; $i -lt 20; $i++) {
+        if (-not (Test-Path $pidFile)) { break }
+        Start-Sleep -Milliseconds 250
+    }
+    if (Test-Path $pidFile) {
+        & $PgCtl -D $DataDir stop -m immediate 2>&1 | Out-Null
+        Write-Log "pg_ctl stop -m immediate Exit $LASTEXITCODE"
+        Start-Sleep -Milliseconds 400
+    }
 }
+
+Get-Process -Name "postgres", "pg_ctl" -ErrorAction SilentlyContinue |
+    Where-Object { $_.Path -and ($_.Path -like "$PgBin*") } |
+    ForEach-Object {
+        Stop-Process -Id $_.Id -Force
+        Write-Log "PostgreSQL-Prozess $($_.Id) beendet"
+    }
 
 Add-Type -AssemblyName System.Windows.Forms | Out-Null
 # Tray-Starter (falls noch offen) ebenfalls beenden
