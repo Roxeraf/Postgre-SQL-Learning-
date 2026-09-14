@@ -6,7 +6,7 @@ Ein Lernpfad in der App: von der ersten Tabelle bis zu JOIN, Gruppen, Änderunge
 - Zusatz-Kapitel zu Aggregaten, Positionen, CASE und Unterabfragen
 - Kurz-Quiz nach jedem Kapitel
 - SQL-Playground für Zusatzübungen von Claude (MCP)
-- PostgreSQL-Bibel unter `/wissen` (eigene Artikel, nicht das alte Mini-Glossar)
+- Wissensbasis unter `/wissen` (eigene Artikel, nicht das alte Mini-Glossar)
 - Karteikarten mit Leitner (Nochmal / Schwer / Sitzt) in localStorage
 - **Claude-Buddy in der App** — fragen und direkt im Drawer antworten lassen, über Claude Code auf diesem Rechner (kein API-Key)
 - MCP für Claude Desktop und Claude Code: dieselben Werkzeuge, wenn du lieber im Client arbeitest
@@ -91,7 +91,7 @@ docker compose up --build
     ├── sql_coach.py                 # Lernfeedback statt Roh-Postgres-Fehler
     ├── lessons/academy_data.py      # Offizieller Pfad
     ├── lessons/path_more.py         # Zusatz-Kapitel
-    ├── lessons/knowledge/           # Bibel-Artikel und Karten
+    ├── lessons/knowledge/           # Wissensbasis-Artikel und Karten
     └── templates/
 ```
 

@@ -30,7 +30,7 @@ beschrieben.
 
 SQL-Playground und Claude
 -------------------------
-Claude kennt das Lager und die Bibel und kann dir zusätzliche Übungen
+Claude kennt das Lager und die Wissensbasis und kann dir zusätzliche Übungen
 bauen. Der offizielle Lernpfad bleibt unverändert. Die Übungen liegen
 in der App unter "Werkstatt".
 

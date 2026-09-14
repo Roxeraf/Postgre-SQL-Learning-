@@ -181,7 +181,7 @@ INSTRUCTIONS = (
     "Zuerst `buddy_context` (wo die Person gerade ist). "
     "Fragen mit `help_with` und `search_path` beantworten. "
     "SQL der Person mit `coach_sql` prüfen — Hinweise, nicht die volle Lösung, außer sie wird verlangt. "
-    "Kapitel: `get_lesson` / `list_lessons`. Bibel: `search_wissen` / `get_article`.\n"
+    "Kapitel: `get_lesson` / `list_lessons`. Wissensbasis: `search_wissen` / `get_article`.\n"
     "\n"
     "Playground-Übungen (neben dem Pfad, Form wie der Lernpfad):\n"
     "Ablauf: anschauen → verstehen (explain mit plain + parts) → vorhersagen → "
@@ -1566,7 +1566,7 @@ def _tools():
             "fn": tool_run_sql,
         },
         "search_wissen": {
-            "description": "Artikel der PostgreSQL-Bibel suchen.",
+            "description": "Artikel der Wissensbasis suchen.",
             "inputSchema": {
                 "type": "object",
                 "properties": {"q": {"type": "string"}},
@@ -1575,7 +1575,7 @@ def _tools():
             "fn": tool_search_wissen,
         },
         "get_article": {
-            "description": "Einen Bibel-Artikel vollständig lesen.",
+            "description": "Einen Artikel der Wissensbasis vollständig lesen.",
             "inputSchema": {
                 "type": "object",
                 "properties": {"slug": {"type": "string"}},
@@ -1709,7 +1709,7 @@ def _tools():
             "fn": tool_delete_practice,
         },
         "list_cards": {
-            "description": "Karteikarten der Bibel, optional nach Thema (lesen, filtern, …).",
+            "description": "Karteikarten der Wissensbasis, optional nach Thema (lesen, filtern, …).",
             "inputSchema": {
                 "type": "object",
                 "properties": {"topic": {"type": "string"}},
@@ -1725,7 +1725,7 @@ def _tools():
             "fn": tool_buddy_context,
         },
         "search_path": {
-            "description": "Offiziellen Lernpfad, Playground und Bibel durchsuchen.",
+            "description": "Offiziellen Lernpfad, Playground und Wissensbasis durchsuchen.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1738,7 +1738,7 @@ def _tools():
         "help_with": {
             "description": (
                 "Frage zum aktuellen (oder angegebenen) Kapitel beantworten: "
-                "Konzepttext, passende Bibel-Artikel, Schritte — ohne Musterlösung."
+                "Konzepttext, passende Artikel aus der Wissensbasis, Schritte — ohne Musterlösung."
             ),
             "inputSchema": {
                 "type": "object",
