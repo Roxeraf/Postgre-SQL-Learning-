@@ -907,6 +907,15 @@ class WorkshopRuntimeTests(unittest.TestCase):
             finally:
                 sys.path[:] = saved
 
+    def test_installer_stages_all_app_python_modules(self):
+        build = (REPO / "installer" / "build.ps1").read_text(encoding="utf-8")
+        self.assertIn('-Filter "*.py"', build)
+        self.assertIn("learn_db.py", (REPO / "installer" / "runtime" / "Start-FlowAppLearn.ps1").read_text(encoding="utf-8"))
+        modules = {p.name for p in (REPO / "app").glob("*.py")}
+        self.assertIn("learn_db.py", modules)
+        self.assertIn("app.py", modules)
+        self.assertIn("sql_coach.py", modules)
+
     def test_ensure_app_on_path_recovers_lessons(self):
         import app as flask_app
 

@@ -110,8 +110,9 @@ if (-not (Test-Path (Join-Path $stagingPg "bin\pg_ctl.exe"))) {
 Write-Step "App-Dateien kopieren"
 $stagingApp = Join-Path $StagingDir "app"
 New-Item -ItemType Directory -Force -Path $stagingApp | Out-Null
-Copy-Item (Join-Path $ProjectRoot "app\app.py") $stagingApp
-Copy-Item (Join-Path $ProjectRoot "app\sql_coach.py") $stagingApp
+Get-ChildItem (Join-Path $ProjectRoot "app") -File -Filter "*.py" | ForEach-Object {
+    Copy-Item $_.FullName $stagingApp
+}
 Copy-Item (Join-Path $ProjectRoot "app\requirements.txt") $stagingApp
 Copy-Item (Join-Path $ProjectRoot "app\templates") (Join-Path $stagingApp "templates") -Recurse
 Copy-Item (Join-Path $ProjectRoot "app\static") (Join-Path $stagingApp "static") -Recurse

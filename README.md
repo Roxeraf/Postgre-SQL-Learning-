@@ -63,6 +63,7 @@ docker compose up --build
 ├── mcp/learnsql_mcp.py              # MCP für Claude Desktop / Claude Code
 └── app/
     ├── app.py                       # Flask-Backend
+    ├── learn_db.py                  # Postgres-Sandbox (auch MCP, ohne Flask)
     ├── sql_coach.py                 # Lernfeedback statt Roh-Postgres-Fehler
     ├── lessons/academy_data.py      # Offizieller Pfad
     ├── lessons/path_more.py         # Zusatz-Kapitel
