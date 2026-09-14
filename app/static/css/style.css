@@ -1590,7 +1590,13 @@ body.buddy-open .buddy-fab { display: none; }
   color: var(--fail);
   font-size: 13px;
 }
-.buddy-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.buddy-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.buddy-actions .btn { white-space: nowrap; }
 
 .buddy-missing h3 { margin: 0 0 8px; font-size: 16px; }
 .buddy-missing p { font-size: 13.5px; }
