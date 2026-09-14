@@ -30,6 +30,15 @@ from learn_db import (  # noqa: E402
 )
 from lessons.academy_data import ACADEMY, PATH_IDS, lesson_by_id  # noqa: E402
 from lessons.knowledge import ARTICLES, article_by_slug, knowledge_cards  # noqa: E402
+from lessons.buddy import (  # noqa: E402
+    buddy_snapshot,
+    enrich_lesson,
+    help_pack,
+    load_learner_context,
+    resolve_lesson,
+    search_learning,
+    teach_for,
+)
 from lessons.workshop import (  # noqa: E402
     SAFE_ID,
     delete_workshop_lesson,
@@ -38,9 +47,10 @@ from lessons.workshop import (  # noqa: E402
     workshop_dir,
     workshop_lessons,
 )
+from sql_coach import diagnose_structure, explain_sql, explain_step_parts  # noqa: E402
 
 PROTOCOL = "2024-11-05"
-BUILD = "1.1.0"
+BUILD = "1.2.0"
 
 STEP_TYPES = [
     "look", "inspect", "explain", "demo", "predict", "predict-cols",
@@ -63,6 +73,15 @@ FIELD_SEMANTICS = {
     "execute": "Nach richtigem predict die SQL ausführen und das Ergebnis darunter zeigen.",
     "id_field": "Spalte, deren Werte Zeilenklicks und expected_ids identifizieren. Default: id.",
     "cta": "Beschriftung des Weiter-Knopfs im look-Step.",
+    "teach": (
+        "Alltags-Erklärung, WARUM die Query so gebaut wird. "
+        "Pflicht an write/apply/challenge/build/fill. Nicht die volle Lösung."
+    ),
+    "plain": "Die Query in einem Satz auf Deutsch. Pflicht am explain-Step.",
+    "parts": (
+        "Antippbare SQL-Teile {token, match, question, answer}. "
+        "Mindestens zwei am explain-Step."
+    ),
     "expected_ids": (
         "Werte von id_field der Zeilen, die im predict-Step markiert werden müssen. "
         "Optional: validate_exercise / save_practice füllen sie aus sql + id_field."
@@ -76,15 +95,15 @@ FIELD_SEMANTICS = {
 STEP_SPECS = {
     "look": {
         "required": ["title", "text"],
-        "optional": ["table", "tables", "note", "cta", "concepts"],
+        "optional": ["table", "tables", "note", "cta", "concepts", "teach"],
     },
     "inspect": {
         "required": ["title", "text", "table", "interaction", "answer"],
         "optional": ["feedback_ok", "feedback_bad", "concepts", "id_field"],
     },
     "explain": {
-        "required": ["title", "text", "sql"],
-        "optional": ["plain", "parts", "before_table", "after_table", "concepts"],
+        "required": ["title", "text", "sql", "plain", "parts"],
+        "optional": ["before_table", "after_table", "concepts", "teach"],
     },
     "demo": {
         "required": ["title", "text", "sql"],
@@ -99,23 +118,23 @@ STEP_SPECS = {
         "optional": ["table", "feedback_ok", "feedback_bad", "concepts"],
     },
     "build": {
-        "required": ["title", "prompt", "pieces", "solution"],
+        "required": ["title", "prompt", "pieces", "solution", "teach"],
         "optional": ["distractors", "hints", "concepts"],
     },
     "fill": {
-        "required": ["title", "template", "solution"],
+        "required": ["title", "template", "solution", "teach"],
         "optional": ["hints", "concepts"],
     },
     "write": {
-        "required": ["title", "prompt", "solution"],
+        "required": ["title", "prompt", "solution", "teach"],
         "optional": ["placeholder", "hints", "concepts", "strict_columns", "ordered", "require", "forbid", "allow_write", "verify"],
     },
     "apply": {
-        "required": ["title", "prompt", "solution"],
+        "required": ["title", "prompt", "solution", "teach"],
         "optional": ["placeholder", "hints", "concepts", "strict_columns", "ordered", "require", "forbid"],
     },
     "challenge": {
-        "required": ["title", "prompt", "solution"],
+        "required": ["title", "prompt", "solution", "teach"],
         "optional": ["placeholder", "hints", "concepts", "strict_columns", "ordered"],
     },
     "mcq": {
@@ -131,7 +150,13 @@ LESSON_ENVELOPE = {
     "minutes": {"required": True, "note": "Ganze Zahl, typisch 8."},
     "concepts": {"required": True, "note": "SQL-Themen, z.B. SELECT, WHERE, JOIN."},
     "model": {"required": True, "note": "Klauseln der Musterlösung in Reihenfolge."},
-    "steps": {"required": True, "note": "Mindestens 3, nicht nur look."},
+    "steps": {
+        "required": True,
+        "note": (
+            "Mindestens 3. Pflicht: look, explain (plain + mindestens zwei parts) "
+            "und ein Schreib-Schritt mit teach (warum, nicht die Lösung)."
+        ),
+    },
     "quiz": {"required": True, "note": "Mindestens 4 Fachfragen. correct ist ein 0-basierter Index."},
 }
 
@@ -149,11 +174,20 @@ RESET_NOTE = (
 )
 
 INSTRUCTIONS = (
-    "SQL-Playground-Übungen folgen dem gleichen Schema wie der Lernpfad. "
-    "Den Inhalt denkst du dir aus — die Form bleibt.\n"
-    "Ablauf: anschauen → verstehen/vorhersagen → selbst schreiben → Kurzcheck.\n"
+    "Du bist der Lern-Buddy für plx.learnSQL und der Autor zusätzlicher Playground-Übungen.\n"
+    "Die App ruft kein Sprachmodell auf — du hängst als Claude Desktop oder Claude Code am MCP.\n"
+    "\n"
+    "Buddy (offizieller Lernpfad /wissen /Karten /Playground):\n"
+    "Zuerst `buddy_context` (wo die Person gerade ist). "
+    "Fragen mit `help_with` und `search_path` beantworten. "
+    "SQL der Person mit `coach_sql` prüfen — Hinweise, nicht die volle Lösung, außer sie wird verlangt. "
+    "Kapitel: `get_lesson` / `list_lessons`. Bibel: `search_wissen` / `get_article`.\n"
+    "\n"
+    "Playground-Übungen (neben dem Pfad, Form wie der Lernpfad):\n"
+    "Ablauf: anschauen → verstehen (explain mit plain + parts) → vorhersagen → "
+    "selbst schreiben (mit teach) → Kurzcheck.\n"
     "Jede Übung braucht: id (ws-…), title, goal, minutes, concepts, model, "
-    "steps (mindestens 3, nicht nur look) und quiz (mindestens 4 Fachfragen zum SQL-Thema).\n"
+    "steps (mindestens look, explain, Schreib-Schritt) und quiz (mindestens 4 Fachfragen).\n"
     "Sandbox learn (Reset: DROP SCHEMA learn CASCADE — Extra-Tabellen verschwinden):\n"
     "  clients      id, name, country (~4 Zeilen)\n"
     "  orders       id, order_number, client_id, client, status, quantity, note, created_at (~24 Zeilen)\n"
@@ -168,7 +202,7 @@ INSTRUCTIONS = (
     "Alte Übungen entfernen über `delete_practice` (eine id oder eine Liste).\n"
     "Gespeicherte Übungen erscheinen im SQL-Playground unter /playground/{id} "
     "(eine aktive Installation; save_practice prüft, ob die laufende App die Datei liest).\n"
-    "Hints helfen, sind aber nicht die volle Lösung. Quiz fragt das SQL-Thema, nicht das MCP. "
+    "Hints und teach helfen, sind aber nicht die volle Lösung. Quiz fragt das SQL-Thema, nicht das MCP. "
     "Offizielle PATH_IDS nicht überschreiben."
 )
 
@@ -194,7 +228,41 @@ MINIMAL_LESSON = {
                     {"id": 3, "order_number": 4713, "client": "Helio", "status": "offen"},
                 ],
             },
-            "cta": "Vorhersagen",
+            "cta": "SQL verstehen",
+        },
+        {
+            "type": "explain",
+            "title": "WHERE in Alltagssprache",
+            "text": "Tippe die Satzteile an. Jeder Teil beantwortet eine Frage.",
+            "sql": "SELECT id, status\nFROM orders\nWHERE status = 'offen'\nORDER BY id;",
+            "plain": "Zeige id und status aus den Aufträgen, nur wo der Status offen ist, sortiert nach id.",
+            "parts": [
+                {
+                    "match": "SELECT id, status",
+                    "token": "SELECT",
+                    "question": "Was möchte ich sehen?",
+                    "answer": "Nur id und status — nicht die ganze Zeile.",
+                },
+                {
+                    "match": "FROM orders",
+                    "token": "FROM",
+                    "question": "Woher kommen die Daten?",
+                    "answer": "Aus der Auftragstabelle `orders`.",
+                },
+                {
+                    "match": "WHERE status = 'offen'",
+                    "token": "WHERE",
+                    "question": "Welche Zeilen bleiben?",
+                    "answer": "Nur Aufträge, deren Status genau offen ist. Text in Anführungszeichen.",
+                },
+                {
+                    "match": "ORDER BY id",
+                    "token": "ORDER BY",
+                    "question": "In welcher Reihenfolge?",
+                    "answer": "Aufsteigend nach id, damit das Ergebnis stabil vergleichbar ist.",
+                },
+            ],
+            "concepts": ["SELECT", "WHERE"],
         },
         {
             "type": "predict",
@@ -229,6 +297,11 @@ MINIMAL_LESSON = {
             "concepts": ["SELECT", "WHERE"],
             "strict_columns": True,
             "ordered": True,
+            "teach": (
+                "`WHERE` filtert Zeilen. Nur Datensätze, für die die Bedingung wahr ist, bleiben. "
+                "Text steht in einfachen Anführungszeichen: status = 'offen'. "
+                "SELECT wählt danach die Spalten, ORDER BY die Reihenfolge."
+            ),
         },
     ],
     "quiz": [
@@ -615,9 +688,10 @@ def tool_list_lessons(_args):
 
 def _step_schema_payload():
     return {
-        "ablauf": "anschauen → verstehen/vorhersagen → selbst schreiben → Kurzcheck",
+        "ablauf": "anschauen → verstehen (explain) → vorhersagen → selbst schreiben → Kurzcheck",
         "rule": (
             "Inhalt selbst ausdenken, Form wie der Lernpfad. "
+            "Pflicht: look, explain (plain+parts), Schreib-Schritt mit teach. "
             "Roh-Entwurf von draft_exercise nicht unverändert speichern."
         ),
         "lesson_fields": LESSON_ENVELOPE,
@@ -724,6 +798,10 @@ def tool_exercise_context(args):
             "save_practice", "get_lesson", "draft_exercise", "delete_practice",
             "step_schema", "list_workshop",
         ],
+        "buddy_tools": [
+            "buddy_context", "help_with", "search_path", "coach_sql",
+            "get_lesson", "search_wissen", "get_article",
+        ],
     })
 
 
@@ -734,7 +812,7 @@ def tool_get_lesson(args):
     lesson = lesson_by_id(lid) or workshop_by_id(lid)
     if not lesson:
         return _err(f"Übung {lid} nicht gefunden.")
-    return _ok_text(lesson)
+    return _ok_text(enrich_lesson(lesson))
 
 
 def _topic_quiz(concepts, prompt):
@@ -799,6 +877,11 @@ def _draft_payload(args) -> dict:
         "Vergleich das Ergebnis mit der Frage, nicht mit einem auswendig gelernten Satz.",
     ]
     apply_prompt = args.get("apply") or f"Gleiche Idee, leicht versetzt: {prompt}"
+    taught = str(args.get("teach") or teach_for(concepts) or (
+        "Zerlege die Frage: Welche Tabelle? Welche Spalten? Welche Zeilen? "
+        "Schreib das als SELECT … FROM … WHERE …"
+    ))
+    plain, parts = explain_step_parts(solution)
     return {
         "id": lid,
         "title": title,
@@ -811,7 +894,18 @@ def _draft_payload(args) -> dict:
                 "type": "look",
                 "title": "Die Frage",
                 "text": look,
-                "cta": "Vorhersagen",
+                "teach": taught,
+                "cta": "SQL verstehen",
+            },
+            {
+                "type": "explain",
+                "title": "Die Query in Teilen",
+                "text": "Tippe die Satzteile an. Ersetze die Standard-Erklärungen durch die Fachfrage dieser Übung.",
+                "sql": solution,
+                "plain": plain,
+                "parts": parts,
+                "concepts": concepts,
+                "teach": taught,
             },
             {
                 "type": "predict",
@@ -829,6 +923,7 @@ def _draft_payload(args) -> dict:
                 "solution": solution,
                 "hints": hints,
                 "concepts": concepts,
+                "teach": taught,
             },
             {
                 "type": "apply",
@@ -838,6 +933,7 @@ def _draft_payload(args) -> dict:
                 "solution": solution,
                 "hints": hints,
                 "concepts": concepts,
+                "teach": taught,
             },
         ],
         "quiz": args.get("quiz") or _topic_quiz(concepts, prompt),
@@ -894,6 +990,17 @@ def validate_lesson(lesson: dict, *, fill_ids: bool = False) -> dict:
         errors.append("steps: mindestens 3 Schritte.")
     elif all(str((s or {}).get("type") or "") == "look" for s in steps):
         errors.append("steps: nicht nur look — es braucht verstehen/schreiben.")
+    if isinstance(steps, list):
+        types = [str((s or {}).get("type") or "") for s in steps if isinstance(s, dict)]
+        if "explain" not in types:
+            errors.append(
+                "steps: mindestens ein explain-Schritt mit Alltagssprache (plain) "
+                "und antippenbaren SQL-Teilen (parts)."
+            )
+        if not any(t in {"write", "apply", "challenge", "build", "fill"} for t in types):
+            errors.append(
+                "steps: mindestens ein Schreib-Schritt (write/apply/challenge/build/fill) mit teach."
+            )
 
     quiz = data.get("quiz") or []
     if not isinstance(quiz, list) or len(quiz) < 4:
@@ -931,6 +1038,49 @@ def validate_lesson(lesson: dict, *, fill_ids: bool = False) -> dict:
         if missing:
             errors.append(f"steps[{idx}] ({stype}): Pflichtfelder fehlen: {', '.join(missing)}.")
             info["ok"] = False
+
+        if stype == "explain":
+            plain = str(step.get("plain") or "").strip()
+            parts = step.get("parts") if isinstance(step.get("parts"), list) else []
+            if len(plain) < 40:
+                errors.append(
+                    f"steps[{idx}] (explain): plain muss die Query in einem Satz erklären."
+                )
+                info["ok"] = False
+            if len(parts) < 2:
+                errors.append(
+                    f"steps[{idx}] (explain): parts braucht mindestens zwei SQL-Teile zum Antippen."
+                )
+                info["ok"] = False
+            else:
+                for pi, part in enumerate(parts):
+                    if not isinstance(part, dict):
+                        errors.append(f"steps[{idx}].parts[{pi}]: kein Objekt.")
+                        info["ok"] = False
+                        continue
+                    missing_part = [
+                        key for key in ("token", "match", "question", "answer")
+                        if not str(part.get(key) or "").strip()
+                    ]
+                    if missing_part:
+                        errors.append(
+                            f"steps[{idx}].parts[{pi}]: es fehlen {', '.join(missing_part)}."
+                        )
+                        info["ok"] = False
+                    elif len(str(part.get("answer") or "").strip()) < 20:
+                        errors.append(
+                            f"steps[{idx}].parts[{pi}]: answer muss den Teil wirklich erklären."
+                        )
+                        info["ok"] = False
+
+        if stype in {"write", "apply", "challenge", "build", "fill"}:
+            taught = str(step.get("teach") or "").strip()
+            if len(taught) < 40:
+                errors.append(
+                    f"steps[{idx}] ({stype}): teach muss erklären, WARUM die Query so gebaut wird "
+                    "— nicht nur die Aufgabe und nicht die volle Lösung."
+                )
+                info["ok"] = False
 
         for key, sql in _sql_fields(step):
             try:
@@ -1196,6 +1346,99 @@ def tool_list_cards(args):
     return _ok_text({"cards": cards[:40]})
 
 
+def tool_buddy_context(_args):
+    return _ok_text(buddy_snapshot())
+
+
+def tool_search_path(args):
+    q = str(args.get("q") or "").strip()
+    if len(q) < 2:
+        return _err("q braucht mindestens zwei Zeichen.")
+    return _ok_text({"results": search_learning(q)})
+
+
+def tool_help_with(args):
+    q = str(args.get("q") or "").strip()
+    if len(q) < 2:
+        ctx = load_learner_context() or {}
+        q = str(
+            ctx.get("question") or ctx.get("step_title") or ctx.get("prompt") or ""
+        ).strip()
+    if len(q) < 2:
+        return _err("q fehlt. Formuliere die Frage der Person.")
+    return _ok_text(help_pack(
+        q,
+        lesson_id=args.get("lesson_id"),
+        step=args.get("step"),
+    ))
+
+
+def tool_coach_sql(args):
+    ctx = load_learner_context() or {}
+    sql = str(args.get("sql") or ctx.get("last_sql") or "").strip()
+    if not sql:
+        return _err("sql fehlt.")
+    lid = str(args.get("lesson_id") or ctx.get("lesson_id") or "").strip()
+    idx = args.get("step")
+    if idx is None:
+        idx = ctx.get("step")
+    lesson = resolve_lesson(lid)
+    step = None
+    if lesson:
+        try:
+            step = (lesson.get("steps") or [])[int(idx)]
+        except (TypeError, ValueError, IndexError):
+            step = None
+        if not isinstance(step, dict):
+            step = None
+    solution = str((step or {}).get("solution") or "")
+    reveal = bool(args.get("reveal_solution"))
+    coach = diagnose_structure(sql, solution, step or {})
+    explained = explain_sql(sql)
+    try:
+        result = sandbox_sql(sql, allow_write=False)
+    except Exception as exc:  # noqa: BLE001
+        return _err(environment_report("SQL fehlgeschlagen.", exc))
+    if not result.get("ok") and _looks_like_connect_error(
+        " ".join(str(result.get(k) or "") for k in ("error", "pg_error"))
+    ):
+        return _sql_payload_or_err(result, "SQL fehlgeschlagen")
+    rows = result.get("rows") or []
+    payload = {
+        "ok": bool(result.get("ok")),
+        "coach": coach or ctx.get("last_coach"),
+        "plain": explained.get("plain"),
+        "parts": [
+            {
+                "token": part.get("key"),
+                "sql": part.get("sql"),
+                "question": part.get("question"),
+                "blurb": part.get("blurb"),
+            }
+            for part in (explained.get("parts") or [])
+        ],
+        "run": {
+            "ok": bool(result.get("ok")),
+            "error": result.get("error"),
+            "columns": result.get("columns"),
+            "row_count": len(rows),
+            "rows": rows[:6],
+        },
+        "lesson_id": lid or None,
+        "step": idx,
+        "has_solution": bool(solution),
+        "solution": solution if reveal else None,
+        "how_to_answer": (
+            "Sag, was an der Query hakt, anhand von SELECT/FROM/WHERE/JOIN. "
+            "Die Musterlösung nur nennen, wenn reveal_solution true ist oder die Person sie verlangt."
+        ),
+    }
+    if not result.get("ok"):
+        payload["ok"] = True
+        payload["run"]["ok"] = False
+    return _ok_text(payload)
+
+
 LESSON_OBJECT_SCHEMA = {
     "type": "object",
     "description": (
@@ -1211,7 +1454,7 @@ LESSON_OBJECT_SCHEMA = {
         "model": {"type": "array", "items": {"type": "string"}},
         "steps": {
             "type": "array",
-            "description": "Mindestens 3 Schritte, nicht nur look.",
+            "description": "Mindestens look, explain (plain+parts) und ein Schreib-Schritt mit teach.",
             "items": {
                 "type": "object",
                 "properties": {
@@ -1328,7 +1571,7 @@ def _tools():
             "fn": tool_get_article,
         },
         "list_lessons": {
-            "description": "Offizielle Kapitel und SQL-Playground-Übungen.",
+            "description": "Offizielle Kapitel und SQL-Playground-Übungen (Lernpfad + Buddy).",
             "inputSchema": {"type": "object", "properties": {}},
             "fn": tool_list_lessons,
         },
@@ -1459,6 +1702,70 @@ def _tools():
                 "properties": {"topic": {"type": "string"}},
             },
             "fn": tool_list_cards,
+        },
+        "buddy_context": {
+            "description": (
+                "Standort der Person in der App (Kapitel, Schritt, letzte Query) "
+                "plus offizieller Pfad. Zuerst lesen, bevor du als Lern-Buddy antwortest."
+            ),
+            "inputSchema": {"type": "object", "properties": {}},
+            "fn": tool_buddy_context,
+        },
+        "search_path": {
+            "description": "Offiziellen Lernpfad, Playground und Bibel durchsuchen.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "q": {"type": "string", "description": "Suchbegriff, z.B. LEFT JOIN oder NULL."},
+                },
+                "required": ["q"],
+            },
+            "fn": tool_search_path,
+        },
+        "help_with": {
+            "description": (
+                "Frage zum aktuellen (oder angegebenen) Kapitel beantworten: "
+                "Konzepttext, passende Bibel-Artikel, Schritte — ohne Musterlösung."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "q": {"type": "string", "description": "Frage der lernenden Person."},
+                    "lesson_id": {
+                        "type": "string",
+                        "description": "ch3, challenge-2 oder ws-… — sonst der Standort aus buddy_context.",
+                    },
+                    "step": {
+                        "type": "integer",
+                        "description": "0-basierter Schrittindex. Default: Standort aus buddy_context.",
+                    },
+                },
+                "required": ["q"],
+            },
+            "fn": tool_help_with,
+        },
+        "coach_sql": {
+            "description": (
+                "SQL der Person gegen den aktuellen Schritt prüfen. "
+                "Liefert Coach-Text und Alltags-Erklärung, nicht die Musterlösung "
+                "(außer reveal_solution)."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "sql": {
+                        "type": "string",
+                        "description": "Query der Person. Default: last_sql aus buddy_context.",
+                    },
+                    "lesson_id": {"type": "string", "description": "Kapitel- oder Playground-id."},
+                    "step": {"type": "integer", "description": "Schrittindex."},
+                    "reveal_solution": {
+                        "type": "boolean",
+                        "description": "true nur wenn die Person die Musterlösung verlangt.",
+                    },
+                },
+            },
+            "fn": tool_coach_sql,
         },
     }
 

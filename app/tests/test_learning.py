@@ -98,14 +98,38 @@ VALID_PLAYGROUND_LESSON = {
     "concepts": ["SELECT"],
     "model": ["SELECT", "FROM"],
     "steps": [
-        {"type": "look", "title": "Frage", "text": "Schau dir die Aufträge an.", "cta": "Weiter"},
-        {"type": "explain", "title": "SQL", "text": "COUNT zählt Zeilen.", "sql": "SELECT COUNT(*) FROM orders;"},
+        {"type": "look", "title": "Frage", "text": "Schau dir die Aufträge an — jede Zeile ist ein Datensatz.", "cta": "Weiter"},
+        {
+            "type": "explain",
+            "title": "SQL",
+            "text": "COUNT zählt Zeilen. Tippe die Teile an.",
+            "sql": "SELECT COUNT(*) FROM orders;",
+            "plain": "Zähle alle Zeilen in der Auftragstabelle — jede Zeile zählt als eins.",
+            "parts": [
+                {
+                    "match": "SELECT COUNT(*)",
+                    "token": "SELECT",
+                    "question": "Was möchte ich sehen?",
+                    "answer": "Die Anzahl der Zeilen, nicht die einzelnen Aufträge.",
+                },
+                {
+                    "match": "FROM orders",
+                    "token": "FROM",
+                    "question": "Woher kommen die Daten?",
+                    "answer": "Aus der Auftragstabelle orders.",
+                },
+            ],
+        },
         {
             "type": "write",
             "title": "Zählen",
             "prompt": "Wie viele offene Aufträge?",
             "solution": "SELECT COUNT(*) FROM orders WHERE status = 'offen';",
             "hints": ["COUNT(*)", "WHERE status = 'offen'"],
+            "teach": (
+                "COUNT(*) zählt Zeilen. WHERE filtert vorher auf status = 'offen', "
+                "sonst würdest du alle Aufträge zählen, nicht nur die offenen."
+            ),
         },
     ],
     "quiz": [
@@ -552,6 +576,7 @@ class WorkshopAndMcpTests(unittest.TestCase):
             "schema", "run_sql", "search_wissen", "draft_exercise",
             "save_practice", "get_lesson", "step_schema", "delete_practice",
             "exercise_context", "validate_exercise", "table_rows",
+            "buddy_context", "help_with", "search_path", "coach_sql",
         ):
             self.assertIn(needed, names)
 
@@ -562,6 +587,9 @@ class WorkshopAndMcpTests(unittest.TestCase):
         self.assertIn("exercise_context", instructions)
         self.assertIn("draft_exercise", instructions)
         self.assertIn("step_schema", instructions)
+        self.assertIn("buddy_context", instructions)
+        self.assertIn("help_with", instructions)
+        self.assertIn("coach_sql", instructions)
         self.assertEqual(init["result"]["serverInfo"]["version"], mcp.BUILD)
         mentioned = set(re.findall(r"`([a-z][a-z0-9_]+)`", instructions))
         unknown = mentioned - names
@@ -578,6 +606,8 @@ class WorkshopAndMcpTests(unittest.TestCase):
         self.assertIn("steps", schema_payload["geruest"])
         self.assertGreaterEqual(len(schema_payload["geruest"]["steps"]), 3)
         self.assertIn("required", schema_payload["fields"]["write"])
+        self.assertIn("teach", schema_payload["fields"]["write"]["required"])
+        self.assertIn("plain", schema_payload["fields"]["explain"]["required"])
         self.assertIn("ordered", schema_payload["fields"]["write"]["optional"])
         self.assertIn("ordered", schema_payload["field_semantics"])
         self.assertEqual(schema_payload["build"], mcp.BUILD)
@@ -619,7 +649,13 @@ class WorkshopAndMcpTests(unittest.TestCase):
         types = [step["type"] for step in payload["steps"]]
         self.assertGreaterEqual(len(types), 3)
         self.assertIn("look", types)
+        self.assertIn("explain", types)
         self.assertIn("write", types)
+        explain = next(step for step in payload["steps"] if step["type"] == "explain")
+        self.assertTrue(explain.get("plain"))
+        self.assertGreaterEqual(len(explain.get("parts") or []), 2)
+        write = next(step for step in payload["steps"] if step["type"] == "write")
+        self.assertGreaterEqual(len(write.get("teach") or ""), 40)
         quiz_blob = json.dumps(payload["quiz"], ensure_ascii=False)
         self.assertNotIn("save_practice", quiz_blob)
         self.assertNotIn("PATH_IDS", quiz_blob)
@@ -703,7 +739,7 @@ class WorkshopAndMcpTests(unittest.TestCase):
         data = json.loads(first)
         self.assertEqual(data["id"], 1)
         self.assertEqual(data["result"]["serverInfo"]["name"], "learnsql")
-        self.assertEqual(data["result"]["serverInfo"]["version"], "1.1.0")
+        self.assertEqual(data["result"]["serverInfo"]["version"], "1.2.0")
 
 
 class McpAgentWorkflowTests(unittest.TestCase):
@@ -766,6 +802,9 @@ class McpAgentWorkflowTests(unittest.TestCase):
         self.assertIn("challenge-2", (payload.get("example_lesson") or {}).get("id", "challenge-2"))
         self.assertGreaterEqual(len(payload["minimal_valid"]["steps"]), 3)
         self.assertGreaterEqual(len(payload["minimal_valid"]["quiz"]), 4)
+        self.assertTrue(any(s.get("type") == "explain" for s in payload["minimal_valid"]["steps"]))
+        self.assertIn("buddy_tools", payload)
+        self.assertIn("buddy_context", payload["buddy_tools"])
         self.assertIn("required", payload["step_types"]["predict"])
         self.assertIn("ordered", payload["field_semantics"])
         self.assertEqual(payload["table"]["columns"], ["id", "status"])
@@ -1052,6 +1091,9 @@ class WorkshopRuntimeTests(unittest.TestCase):
         self.assertIn('<details class="card mcp-help mcp-setup">', shop_html)
         self.assertNotIn('<details class="card mcp-help mcp-setup" open>', shop_html)
         self.assertIn("MCP · nicht installiert", wissen_nav.data.decode("utf-8"))
+        self.assertIn("Claude-Buddy", shop_html)
+        self.assertIn("buddy-panel", shop_html)
+        self.assertIn('id="buddy-fab"', shop_html)
         with tempfile.TemporaryDirectory() as tmp:
             env = claude_sandbox_env(tmp)
             desktop = Path(tmp) / "Claude"
@@ -1071,6 +1113,11 @@ class WorkshopRuntimeTests(unittest.TestCase):
         lesson = client.get("/learn/ch-agg")
         self.assertEqual(lesson.status_code, 200)
         self.assertIn("Summen".encode("utf-8"), lesson.data)
+        lesson_html = lesson.data.decode("utf-8")
+        self.assertIn("Claude-Buddy", lesson_html)
+        self.assertIn("Claude erklärt mit", lesson_html)
+        self.assertIn("gleichartige Zeilen", lesson_html)
+        self.assertIn("buddy-panel", lesson_html)
         missing = client.get("/wissen/gibt-es-nicht")
         self.assertEqual(missing.status_code, 404)
 
@@ -1156,6 +1203,104 @@ class WorkshopRuntimeTests(unittest.TestCase):
             html = page.data.decode("utf-8")
             self.assertIn("verbunden mit Claude", html)
             self.assertNotIn("Einrichten", html)
+
+
+class BuddyAndExplainTests(unittest.TestCase):
+    def test_enrich_lesson_adds_teach_and_related(self):
+        from lessons.buddy import enrich_lesson
+
+        ch3 = enrich_lesson(lesson_by_id("ch3"))
+        writes = [s for s in ch3["steps"] if s["type"] == "write"]
+        self.assertTrue(writes)
+        self.assertGreaterEqual(len(writes[0].get("teach") or ""), 40)
+        self.assertTrue(ch3.get("related"))
+        self.assertTrue(any(s.get("related") for s in writes))
+
+    def test_buddy_context_roundtrip(self):
+        import app as flask_app
+
+        client = flask_app.app.test_client()
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict("os.environ", {"WORKSHOP_DIR": tmp}):
+                posted = client.post("/api/buddy/context", json={
+                    "page": "learn",
+                    "url": "/learn/ch3",
+                    "lesson_id": "ch3",
+                    "lesson_title": "WHERE",
+                    "step": 2,
+                    "step_type": "write",
+                    "step_title": "Offene Aufträge",
+                    "last_sql": "SELECT * FROM orders WHERE status = offen",
+                    "last_coach": "Textwerte brauchen Anführungszeichen.",
+                    "progress": {"completed": ["ch0"], "current": "ch3", "chapters_done": 1, "chapters_total": 20},
+                })
+                self.assertTrue(posted.get_json()["ok"])
+                got = client.get("/api/buddy/context")
+        payload = got.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["context"]["lesson_id"], "ch3")
+        self.assertIn("status = offen", payload["context"]["last_sql"])
+        self.assertEqual(payload["context"]["progress"]["completed"], ["ch0"])
+
+    def test_mcp_buddy_tools_and_explain_required(self):
+        sys.path.insert(0, str(REPO / "mcp"))
+        import learnsql_mcp as mcp
+        from lessons.buddy import save_learner_context
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict("os.environ", {"WORKSHOP_DIR": tmp}):
+                save_learner_context({
+                    "page": "learn",
+                    "lesson_id": "ch3",
+                    "lesson_title": "WHERE",
+                    "step": 0,
+                    "step_type": "look",
+                    "step_title": "Filter",
+                })
+                with patch.object(mcp, "sandbox_sql", side_effect=ok_sandbox_sql):
+                    buddy = mcp_call(mcp, "buddy_context", {})
+                    help_reply = mcp_call(mcp, "help_with", {"q": "Was macht WHERE?"})
+                    search = mcp_call(mcp, "search_path", {"q": "WHERE"})
+                    coach = mcp_call(mcp, "coach_sql", {"sql": "SELECT * FROM orders WHERE status = offen"})
+                    thin = copy.deepcopy(VALID_PLAYGROUND_LESSON)
+                    thin["id"] = "ws-no-explain"
+                    thin["steps"] = [
+                        {"type": "look", "title": "Frage", "text": "Nur schauen, keine Erklärung."},
+                        {
+                            "type": "write",
+                            "title": "Zählen",
+                            "prompt": "Wie viele offene Aufträge?",
+                            "solution": "SELECT COUNT(*) FROM orders WHERE status = 'offen';",
+                            "teach": "WHERE filtert Zeilen, COUNT zählt danach die übrig gebliebenen.",
+                        },
+                    ]
+                    rejected = mcp_call(mcp, "validate_exercise", {"lesson": thin})
+        self.assertFalse(mcp_is_error(buddy))
+        snap = mcp_payload(buddy)
+        self.assertEqual(snap["lesson"]["id"], "ch3")
+        self.assertIn("buddy_context", snap["how_to_help"])
+        self.assertFalse(mcp_is_error(help_reply))
+        pack = mcp_payload(help_reply)
+        self.assertTrue(pack.get("teach") or pack.get("hits") or pack.get("articles"))
+        self.assertFalse(mcp_is_error(search))
+        self.assertTrue(mcp_payload(search)["results"])
+        self.assertFalse(mcp_is_error(coach))
+        coach_payload = mcp_payload(coach)
+        self.assertTrue(coach_payload.get("plain") or coach_payload.get("coach"))
+        self.assertIsNone(coach_payload.get("solution"))
+        self.assertTrue(mcp_is_error(rejected))
+        blob = " ".join(mcp_payload(rejected).get("errors") or [])
+        self.assertIn("explain", blob)
+
+    def test_sql_coach_explain_parts(self):
+        from sql_coach import explain_step_parts
+
+        plain, parts = explain_step_parts("SELECT id FROM orders WHERE status = 'offen'")
+        self.assertIn("orders", plain.lower())
+        self.assertGreaterEqual(len(parts), 2)
+        tokens = {p["token"] for p in parts}
+        self.assertIn("SELECT", tokens)
+        self.assertIn("FROM", tokens)
 
 
 if __name__ == "__main__":

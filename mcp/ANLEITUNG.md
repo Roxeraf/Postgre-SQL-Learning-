@@ -1,29 +1,37 @@
-# MCP für Claude — Übungen neben dem Pfad
+# MCP für Claude — Buddy auf dem Pfad, Übungen daneben
 
-Claude kennt das Lager (`orders`, `clients`, `stock`, `order_items`) und die Bibel.
-Er schreibt **zusätzliche Übungen** in den SQL-Playground. Der offizielle Lernpfad bleibt unverändert.
-Du öffnest sie in der App unter **SQL-Playground** und löst sie wie ein normales Kapitel.
+Claude kennt das Lager (`orders`, `clients`, `stock`, `order_items`), den **offiziellen Lernpfad** und die Bibel.
+
+Zwei Rollen:
+
+1. **Lern-Buddy** überall in der App (Kapitel, Bibel, Karten, Playground). In der App **Claude** antippen, Prompt kopieren, in Claude Code oder Claude Desktop einfügen. Claude liest `buddy_context` (Kapitel, Schritt, letzte Query).
+2. **Zusatzübungen** in den SQL-Playground schreiben. Der offizielle Lernpfad bleibt unverändert. Übungen brauchen jetzt eine richtige Erklärung: `explain` mit Alltagssprache (`plain`) und antippenbaren SQL-Teilen (`parts`), plus `teach` an den Schreib-Schritten.
 
 Die App ruft kein Sprachmodell auf. Claude hängt nur als Client am MCP.
 
 **Voraussetzung:** plx.learnSQL (oder Docker) muss laufen, bevor Claude SQL-Werkzeuge nutzt.
-Bibel lesen und Übungen speichern geht auch ohne Datenbank.
+Bibel lesen, Standort (`buddy_context`) und Übungen speichern geht auch ohne Datenbank.
 
 ## Was du Claude sagst
 
 Kopieren und anpassen:
 
-- Bau mir drei Playground-Übungen zu offenen Aufträgen mit GROUP BY.
+- Ich bin im Lernpfad. Lies `buddy_context` und erklär mir den aktuellen Schritt, ohne die Lösung zu verraten.
+- Meine Query gibt das Falsche zurück. `coach_sql` — was übersehe ich?
+- Welche Bibel-Stelle passt zu JOIN?
+- Bau mir drei Playground-Übungen zu offenen Aufträgen mit GROUP BY — mit explain-Schritt und teach.
 - Eine LEFT-JOIN-Übung, bei der 4730 ohne Kunde sichtbar bleibt.
 - Prüf die Musterlösung mit run_sql, dann speichern.
 - Lösch die vier alten Übungen zu GROUP BY.
 
 Danach in der App **SQL-Playground** öffnen und die neue Karte anklicken. Überflüssige Karten löschst du am Knopf auf der Karte oder lässt Claude `delete_practice` nutzen.
 
-Claude holt zuerst `exercise_context` (Übungsdesign, Live-Sandbox, Beispiel, Ziel-URL).
+Als Buddy: zuerst `buddy_context`, Fragen mit `help_with` / `search_path`, SQL mit `coach_sql`.
+
+Als Übungsautor: zuerst `exercise_context` (Übungsdesign, Live-Sandbox, Beispiel, Ziel-URL).
 Tabellenzeilen kommen über `table_rows`, IDs über `run_sql` mit `as_ids`.
-Vor dem Speichern prüft `validate_exercise`; `save_practice` legt die Karte unter `/playground/{id}` ab
-und bestätigt, dass die laufende App sie sieht. `draft_exercise` ist nur ein Gerüst.
+Vor dem Speichern prüft `validate_exercise` — ohne `explain` (plain + parts) und ohne `teach` am Schreib-Schritt wird nicht gespeichert.
+`save_practice` legt die Karte unter `/playground/{id}` ab und bestätigt, dass die laufende App sie sieht. `draft_exercise` ist nur ein Gerüst.
 
 Beim Zurücksetzen baut die App das Schema `learn` per `DROP SCHEMA learn CASCADE` neu auf.
 Zusätzliche Tabellen in `learn` sind danach weg.

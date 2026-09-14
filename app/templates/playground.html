@@ -3,14 +3,15 @@
 {% block content %}
 {% set mcp_ready = mcp_status and mcp_status.installed %}
 {% set claude_prompts = [
-  "Bau mir drei Playground-Übungen zu offenen Aufträgen mit GROUP BY.",
-  "Eine LEFT-JOIN-Übung, bei der 4730 ohne Kunde sichtbar bleibt.",
+  "Bau mir drei Playground-Übungen zu offenen Aufträgen mit GROUP BY — mit explain-Schritt und teach.",
+  "Eine LEFT-JOIN-Übung, bei der 4730 ohne Kunde sichtbar bleibt. Erst erklären, dann schreiben lassen.",
   "Prüf die Musterlösung mit run_sql, dann speichern.",
+  "Ich bin im Lernpfad. Lies buddy_context und erklär mir, wo ich stehe, ohne die Lösung zu verraten.",
 ] %}
 <header class="page-header">
   <p class="eyebrow">Neben dem Pfad</p>
   <h1>SQL-Playground</h1>
-  <p class="lede">Claude schreibt dir Zusatzübungen. Der Lernpfad bleibt unverändert.</p>
+  <p class="lede">Claude schreibt dir Zusatzübungen mit Erklärung. Auf dem Lernpfad ist er der Buddy, der Fragen beantwortet.</p>
 </header>
 
 <section class="mcp-bar" id="mcp-connect">

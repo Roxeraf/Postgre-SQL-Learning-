@@ -562,27 +562,31 @@ async function postJson(url, body, timeoutMs = 15000) {
   }
 }
 
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+    throw new Error("clipboard");
+  } catch {
+    const hold = document.createElement("textarea");
+    hold.value = text;
+    hold.setAttribute("readonly", "");
+    hold.style.position = "fixed";
+    hold.style.left = "-9999px";
+    document.body.appendChild(hold);
+    hold.select();
+    document.execCommand("copy");
+    hold.remove();
+  }
+}
+
 function initPromptChips() {
   document.querySelectorAll(".js-prompt-chip").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const text = btn.getAttribute("data-prompt") || btn.textContent.trim();
-      try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(text);
-        } else {
-          throw new Error("clipboard");
-        }
-      } catch {
-        const hold = document.createElement("textarea");
-        hold.value = text;
-        hold.setAttribute("readonly", "");
-        hold.style.position = "fixed";
-        hold.style.left = "-9999px";
-        document.body.appendChild(hold);
-        hold.select();
-        document.execCommand("copy");
-        hold.remove();
-      }
+      await copyText(text);
       const label = btn.textContent;
       btn.classList.add("is-copied", "active");
       btn.textContent = "Kopiert";
@@ -592,6 +596,163 @@ function initPromptChips() {
       }, 1200);
     });
   });
+}
+
+function currentPageKind() {
+  const path = location.pathname;
+  if (path.startsWith("/learn/")) return "learn";
+  if (path.startsWith("/playground")) return "playground";
+  if (path.startsWith("/wissen")) return "wissen";
+  if (path.startsWith("/cards")) return "cards";
+  return "home";
+}
+
+function buddyProgress() {
+  const store = loadStore();
+  const ids = [...document.querySelectorAll(".lesson-list li[data-academy-id]")].map((el) => el.dataset.academyId);
+  const completed = ids.filter((id) => store.academy?.lessons?.[id]?.complete);
+  return {
+    completed,
+    current: store.lastAcademy || null,
+    chapters_done: completed.length,
+    chapters_total: ids.length,
+  };
+}
+
+let buddyState = {};
+
+function pageBuddyDefaults() {
+  const root = document.getElementById("academy-root");
+  const hold = document.getElementById("academy-data");
+  let lesson = null;
+  if (hold) {
+    try {
+      lesson = JSON.parse(hold.textContent);
+    } catch {
+      lesson = null;
+    }
+  }
+  const heading = document.querySelector(".wissen-article h1, .content h1");
+  return {
+    page: currentPageKind(),
+    url: location.pathname,
+    lesson_id: (root && root.dataset.lessonId) || (lesson && lesson.id) || "",
+    lesson_title: (lesson && lesson.title) || (heading ? heading.textContent.trim() : ""),
+    chapter: lesson ? lesson.chapter : undefined,
+    workshop: Boolean(root && root.dataset.workshop),
+    progress: buddyProgress(),
+  };
+}
+
+function formatBuddyHere(state) {
+  if (state.lesson_title && (state.step_title || state.step_type)) {
+    const where = state.workshop ? "Playground" : `Kapitel ${state.chapter ?? ""}`.trim();
+    const stepNo = Number.isFinite(Number(state.step)) ? Number(state.step) + 1 : "";
+    return `${where} · ${state.lesson_title} · Schritt ${stepNo} · ${state.step_title || state.step_type}`;
+  }
+  if (state.page === "wissen") return `Bibel · ${state.lesson_title || "Nachschlagen"}`;
+  if (state.page === "cards") return "Karteikarten";
+  if (state.page === "playground") return "SQL-Playground — Claude schreibt Zusatzübungen mit Erklärung.";
+  if (state.page === "learn") return state.lesson_title || "Lernpfad";
+  return "Übersicht. Öffne ein Kapitel, dann erklärt Claude genau diesen Schritt.";
+}
+
+function buildBuddyPrompt(ask) {
+  const state = { ...pageBuddyDefaults(), ...buddyState };
+  const question = (ask || document.getElementById("buddy-ask")?.value || "").trim();
+  const lines = [
+    "Ich lerne PostgreSQL in plx.learnSQL (MCP learnsql).",
+    "",
+    `Wo ich bin: ${formatBuddyHere(state)}`,
+  ];
+  if (state.prompt) lines.push(`Aufgabe: ${state.prompt}`);
+  if (state.last_sql) {
+    lines.push("Meine letzte Query:");
+    lines.push(state.last_sql);
+  }
+  if (state.last_coach) lines.push(`Letzter Hinweis der App: ${state.last_coach}`);
+  lines.push("");
+  lines.push(`Frage: ${question || "Erklär mir, wo ich stehe, ohne die Lösung zu verraten."}`);
+  lines.push("");
+  lines.push("Bitte zuerst buddy_context lesen, dann help_with (und coach_sql falls SQL da ist). Lösung nicht vorgeben, außer ich frage danach.");
+  return lines.join("\n");
+}
+
+let buddyTimer = null;
+function syncBuddyContext(extra = {}) {
+  buddyState = {
+    ...pageBuddyDefaults(),
+    ...buddyState,
+    ...extra,
+    url: location.pathname,
+    page: currentPageKind(),
+    progress: buddyProgress(),
+  };
+  const here = document.getElementById("buddy-here");
+  if (here) here.textContent = formatBuddyHere(buddyState);
+  window.clearTimeout(buddyTimer);
+  buddyTimer = window.setTimeout(() => {
+    postJson("/api/buddy/context", buddyState);
+  }, 280);
+}
+
+function openBuddy(opts = {}) {
+  const panel = document.getElementById("buddy-panel");
+  const fab = document.getElementById("buddy-fab");
+  if (!panel) return;
+  if (opts.ask) {
+    const box = document.getElementById("buddy-ask");
+    if (box) box.value = opts.ask;
+  }
+  panel.hidden = false;
+  document.body.classList.add("buddy-open");
+  fab?.setAttribute("aria-expanded", "true");
+  document.getElementById("buddy-ask")?.focus();
+  syncBuddyContext({ question: document.getElementById("buddy-ask")?.value || "" });
+}
+
+function closeBuddy() {
+  const panel = document.getElementById("buddy-panel");
+  const fab = document.getElementById("buddy-fab");
+  if (!panel) return;
+  panel.hidden = true;
+  document.body.classList.remove("buddy-open");
+  fab?.setAttribute("aria-expanded", "false");
+}
+
+function initBuddy() {
+  document.getElementById("buddy-close")?.addEventListener("click", closeBuddy);
+  document.addEventListener("click", (e) => {
+    const open = e.target.closest(".js-buddy-open");
+    if (!open) return;
+    e.preventDefault();
+    openBuddy({ ask: open.getAttribute("data-ask") || "" });
+  });
+  document.getElementById("buddy-chips")?.addEventListener("click", (e) => {
+    const chip = e.target.closest(".js-buddy-chip");
+    if (!chip) return;
+    const box = document.getElementById("buddy-ask");
+    if (box) box.value = chip.getAttribute("data-ask") || "";
+  });
+  document.getElementById("buddy-copy")?.addEventListener("click", async () => {
+    const text = buildBuddyPrompt();
+    const preview = document.getElementById("buddy-preview");
+    const msg = document.getElementById("buddy-copy-msg");
+    if (preview) {
+      preview.hidden = false;
+      preview.textContent = text;
+    }
+    await copyText(text);
+    if (msg) {
+      msg.hidden = false;
+      window.setTimeout(() => { msg.hidden = true; }, 2800);
+    }
+    syncBuddyContext({ question: document.getElementById("buddy-ask")?.value || "" });
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && document.body.classList.contains("buddy-open")) closeBuddy();
+  });
+  syncBuddyContext();
 }
 
 function initMcpConnect() {
@@ -1420,6 +1581,7 @@ initWissen();
 initResetDb();
 initMcpConnect();
 initPromptChips();
+initBuddy();
 initDashboard();
 refreshChrome();
 
@@ -1433,5 +1595,7 @@ window.LearnUI = {
   saveStore,
   academyState,
   refreshChrome,
+  syncBuddyContext,
+  openBuddy,
 };
 

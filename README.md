@@ -8,7 +8,7 @@ Ein Lernpfad in der App: von der ersten Tabelle bis zu JOIN, Gruppen, Änderunge
 - SQL-Playground für Zusatzübungen von Claude (MCP)
 - PostgreSQL-Bibel unter `/wissen` (eigene Artikel, nicht das alte Mini-Glossar)
 - Karteikarten mit Leitner (Nochmal / Schwer / Sitzt) in localStorage
-- MCP für Claude Desktop und Claude Code, Übungen erscheinen im SQL-Playground
+- MCP für Claude Desktop und Claude Code: Lern-Buddy auf dem Pfad, Zusatzübungen im SQL-Playground
 
 Trainingsdaten setzt du bei Bedarf über **Datenbank zurücksetzen** zurück.
 
@@ -72,11 +72,13 @@ docker compose up --build
 
 ### MCP (Claude Desktop, Claude Code)
 
-Die App ruft kein LLM auf. Claude hängt als Client am MCP und legt **zusätzliche Übungen** in den SQL-Playground — der offizielle Pfad bleibt unverändert.
+Die App ruft kein LLM auf. Claude hängt als Client am MCP: als **Lern-Buddy** auf dem offiziellen Pfad (Fragen erklären, SQL prüfen) und als Autor **zusätzlicher Übungen** im SQL-Playground.
 
-Was du sagen kannst: „Bau mir drei Playground-Übungen zu offenen Aufträgen mit GROUP BY.“ Danach `/playground` öffnen. Alte Karten löschst du in der App oder sagst Claude `delete_practice`.
+In der App: Knopf **Claude** oder in der Seitenleiste **Claude-Buddy**. Der Prompt wird kopiert; Claude Code / Desktop liest über `buddy_context`, wo du gerade bist.
 
-Claude soll zuerst `exercise_context` lesen, die Lösung mit `validate_exercise` prüfen und erst dann `save_practice` aufrufen. Extra-Tabellen in `learn` verschwinden beim Zurücksetzen (`DROP SCHEMA learn CASCADE`).
+Was du sagen kannst: „Erklär mir diesen Schritt, ohne die Lösung zu verraten.“ oder „Bau mir drei Playground-Übungen zu offenen Aufträgen mit GROUP BY — mit explain-Schritt und teach.“ Alte Karten löschst du in der App oder sagst Claude `delete_practice`.
+
+Claude soll zuerst `buddy_context` (Lernen) oder `exercise_context` (Playground-Übungen) lesen. Übungen brauchen einen **explain**-Schritt (Alltagssprache + antippenbare SQL-Teile) und `teach` an den Schreib-Schritten. Vor dem Speichern `validate_exercise`. Extra-Tabellen in `learn` verschwinden beim Zurücksetzen (`DROP SCHEMA learn CASCADE`).
 
 Schritt-für-Schritt: [mcp/ANLEITUNG.md](mcp/ANLEITUNG.md)
 

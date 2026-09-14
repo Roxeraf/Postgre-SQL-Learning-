@@ -155,6 +155,40 @@ def clause_snippets(sql: str) -> list[dict]:
     return parts
 
 
+def explain_step_parts(sql: str) -> tuple[str, list[dict]]:
+    """Turn a query into explain-step `plain` + clickable `parts`."""
+    explained = explain_sql(sql)
+    parts = []
+    for part in explained.get("parts") or []:
+        token = part.get("key") or "SQL"
+        match = compact_sql(part.get("sql") or "")[:90]
+        if not match:
+            continue
+        parts.append({
+            "match": match,
+            "token": token,
+            "question": part.get("question") or "Was macht dieser Teil?",
+            "answer": part.get("blurb") or part.get("title") or "",
+        })
+    if len(parts) < 2:
+        parts = [
+            {
+                "match": "SELECT",
+                "token": "SELECT",
+                "question": "Was möchte ich sehen?",
+                "answer": "Die Spalten, die im Ergebnis erscheinen sollen.",
+            },
+            {
+                "match": "FROM",
+                "token": "FROM",
+                "question": "Woher kommen die Daten?",
+                "answer": "Die Tabelle, in der SQL suchen soll.",
+            },
+        ]
+    plain = explained.get("plain") or "Diese Abfrage liest Daten."
+    return plain, parts
+
+
 def explain_sql(sql: str) -> dict:
     parts = clause_snippets(sql)
     plain_bits = []

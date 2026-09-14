@@ -10,6 +10,10 @@ from pathlib import Path
 SAFE_ID = re.compile(r"^[a-z0-9][a-z0-9_-]{1,60}$")
 
 
+def learner_context_path() -> Path:
+    return workshop_dir() / ".learner-context.json"
+
+
 def workshop_dir() -> Path:
     env = os.environ.get("WORKSHOP_DIR")
     if env:

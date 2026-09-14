@@ -65,6 +65,11 @@ from learn_db import (  # noqa: E402
     _format_restore_error,
 )
 from lessons.workshop import delete_workshop_lesson, workshop_by_id, workshop_lessons  # noqa: E402
+from lessons.buddy import (  # noqa: E402
+    enrich_lesson,
+    load_learner_context,
+    save_learner_context,
+)
 from sql_coach import (  # noqa: E402
     diagnose_structure,
     explain_sql as explain_sql_query,
@@ -421,7 +426,7 @@ def index():
 
 @app.route("/learn/<lesson_id>")
 def academy_lesson(lesson_id):
-    lesson_obj = find_lesson(lesson_id)
+    lesson_obj = enrich_lesson(find_lesson(lesson_id))
     if not lesson_obj:
         return "Lektion nicht gefunden", 404
     prev_id, next_id = academy_nav(lesson_id)
@@ -446,7 +451,7 @@ def playground():
 
 @app.route("/playground/<lesson_id>")
 def playground_lesson(lesson_id):
-    lesson_obj = workshop_by_id(lesson_id)
+    lesson_obj = enrich_lesson(workshop_by_id(lesson_id))
     if not lesson_obj:
         return "Übung nicht gefunden", 404
     prev_id, next_id = academy_nav(lesson_id)
@@ -847,6 +852,18 @@ def api_search():
         if len(results) >= 24:
             break
     return jsonify({"ok": True, "results": results, "query": query})
+
+
+@app.route("/api/buddy/context", methods=["GET", "POST"])
+def api_buddy_context():
+    if request.method == "POST":
+        data = request.get_json(force=True, silent=True) or {}
+        payload = save_learner_context(data)
+        return jsonify({"ok": True, "context": payload})
+    ctx = load_learner_context()
+    if not ctx:
+        return jsonify({"ok": False, "error": "Noch kein Standort."})
+    return jsonify({"ok": True, "context": ctx})
 
 
 if __name__ == "__main__":
