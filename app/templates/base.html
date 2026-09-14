@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/css/style.css?v=26">
+<link rel="stylesheet" href="/static/css/style.css?v=27">
 <script src="/static/js/vendor/marked.min.js?v=1"></script>
 </head>
 <body>
@@ -34,6 +34,14 @@
     <div class="skill-pair" id="skill-pair">
       <div class="skill-row"><span>Pfad</span><span class="skill-bar"><i id="bar-sql" style="width:0%"></i></span><span id="pct-sql">0%</span></div>
     </div>
+    <button class="tool-link tool-link-stack js-buddy-open buddy-nav-top" type="button" id="nav-buddy">
+      <span>Claude-Buddy</span>
+      {% if mcp_status and mcp_status.installed %}
+      <span class="mcp-nav-status is-on">fragt und erklärt</span>
+      {% else %}
+      <span class="mcp-nav-status is-off">noch ohne Claude</span>
+      {% endif %}
+    </button>
 
     <p class="nav-label">Lernpfad</p>
     <ol class="lesson-list">
@@ -58,14 +66,6 @@
         <span class="mcp-nav-status is-off">MCP · nicht installiert</span>
         {% endif %}
       </a>
-      <button class="tool-link tool-link-stack js-buddy-open" type="button" id="nav-buddy">
-        <span>Claude-Buddy</span>
-        {% if mcp_status and mcp_status.installed %}
-        <span class="mcp-nav-status is-on">fragt und erklärt</span>
-        {% else %}
-        <span class="mcp-nav-status is-off">noch ohne Claude</span>
-        {% endif %}
-      </button>
       <a class="tool-link {{ 'active' if active_tool == 'wissen' else '' }}" href="/wissen">Wissensbasis</a>
       <a class="tool-link {{ 'active' if active_tool == 'cards' else '' }}" href="/cards">Karteikarten</a>
       <button class="tool-link" type="button" id="open-schema">Alle Tabellen</button>

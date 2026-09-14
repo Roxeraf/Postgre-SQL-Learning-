@@ -1406,7 +1406,15 @@ details.mcp-setup[open] > summary::after { content: "Verbergen"; }
 .model-buddy {
   margin-top: 12px;
   width: 100%;
+  margin-bottom: 64px;
 }
+
+.buddy-nav-top {
+  margin: 0 0 18px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+}
+.buddy-nav-top:hover { border-color: var(--border-strong); }
 
 .buddy-fab {
   position: fixed;
