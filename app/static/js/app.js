@@ -583,9 +583,15 @@ async function copyText(text) {
 }
 
 function initPromptChips() {
+  const buddyReady = Boolean(document.getElementById("buddy-send"));
   document.querySelectorAll(".js-prompt-chip").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const text = btn.getAttribute("data-prompt") || btn.textContent.trim();
+      if (buddyReady) {
+        openBuddy({ ask: text });
+        buddySend(text);
+        return;
+      }
       await copyText(text);
       const label = btn.textContent;
       btn.classList.add("is-copied", "active");
@@ -652,9 +658,69 @@ function formatBuddyHere(state) {
   }
   if (state.page === "wissen") return `Bibel · ${state.lesson_title || "Nachschlagen"}`;
   if (state.page === "cards") return "Karteikarten";
-  if (state.page === "playground") return "SQL-Playground — Claude schreibt Zusatzübungen mit Erklärung.";
+  if (state.page === "playground") {
+    if (state.workshop && state.lesson_title) return `Playground · ${state.lesson_title}`;
+    return "SQL-Playground · Übersicht — Claude legt hier Übungen an.";
+  }
   if (state.page === "learn") return state.lesson_title || "Lernpfad";
-  return "Übersicht. Öffne ein Kapitel, dann erklärt Claude genau diesen Schritt.";
+  return "Übersicht — du kannst fragen oder eine Übung anlegen.";
+}
+
+function buddyChipSets(state) {
+  const atStep = Boolean(state.lesson_title && (state.step_title || state.step_type));
+  if (atStep) {
+    return [
+      ["Erklär mir diesen Schritt, ohne die Lösung zu verraten.", "Diesen Schritt erklären"],
+      ["Meine Query passt noch nicht. Was übersehe ich?", "Meine Query verstehen"],
+      ["Erklär das Konzept nochmal an der Auftragstabelle.", "Konzept nochmal"],
+      ["Welche Bibel-Stelle sollte ich dazu lesen?", "Zur Bibel"],
+    ];
+  }
+  if (state.page === "wissen") {
+    return [
+      ["Erklär mir diesen Artikel an der Auftragstabelle.", "Artikel erklären"],
+      ["Bau mir eine Playground-Übung zu diesem Thema — mit explain-Schritt und teach.", "Übung dazu anlegen"],
+      ["Welche Stelle sollte ich als Nächstes lesen?", "Weiterlesen"],
+    ];
+  }
+  if (state.page === "cards") {
+    return [
+      ["Welche Karten sollte ich jetzt wiederholen?", "Karten wählen"],
+      ["Erklär das Konzept auf der Karte an der Auftragstabelle.", "Konzept erklären"],
+    ];
+  }
+  const chips = [
+    ["Bau mir eine Playground-Übung zu offenen Aufträgen mit WHERE — mit explain-Schritt und teach.", "Übung anlegen"],
+    ["Was kann ich hier mit dir machen?", "Was kann ich hier machen?"],
+  ];
+  if (state.progress && state.progress.current) {
+    chips.push([
+      "Ich bin im Lernpfad. Lies buddy_context und erklär mir, wo ich stehe, ohne die Lösung zu verraten.",
+      "Zum aktuellen Kapitel",
+    ]);
+  }
+  return chips;
+}
+
+function renderBuddyChips() {
+  const row = document.getElementById("buddy-chips");
+  if (!row) return;
+  const state = { ...pageBuddyDefaults(), ...buddyState };
+  row.innerHTML = buddyChipSets(state).map(([ask, label]) => (
+    `<button type="button" class="section-chip js-buddy-chip" data-ask="${esc(ask)}">${esc(label)}</button>`
+  )).join("");
+}
+
+function syncBuddyAskPlaceholder(state) {
+  const box = document.getElementById("buddy-ask");
+  if (!box) return;
+  if (state.lesson_title && (state.step_title || state.step_type)) {
+    box.placeholder = "Was ist unklar? z. B. Warum braucht WHERE Anführungszeichen?";
+  } else if (state.page === "playground" || state.page === "home") {
+    box.placeholder = "Welche Übung soll Claude anlegen? Oder frag einfach.";
+  } else {
+    box.placeholder = "Was ist unklar?";
+  }
 }
 
 const BUDDY_TOOL_LABELS = {
@@ -715,10 +781,31 @@ function syncBuddyContext(extra = {}) {
   };
   const here = document.getElementById("buddy-here");
   if (here) here.textContent = formatBuddyHere(buddyState);
+  renderBuddyChips();
+  syncBuddyAskPlaceholder(buddyState);
   window.clearTimeout(buddyTimer);
   buddyTimer = window.setTimeout(() => {
     postJson("/api/buddy/context", buddyState);
   }, 280);
+}
+
+const BUDDY_OPEN_KEY = "learnsql-buddy-open";
+
+function buddyKeepOpen(on) {
+  try {
+    if (on) window.sessionStorage.setItem(BUDDY_OPEN_KEY, "1");
+    else window.sessionStorage.removeItem(BUDDY_OPEN_KEY);
+  } catch {
+    /* private mode */
+  }
+}
+
+function buddyWasOpen() {
+  try {
+    return window.sessionStorage.getItem(BUDDY_OPEN_KEY) === "1";
+  } catch {
+    return false;
+  }
 }
 
 function openBuddy(opts = {}) {
@@ -732,7 +819,8 @@ function openBuddy(opts = {}) {
   panel.hidden = false;
   document.body.classList.add("buddy-open");
   fab?.setAttribute("aria-expanded", "true");
-  document.getElementById("buddy-ask")?.focus();
+  buddyKeepOpen(true);
+  if (!opts.quiet) document.getElementById("buddy-ask")?.focus();
   syncBuddyContext({ question: document.getElementById("buddy-ask")?.value || "" });
 }
 
@@ -743,6 +831,7 @@ function closeBuddy() {
   panel.hidden = true;
   document.body.classList.remove("buddy-open");
   fab?.setAttribute("aria-expanded", "false");
+  buddyKeepOpen(false);
 }
 
 // --- buddy chat over SSE ----------------------------------------------------
@@ -821,6 +910,36 @@ function buddyNote(kind, text) {
   buddyScroll();
 }
 
+function buddyPracticeCard(data) {
+  const box = document.getElementById("buddy-chat");
+  if (!box) return;
+  const el = document.createElement("div");
+  el.className = "buddy-practice";
+  const title = data.title || data.id || "Übung";
+  if (data.action === "delete") {
+    const n = (data.ids && data.ids.length) || (data.id ? 1 : 0);
+    el.innerHTML = `<p class="buddy-practice-kicker">Playground</p>
+      <p>${n === 1 ? "Übung gelöscht." : `${n} Übungen gelöscht.`}</p>`;
+  } else {
+    const url = data.url || `/playground/${data.id || ""}`;
+    el.innerHTML = `<p class="buddy-practice-kicker">Neue Übung</p>
+      <p class="buddy-practice-title">${esc(title)}</p>
+      <a class="btn btn-primary" href="${esc(url)}">Öffnen</a>`;
+  }
+  box.appendChild(el);
+  buddyScroll();
+}
+
+function maybeLeaveDeletedPractice(data) {
+  if (!data || data.action !== "delete") return;
+  const ids = data.ids || (data.id ? [data.id] : []);
+  const here = location.pathname.replace(/\/$/, "");
+  if (ids.some((id) => here === `/playground/${id}`)) {
+    buddyKeepOpen(true);
+    window.location.href = "/playground";
+  }
+}
+
 function buddyActivity(text) {
   const el = document.getElementById("buddy-activity");
   if (!el) return;
@@ -872,6 +991,10 @@ function buddyRestore() {
   }
   buddyTurns = buddyLog.filter((m) => m.role === "user").length;
   buddyLog.forEach((msg) => {
+    if (msg.role === "practice") {
+      buddyPracticeCard(msg);
+      return;
+    }
     const el = buddyBubble(msg.role === "user" ? "user" : "claude", "");
     if (!el) return;
     if (msg.role === "user") el.textContent = msg.text;
@@ -945,6 +1068,20 @@ function buddyHandle(block, ctx) {
     }
   } else if (name === "notice") {
     buddyNote(data.kind || "info", data.text || "");
+  } else if (name === "practice") {
+    ctx.practices = (ctx.practices || 0) + 1;
+    buddyPracticeCard(data);
+    buddyLog.push({
+      role: "practice",
+      action: data.action,
+      id: data.id,
+      ids: data.ids,
+      title: data.title,
+      url: data.url,
+    });
+    buddyPersist();
+    refreshPlaygroundCatalog();
+    maybeLeaveDeletedPractice(data);
   } else if (name === "done") {
     ctx.done = true;
     const text = data.text || ctx.text;
@@ -952,8 +1089,8 @@ function buddyHandle(block, ctx) {
     if (ctx.bubble) buddyRender(ctx.bubble, text);
     buddyLog.push({ role: "claude", text });
     buddyPersist();
-    if (ctx.tools.has("save_practice") || ctx.tools.has("delete_practice")) {
-      buddyNote("info", "Der SQL-Playground hat sich geändert.");
+    if (!ctx.practices && (ctx.tools.has("save_practice") || ctx.tools.has("delete_practice"))) {
+      refreshPlaygroundCatalog();
     }
     const reset = document.getElementById("buddy-reset");
     if (reset) reset.hidden = false;
@@ -982,7 +1119,7 @@ async function buddySend(ask) {
 
   buddyCtrl = new AbortController();
   buddyBusy(true);
-  const ctx = { text: "", bubble: null, tools: new Set(), done: false, pending: false };
+  const ctx = { text: "", bubble: null, tools: new Set(), done: false, pending: false, practices: 0 };
 
   try {
     const res = await fetch("/api/buddy/chat", {
@@ -1053,6 +1190,24 @@ function initBuddy() {
       buddySend();
     }
   });
+  document.getElementById("buddy-chat")?.addEventListener("click", (e) => {
+    const a = e.target.closest("a[href]");
+    if (!a) return;
+    const href = a.getAttribute("href") || "";
+    let path = href;
+    try {
+      if (/^https?:/i.test(href)) {
+        const u = new URL(href, location.origin);
+        if (u.origin !== location.origin) return;
+        path = u.pathname;
+      }
+    } catch {
+      return;
+    }
+    if (path.startsWith("/playground") || path.startsWith("/learn/")) {
+      buddyKeepOpen(true);
+    }
+  });
   window.addEventListener("beforeunload", () => {
     if (buddyCtrl) buddyCtrl.abort();
   });
@@ -1060,7 +1215,8 @@ function initBuddy() {
     if (e.key === "Escape" && document.body.classList.contains("buddy-open")) closeBuddy();
   });
   buddyRestore();
-  syncBuddyContext();
+  if (buddyWasOpen()) openBuddy({ quiet: true });
+  else syncBuddyContext();
 }
 
 function initMcpConnect() {
@@ -1632,26 +1788,75 @@ function initQuiz(lessonId, exerciseCount, quizCount) {
   });
 }
 
-function initPlaygroundDelete() {
-  const grid = document.querySelector(".path-playground");
-  if (!grid) return;
-  const countEl = document.getElementById("playground-count");
-  const mainEl = document.getElementById("playground-main");
-  const promptsEl = document.getElementById("playground-prompts");
-  const emptyEl = document.getElementById("playground-empty");
-
-  const refreshEmpty = () => {
-    const left = grid.querySelectorAll(".playground-card").length;
-    if (countEl) {
-      countEl.textContent = left === 1
-        ? "1 Übung · wie ein normales Kapitel lösen"
-        : `${left} Übungen · wie ein normales Kapitel lösen`;
-    }
-    if (left > 0) return;
-    if (mainEl) mainEl.hidden = true;
-    if (promptsEl) promptsEl.hidden = true;
-    if (emptyEl) emptyEl.hidden = false;
+function playgroundEls() {
+  return {
+    grid: document.querySelector(".path-playground"),
+    countEl: document.getElementById("playground-count"),
+    mainEl: document.getElementById("playground-main"),
+    promptsEl: document.getElementById("playground-prompts"),
+    emptyEl: document.getElementById("playground-empty"),
   };
+}
+
+function playgroundCardHtml(p) {
+  const id = p.id || "";
+  const title = p.title || id;
+  const concept = p.concept ? `<span>${esc(p.concept)}</span>` : "";
+  const steps = Number(p.step_count) || 0;
+  const minutes = p.minutes || 8;
+  return `<article class="path-card playground-card" data-practice-id="${esc(id)}">
+    <a class="path-card-body" href="/playground/${esc(id)}">
+      <div class="path-top">
+        <span class="path-letter">P</span>
+        <span class="path-mins">${esc(minutes)} Min</span>
+      </div>
+      <h3>${esc(title)}</h3>
+      <p class="path-goals">${esc(p.goal || "")}</p>
+      <div class="path-meta">
+        <span>${steps} Schritte</span>
+        ${concept}
+      </div>
+    </a>
+    <button class="path-card-delete" type="button" data-id="${esc(id)}" data-title="${esc(title)}">Löschen</button>
+  </article>`;
+}
+
+function setPlaygroundEmpty(hasCards) {
+  const { grid, countEl, mainEl, promptsEl, emptyEl } = playgroundEls();
+  const left = hasCards && grid ? grid.querySelectorAll(".playground-card").length : 0;
+  if (countEl) {
+    countEl.textContent = left === 1
+      ? "1 Übung · wie ein normales Kapitel lösen"
+      : `${left} Übungen · wie ein normales Kapitel lösen`;
+  }
+  if (mainEl) mainEl.hidden = left === 0;
+  if (promptsEl) promptsEl.hidden = left === 0;
+  if (emptyEl) emptyEl.hidden = left > 0;
+}
+
+function renderPlaygroundCatalog(practices) {
+  const { grid } = playgroundEls();
+  if (!grid) return;
+  const list = practices || [];
+  grid.innerHTML = list.map(playgroundCardHtml).join("");
+  setPlaygroundEmpty(list.length > 0);
+}
+
+async function refreshPlaygroundCatalog() {
+  if (!document.getElementById("playground-main") && !document.getElementById("playground-empty")) return;
+  try {
+    const res = await fetch("/api/playground");
+    const data = await res.json();
+    if (!data.ok) return;
+    renderPlaygroundCatalog(data.practices || []);
+  } catch {
+    /* listing can wait for the next visit */
+  }
+}
+
+function initPlaygroundDelete() {
+  const { grid } = playgroundEls();
+  if (!grid) return;
 
   grid.addEventListener("click", async (e) => {
     const btn = e.target.closest(".path-card-delete");
@@ -1670,12 +1875,17 @@ function initPlaygroundDelete() {
         return;
       }
       btn.closest(".playground-card")?.remove();
-      refreshEmpty();
+      setPlaygroundEmpty(grid.querySelectorAll(".playground-card").length > 0);
     } catch {
       window.alert("Löschen fehlgeschlagen.");
     } finally {
       btn.disabled = false;
     }
+  });
+
+  window.addEventListener("focus", () => {
+    const path = location.pathname.replace(/\/$/, "") || "/";
+    if (path === "/playground") refreshPlaygroundCatalog();
   });
 }
 

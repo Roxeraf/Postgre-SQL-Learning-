@@ -200,8 +200,9 @@ INSTRUCTIONS = (
     "Step-Typen im Detail: `step_schema`. "
     "Vorbild über `get_lesson` (ch8 oder challenge-2). "
     "Alte Übungen entfernen über `delete_practice` (eine id oder eine Liste).\n"
-    "Gespeicherte Übungen erscheinen im SQL-Playground unter /playground/{id} "
-    "(eine aktive Installation; save_practice prüft, ob die laufende App die Datei liest).\n"
+    "Gespeicherte Übungen erscheinen im SQL-Playground unter /playground/{id}. "
+    "Die App aktualisiert die Liste selbst — sag der Person nicht, sie solle neu laden, "
+    "und erwähne reachable nicht.\n"
     "Hints und teach helfen, sind aber nicht die volle Lösung. Quiz fragt das SQL-Thema, nicht das MCP. "
     "Offizielle PATH_IDS nicht überschreiben."
 )
@@ -478,17 +479,26 @@ def live_install() -> dict | None:
     return ranked[0] if ranked else None
 
 
+def env_app_url() -> str | None:
+    raw = (os.environ.get("APP_URL") or "").strip().rstrip("/")
+    return raw or None
+
+
 def resolve_workshop() -> dict:
     live = live_install()
     env_dir = os.environ.get("WORKSHOP_DIR")
     env_home = os.environ.get("LEARN_SQL_HOME")
+    env_url = env_app_url()
     if live and (live.get("pid_alive") or live.get("http_ok")):
-        return {
+        out = {
             **live,
             "source": "live-runtime",
             "env_workshop": env_dir,
             "env_home": env_home,
         }
+        if env_url and not out.get("app_url"):
+            out["app_url"] = env_url
+        return out
     folder = Path(env_dir) if env_dir else workshop_dir()
     return {
         "home": str(Path(env_home).expanduser()) if env_home else str(ROOT),
@@ -498,7 +508,7 @@ def resolve_workshop() -> dict:
         "appPort": None,
         "pid_alive": False,
         "http_ok": False,
-        "app_url": None,
+        "app_url": env_url,
         "source": "env" if env_dir else "default",
         "env_workshop": env_dir,
         "env_home": env_home,
@@ -1261,10 +1271,11 @@ def tool_save_practice(args):
     except ValueError as exc:
         return _err(str(exc))
     lid = str(data.get("id") or "")
+    title = str(data.get("title") or lid)
     url = _absolute_url(target.get("app_url"), lid)
     reachable = None
     http_status = None
-    if target.get("app_url") and (target.get("pid_alive") or target.get("http_ok") or target.get("appPort")):
+    if target.get("app_url"):
         http_status, _final = http_get(url)
         reachable = http_status == 200
         if not reachable:
@@ -1279,6 +1290,7 @@ def tool_save_practice(args):
                 extra={
                     "saved": str(path),
                     "id": lid,
+                    "title": title,
                     "url": url,
                     "reachable": False,
                     "http_status": http_status,
@@ -1290,6 +1302,7 @@ def tool_save_practice(args):
     return _ok_text({
         "saved": str(path),
         "id": lid,
+        "title": title,
         "url": url,
         "reachable": reachable,
         "http_status": http_status,

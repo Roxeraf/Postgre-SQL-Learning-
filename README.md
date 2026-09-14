@@ -104,7 +104,8 @@ der Drawer nur einen Hinweis.
 
 In der App: Knopf **Claude** oder in der Seitenleiste **Claude-Buddy**. Frage eintippen, die
 Antwort läuft Wort für Wort ein. Claude liest über `buddy_context`, wo du stehst, prüft deine
-Query mit `coach_sql` und legt auf Wunsch Übungen in den SQL-Playground.
+Query mit `coach_sql` und legt auf Wunsch Übungen in den SQL-Playground. Neu angelegte Übungen
+erscheinen ohne Neuladen; der Drawer bleibt beim Wechsel auf die Übung offen.
 
 Der Buddy darf ausschließlich die `learnsql`-Werkzeuge benutzen — keine Datei-, Shell- oder
 Web-Zugriffe. **Stopp** bricht ab, **Neues Gespräch** vergisst den Verlauf.

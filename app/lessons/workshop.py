@@ -68,6 +68,42 @@ def workshop_lessons() -> list[dict]:
     return lessons
 
 
+def public_practice(item: dict) -> dict:
+    concepts = item.get("concepts") or []
+    lid = item["id"]
+    return {
+        "id": lid,
+        "title": item.get("title") or lid,
+        "goal": item.get("goal") or "",
+        "minutes": item.get("minutes") or 8,
+        "step_count": len(item.get("steps") or []),
+        "concept": concepts[0] if concepts else None,
+        "url": f"/playground/{lid}",
+    }
+
+
+def recent_workshop_lessons(limit: int = 3) -> list[dict]:
+    folder = workshop_dir()
+    if not folder.is_dir():
+        return []
+    ranked = []
+    for path in folder.glob("*.json"):
+        try:
+            ranked.append((path.stat().st_mtime, path))
+        except OSError:
+            continue
+    ranked.sort(reverse=True)
+    out = []
+    for _, path in ranked:
+        lesson = _read_lesson(path)
+        if not lesson:
+            continue
+        out.append(lesson)
+        if len(out) >= limit:
+            break
+    return out
+
+
 def workshop_by_id(lesson_id: str):
     for lesson in workshop_lessons():
         if lesson["id"] == lesson_id:

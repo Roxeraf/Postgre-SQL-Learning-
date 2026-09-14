@@ -662,7 +662,7 @@ class WorkshopAndMcpTests(unittest.TestCase):
         self.assertGreaterEqual(len(payload["quiz"]), 4)
 
         with tempfile.TemporaryDirectory() as tmp:
-            with patch.dict("os.environ", {"WORKSHOP_DIR": tmp}):
+            with patch.dict("os.environ", {"WORKSHOP_DIR": tmp, "APP_URL": ""}):
                 with patch.object(mcp, "sandbox_sql", side_effect=ok_sandbox_sql):
                     saved = mcp.handle({
                         "jsonrpc": "2.0",
@@ -873,8 +873,27 @@ class McpAgentWorkflowTests(unittest.TestCase):
             self.assertFalse(mcp_is_error(reply))
             payload = mcp_payload(reply)
             self.assertTrue(payload["reachable"])
+            self.assertEqual(payload.get("title"), VALID_PLAYGROUND_LESSON["title"])
             self.assertIn("http://127.0.0.1:8081/playground/ws-mcp-del", payload["url"])
             self.assertTrue((Path(tmp) / "ws-mcp-del.json").is_file())
+
+    def test_save_practice_uses_app_url_without_runtime(self):
+        mcp = self.mcp
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {"WORKSHOP_DIR": tmp, "APP_URL": "http://127.0.0.1:8081"}
+            with patch.dict(os.environ, env, clear=False):
+                with patch.object(mcp, "live_install", return_value=None):
+                    with patch.object(mcp, "sandbox_sql", side_effect=ok_sandbox_sql):
+                        with patch.object(
+                            mcp, "http_get",
+                            return_value=(200, "http://127.0.0.1:8081/playground/ws-mcp-del"),
+                        ) as probed:
+                            reply = mcp_call(mcp, "save_practice", {"lesson": VALID_PLAYGROUND_LESSON})
+            self.assertFalse(mcp_is_error(reply))
+            payload = mcp_payload(reply)
+            self.assertTrue(payload["reachable"])
+            self.assertEqual(payload["title"], VALID_PLAYGROUND_LESSON["title"])
+            probed.assert_called()
 
     def test_save_practice_unreachable_is_error(self):
         mcp = self.mcp
@@ -1103,6 +1122,8 @@ class WorkshopRuntimeTests(unittest.TestCase):
         self.assertIn("Claude-Buddy", shop_html)
         self.assertIn("buddy-panel", shop_html)
         self.assertIn('id="buddy-fab"', shop_html)
+        self.assertNotIn("Öffne ein Kapitel", shop_html)
+        self.assertIn("du kannst fragen oder eine Übung anlegen", shop_html)
         with tempfile.TemporaryDirectory() as tmp:
             env = claude_sandbox_env(tmp)
             desktop = Path(tmp) / "Claude"
@@ -1151,10 +1172,18 @@ class WorkshopRuntimeTests(unittest.TestCase):
                 })
                 listing = client.get("/playground")
                 listing_html = listing.data.decode("utf-8")
+                listed = client.get("/api/playground")
                 self.assertIn("Deine Übungen", listing_html)
                 self.assertIn("path-card", listing_html)
                 self.assertIn("path-playground", listing_html)
                 self.assertIn("Löschen", listing_html)
+                catalog = listed.get_json()
+                self.assertTrue(catalog["ok"])
+                self.assertEqual(catalog["practices"][0]["id"], "ws-player-label")
+                self.assertEqual(catalog["practices"][0]["url"], "/playground/ws-player-label")
+                self.assertEqual(catalog["practices"][0]["step_count"], 1)
+                self.assertIn("playground-nav", listing_html)
+                self.assertIn("Offene zählen", listing_html)
                 if "Einrichten" in listing_html:
                     self.assertLess(listing_html.find("Deine Übungen"), listing_html.find("Einrichten"))
                 page = client.get("/playground/ws-player-label")
@@ -1168,6 +1197,8 @@ class WorkshopRuntimeTests(unittest.TestCase):
         self.assertNotIn("Kapitel W", html)
         self.assertIn("Zum Playground", html)
         self.assertIn('data-workshop="1"', html)
+        self.assertIn("playground-nav-link", html)
+        self.assertIn("Offene zählen", html)
         self.assertEqual(old.status_code, 301)
         self.assertIn("/playground/ws-player-label", old.headers.get("Location", ""))
         self.assertEqual(blocked.status_code, 400)
@@ -1378,6 +1409,81 @@ class ClaudeBuddyChatTests(unittest.TestCase):
         self.assertEqual(payloads["done"]["session_id"], "sess-1")
         self.assertTrue(payloads["done"]["ok"])
 
+    def test_iter_events_emits_practice_from_save_and_delete(self):
+        import claude_cli
+
+        lines = [
+            json.dumps({
+                "type": "assistant",
+                "message": {"content": [{
+                    "type": "tool_use",
+                    "id": "toolu_save",
+                    "name": "mcp__learnsql__save_practice",
+                }]},
+            }),
+            json.dumps({
+                "type": "user",
+                "message": {"content": [{
+                    "type": "tool_result",
+                    "tool_use_id": "toolu_save",
+                    "content": [{
+                        "type": "text",
+                        "text": json.dumps({
+                            "saved": "/tmp/ws-status.json",
+                            "id": "ws-status-auftraege",
+                            "title": "Status auslesen",
+                            "url": "http://127.0.0.1:8080/playground/ws-status-auftraege",
+                            "reachable": True,
+                        }),
+                    }],
+                }]},
+            }),
+            json.dumps({
+                "type": "user",
+                "message": {"content": [{
+                    "type": "tool_result",
+                    "tool_use_id": "unknown",
+                    "content": json.dumps({
+                        "deleted": ["ws-old"],
+                        "missing": [],
+                        "errors": [],
+                    }),
+                }]},
+            }),
+        ]
+        events = list(claude_cli.iter_events(lines))
+        names = [name for name, _ in events]
+        self.assertEqual(names, ["tool", "practice", "practice"])
+        saved = events[1][1]
+        self.assertEqual(saved["action"], "save")
+        self.assertEqual(saved["id"], "ws-status-auftraege")
+        self.assertEqual(saved["title"], "Status auslesen")
+        self.assertEqual(saved["url"], "/playground/ws-status-auftraege")
+        deleted = events[2][1]
+        self.assertEqual(deleted["action"], "delete")
+        self.assertEqual(deleted["ids"], ["ws-old"])
+        self.assertEqual(deleted["url"], "/playground")
+
+    def test_server_env_sets_app_url_from_bind_all(self):
+        import claude_cli
+
+        with patch.dict(os.environ, {
+            "APP_URL": "",
+            "APP_HOST": "0.0.0.0",
+            "APP_PORT": "8099",
+        }, clear=False):
+            self.assertEqual(claude_cli.app_base_url(), "http://127.0.0.1:8099")
+            self.assertEqual(claude_cli.server_env()["APP_URL"], "http://127.0.0.1:8099")
+
+    def test_persona_lets_the_app_refresh_the_playground(self):
+        import claude_cli
+
+        self.assertIn("aktualisiert den Playground selbst", claude_cli.BUDDY_PERSONA)
+        self.assertEqual(
+            claude_cli.playground_href("http://127.0.0.1:8080/playground/ws-a", "ws-a"),
+            "/playground/ws-a",
+        )
+
     def test_allowed_tools_match_the_mcp_server(self):
         """Adding a 21st MCP tool must not silently stay unreachable."""
         import claude_cli
@@ -1455,6 +1561,7 @@ class ClaudeBuddyChatTests(unittest.TestCase):
                 entry = data["mcpServers"]["learnsql"]
                 self.assertTrue(entry["args"][-1].endswith("learnsql_mcp.py"))
                 self.assertEqual(entry["env"]["WORKSHOP_DIR"], str(workshop_dir()))
+                self.assertTrue(entry["env"]["APP_URL"].startswith("http://"))
 
     def test_mcp_child_runs_on_this_interpreter(self):
         """A venv's python symlinks out to the system one.
