@@ -199,8 +199,12 @@ function Start-Flask {
 
     $appPy = Join-Path $AppDir "app.py"
     $lessonMod = Join-Path $AppDir "lessons\academy_data.py"
+    $learnDb = Join-Path $AppDir "learn_db.py"
     if (-not (Test-Path $lessonMod)) {
         throw "Lektionsdateien fehlen: $lessonMod. Bitte plx.learnSQL neu installieren."
+    }
+    if (-not (Test-Path $learnDb)) {
+        throw "App-Modul fehlt: $learnDb. Bitte plx.learnSQL neu installieren (Setup neu bauen)."
     }
     # Absoluter Pfad, damit der Traceback nicht nach {app}\app.py (Installationswurzel) aussieht.
     # sys.path setzt app.py selbst — das eingebettete Python ignoriert PYTHONPATH und cwd.
@@ -266,7 +270,7 @@ Add-Type -AssemblyName System.Drawing
 try {
     Write-Log "Start in $Root"
 
-    foreach ($needed in @($Python, (Join-Path $PgBin "pg_ctl.exe"), $SqlFile, $InitDbPy, (Join-Path $AppDir "app.py"), (Join-Path $AppDir "lessons\academy_data.py"))) {
+    foreach ($needed in @($Python, (Join-Path $PgBin "pg_ctl.exe"), $SqlFile, $InitDbPy, (Join-Path $AppDir "app.py"), (Join-Path $AppDir "learn_db.py"), (Join-Path $AppDir "lessons\academy_data.py"))) {
         if (-not (Test-Path $needed)) { throw "Installationsdatei fehlt: $needed" }
     }
 

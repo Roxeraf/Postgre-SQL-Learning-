@@ -113,7 +113,9 @@ New-Item -ItemType Directory -Force -Path $stagingApp | Out-Null
 # Every top-level module, not a hand-kept list: app.py imports learn_db and
 # claude_cli, and an enumerated list silently ships a package that dies with
 # ModuleNotFoundError the first time a colleague starts it.
-Copy-Item (Join-Path $ProjectRoot "app\*.py") $stagingApp
+Get-ChildItem (Join-Path $ProjectRoot "app") -File -Filter "*.py" | ForEach-Object {
+    Copy-Item $_.FullName $stagingApp
+}
 Copy-Item (Join-Path $ProjectRoot "app\requirements.txt") $stagingApp
 Copy-Item (Join-Path $ProjectRoot "app\templates") (Join-Path $stagingApp "templates") -Recurse
 Copy-Item (Join-Path $ProjectRoot "app\static") (Join-Path $stagingApp "static") -Recurse

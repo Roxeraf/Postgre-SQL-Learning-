@@ -946,6 +946,15 @@ class WorkshopRuntimeTests(unittest.TestCase):
             finally:
                 sys.path[:] = saved
 
+    def test_installer_stages_all_app_python_modules(self):
+        build = (REPO / "installer" / "build.ps1").read_text(encoding="utf-8")
+        self.assertIn('-Filter "*.py"', build)
+        self.assertIn("learn_db.py", (REPO / "installer" / "runtime" / "Start-FlowAppLearn.ps1").read_text(encoding="utf-8"))
+        modules = {p.name for p in (REPO / "app").glob("*.py")}
+        self.assertIn("learn_db.py", modules)
+        self.assertIn("app.py", modules)
+        self.assertIn("sql_coach.py", modules)
+
     def test_ensure_app_on_path_recovers_lessons(self):
         import app as flask_app
 
@@ -1547,14 +1556,16 @@ class InstallerPackagesEverythingTests(unittest.TestCase):
 
     def test_build_script_stages_every_top_level_module(self):
         build = (REPO / "installer" / "build.ps1").read_text(encoding="utf-8")
-        staged = "app\\*.py" in build
-        if not staged:
-            missing = [
-                path.name
-                for path in sorted((REPO / "app").glob("*.py"))
-                if f'app\\{path.name}"' not in build
-            ]
-            self.fail(f"build.ps1 kopiert diese Module nicht: {missing}")
+        # Either spelling of "copy them all" is fine; what must not come back
+        # is an enumerated list that quietly drops a module.
+        if '-Filter "*.py"' in build or "app\\*.py" in build:
+            return
+        missing = [
+            path.name
+            for path in sorted((REPO / "app").glob("*.py"))
+            if f'app\\{path.name}"' not in build
+        ]
+        self.fail(f"build.ps1 kopiert diese Module nicht: {missing}")
 
     def test_mcp_registration_still_targets_claude_code(self):
         """The installer must keep writing mcpServers.learnsql into Claude Code."""

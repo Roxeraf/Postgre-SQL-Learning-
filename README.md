@@ -87,6 +87,7 @@ docker compose up --build
 └── app/
     ├── app.py                       # Flask-Backend
     ├── claude_cli.py                # startet Claude Code für den Buddy-Chat
+    ├── learn_db.py                  # Postgres-Sandbox (auch MCP, ohne Flask)
     ├── sql_coach.py                 # Lernfeedback statt Roh-Postgres-Fehler
     ├── lessons/academy_data.py      # Offizieller Pfad
     ├── lessons/path_more.py         # Zusatz-Kapitel
