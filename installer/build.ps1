@@ -110,8 +110,10 @@ if (-not (Test-Path (Join-Path $stagingPg "bin\pg_ctl.exe"))) {
 Write-Step "App-Dateien kopieren"
 $stagingApp = Join-Path $StagingDir "app"
 New-Item -ItemType Directory -Force -Path $stagingApp | Out-Null
-Copy-Item (Join-Path $ProjectRoot "app\app.py") $stagingApp
-Copy-Item (Join-Path $ProjectRoot "app\sql_coach.py") $stagingApp
+# Every top-level module, not a hand-kept list: app.py imports learn_db and
+# claude_cli, and an enumerated list silently ships a package that dies with
+# ModuleNotFoundError the first time a colleague starts it.
+Copy-Item (Join-Path $ProjectRoot "app\*.py") $stagingApp
 Copy-Item (Join-Path $ProjectRoot "app\requirements.txt") $stagingApp
 Copy-Item (Join-Path $ProjectRoot "app\templates") (Join-Path $stagingApp "templates") -Recurse
 Copy-Item (Join-Path $ProjectRoot "app\static") (Join-Path $stagingApp "static") -Recurse

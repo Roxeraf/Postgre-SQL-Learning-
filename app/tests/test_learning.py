@@ -1537,6 +1537,43 @@ class ClaudeBuddyChatTests(unittest.TestCase):
             self.assertNotIn("buddy-copy", html)
 
 
+class InstallerPackagesEverythingTests(unittest.TestCase):
+    """The Windows package is built from an explicit file list.
+
+    app.py imports learn_db and claude_cli; a list that forgets one ships a
+    setup that dies with ModuleNotFoundError on the colleague's machine, and
+    nothing catches it until someone runs the .exe.
+    """
+
+    def test_build_script_stages_every_top_level_module(self):
+        build = (REPO / "installer" / "build.ps1").read_text(encoding="utf-8")
+        staged = "app\\*.py" in build
+        if not staged:
+            missing = [
+                path.name
+                for path in sorted((REPO / "app").glob("*.py"))
+                if f'app\\{path.name}"' not in build
+            ]
+            self.fail(f"build.ps1 kopiert diese Module nicht: {missing}")
+
+    def test_mcp_registration_still_targets_claude_code(self):
+        """The installer must keep writing mcpServers.learnsql into Claude Code."""
+        sys.path.insert(0, str(REPO / "mcp"))
+        import install_mcp
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict(os.environ, claude_sandbox_env(tmp), clear=False):
+                paths = install_mcp.claude_config_paths()
+                labels = {install_mcp.client_label(path) for path in paths}
+        self.assertIn("Claude Code", labels)
+        self.assertIn("Claude Desktop", labels)
+
+        iss = (REPO / "installer" / "FlowAppLearn.iss").read_text(encoding="utf-8")
+        self.assertIn("Configure-LearnSqlMcp.ps1", iss)
+        start = (REPO / "installer" / "runtime" / "Start-FlowAppLearn.ps1").read_text(encoding="utf-8")
+        self.assertIn("Register-LearnSqlMcp", start)
+
+
 class DocsMatchRealityTests(unittest.TestCase):
     """The app used to call no model at all. It does now — say so."""
 
