@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/css/style.css?v=29">
+<link rel="stylesheet" href="/static/css/style.css?v=30">
 <script src="/static/js/vendor/marked.min.js?v=1"></script>
 </head>
 <body>
@@ -114,7 +114,12 @@
         {% endif %}
       </p>
     </div>
-    <button class="icon-btn" type="button" id="buddy-close" aria-label="Schließen">✕</button>
+    <div class="buddy-head-actions">
+      {% if claude_cli and claude_cli.available %}
+      <button class="btn ghost" type="button" id="buddy-reset">Neues Gespräch</button>
+      {% endif %}
+      <button class="icon-btn" type="button" id="buddy-close" aria-label="Schließen">✕</button>
+    </div>
   </div>
   <p class="buddy-here" id="buddy-here">Übersicht — du kannst fragen oder eine Übung anlegen.</p>
 {% if claude_cli and claude_cli.available %}
@@ -127,7 +132,6 @@
   <div class="exercise-actions buddy-actions">
     <button class="btn btn-primary" type="button" id="buddy-send">Fragen</button>
     <button class="btn" type="button" id="buddy-stop" hidden>Stopp</button>
-    <button class="btn btn-ghost" type="button" id="buddy-reset" hidden>Neues Gespräch</button>
   </div>
 {% else %}
   <div class="buddy-missing" id="buddy-missing">
@@ -144,7 +148,7 @@
 {% endif %}
 </aside>
 
-<script src="/static/js/app.js?v=26"></script>
+<script src="/static/js/app.js?v=28"></script>
 {% block page_scripts %}{% endblock %}
 </body>
 </html>

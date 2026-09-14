@@ -1647,6 +1647,10 @@ class ClaudeBuddyChatTests(unittest.TestCase):
                 html = client.get("/learn/ch0").get_data(as_text=True)
             self.assertIn(present, html)
             self.assertNotIn(absent, html)
+            if available:
+                self.assertIn("Neues Gespräch", html)
+                self.assertIn('id="buddy-reset"', html)
+                self.assertNotIn('id="buddy-reset" hidden', html)
             # The copy-the-prompt workaround is gone for good.
             self.assertNotIn("Prompt für Claude kopieren", html)
             self.assertNotIn("buddy-preview", html)
