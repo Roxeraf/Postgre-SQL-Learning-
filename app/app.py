@@ -6,7 +6,6 @@ from collections import Counter
 from pathlib import Path
 
 import psycopg2
-import psycopg2.extras
 from flask import Flask, jsonify, redirect, render_template, request
 
 
@@ -55,6 +54,16 @@ from lessons.knowledge import (  # noqa: E402
     related_articles,
     sections as knowledge_sections,
 )
+from learn_db import (  # noqa: E402
+    ALLOWED_SCHEMAS,
+    SAFE_IDENT,
+    ensure_app_database,
+    fetch_schema,
+    get_connection,
+    is_missing_database_error as _is_missing_database_error,
+    run_sql,
+    _format_restore_error,
+)
 from lessons.workshop import delete_workshop_lesson, workshop_by_id, workshop_lessons  # noqa: E402
 from sql_coach import (  # noqa: E402
     diagnose_structure,
@@ -100,14 +109,6 @@ def load_mcp_status():
     if helper:
         return helper.probe_status(helper.resolve_home())
     return _load_mcp_status_file()
-
-TABLE_LABELS = {
-    "orders": "Aufträge",
-    "clients": "Kunden",
-    "stock": "Bestand",
-    "order_items": "Positionen",
-}
-
 
 def _plain(text: str) -> str:
     return re.sub(r"[#*_`>|]+", " ", text or "").lower()
@@ -229,39 +230,6 @@ for art in ARTICLES:
         "preview": art.get("summary") or "",
     })
 
-DB_CONFIG = dict(
-    host=os.environ.get("DB_HOST", "db"),
-    port=os.environ.get("DB_PORT", "5432"),
-    dbname=os.environ.get("DB_NAME", "learnsql"),
-    user=os.environ.get("DB_USER", "lernuser"),
-    password=os.environ.get("DB_PASSWORD", "lernuser"),
-    connect_timeout=5,
-    options="-c statement_timeout=8s",
-)
-
-MAX_ROWS = 200
-SAFE_IDENT = re.compile(r"^[a-zA-Z0-9_]+$")
-ALLOWED_SCHEMAS = ("learn",)
-ADMIN_CONFIG = dict(
-    DB_CONFIG,
-    user=os.environ.get("DB_ADMIN_USER", "postgres"),
-    password=os.environ.get("DB_ADMIN_PASSWORD", "postgres"),
-)
-MAINTENANCE_DB = os.environ.get("DB_MAINTENANCE_NAME", "postgres")
-
-FORBIDDEN_KEYWORDS = re.compile(
-    r"\b(drop|alter|truncate|grant|revoke|create|copy|vacuum|comment|"
-    r"reindex|cluster|lock|load|discard|reassign|security)\b",
-    re.IGNORECASE,
-)
-WRITE_KEYWORDS = re.compile(r"\b(insert|update|delete)\b", re.IGNORECASE)
-QUERY_HEADS = {"select", "with", "explain"}
-WRITE_HEADS = {"insert", "update", "delete"}
-BEGIN_HEADS = {"begin", "start"}
-COMMIT_HEADS = {"commit"}
-ROLLBACK_HEADS = {"rollback", "abort"}
-
-
 def _init_sql_path():
     env = os.environ.get("SQL_INIT_PATH")
     here = Path(__file__).parent
@@ -276,287 +244,6 @@ def _init_sql_path():
         if path.is_file():
             return path
     return None
-
-
-def _is_missing_database_error(exc, dbname):
-    """True, wenn Postgres erreichbar ist, die Zieldatenbank aber fehlt."""
-    msg = str(exc).lower()
-    name = str(dbname).lower()
-    if name not in msg:
-        return False
-    return (
-        "does not exist" in msg
-        or "existiert nicht" in msg
-        or "n'existe pas" in msg
-    )
-
-
-def _format_restore_error(err):
-    text = str(err or "")
-    if _is_missing_database_error(text, DB_CONFIG["dbname"]):
-        return (
-            "Die Übungsdatenbank learnsql fehlt im Postgres-Container. "
-            "Im Projektordner ausführen: "
-            'docker compose exec db psql -U postgres -c "CREATE DATABASE learnsql;" '
-            "Danach in der App erneut prüfen. "
-            "Alternativ mit frischem Volume: docker compose down -v && docker compose up --build. "
-            f"({text})"
-        )
-    return text
-
-
-def _admin_connect(dbname):
-    cfg = dict(ADMIN_CONFIG, dbname=dbname)
-    conn = psycopg2.connect(**cfg)
-    conn.autocommit = True
-    return conn
-
-
-def ensure_app_database():
-    """Legt die Übungsdatenbank an, wenn der Server läuft, die DB aber fehlt."""
-    target = str(DB_CONFIG["dbname"])
-    if not SAFE_IDENT.match(target):
-        return False, f"Ungültiger Datenbankname: {target}"
-    try:
-        conn = _admin_connect(target)
-        conn.close()
-        return True, None
-    except Exception as exc:  # noqa: BLE001
-        if not _is_missing_database_error(exc, target):
-            return False, str(exc)
-    try:
-        conn = _admin_connect(MAINTENANCE_DB)
-        try:
-            with conn.cursor() as cur:
-                cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (target,))
-                if cur.fetchone() is None:
-                    cur.execute(f'CREATE DATABASE "{target}"')
-        finally:
-            conn.close()
-    except Exception as exc:  # noqa: BLE001
-        msg = str(exc)
-        if "already exists" in msg.lower() or "existiert bereits" in msg.lower():
-            return True, None
-        return False, msg
-    return True, None
-
-
-def get_connection(admin=False):
-    cfg = dict(ADMIN_CONFIG if admin else DB_CONFIG)
-    try:
-        conn = psycopg2.connect(**cfg)
-    except Exception as exc:  # noqa: BLE001
-        if not _is_missing_database_error(exc, cfg["dbname"]):
-            raise
-        ok, err = ensure_app_database()
-        if not ok:
-            raise ConnectionError(err or str(exc)) from exc
-        conn = psycopg2.connect(**cfg)
-    conn.autocommit = True
-    with conn.cursor() as cur:
-        cur.execute("SET search_path TO learn, public")
-    return conn
-
-
-def split_statements(sql: str):
-    """Teilt ein Skript an Semikolons, lässt Strings und --Kommentare in Ruhe."""
-    statements = []
-    buf = []
-    i = 0
-    in_single = False
-    n = len(sql)
-    while i < n:
-        ch = sql[i]
-        nxt = sql[i + 1] if i + 1 < n else ""
-        if not in_single and ch == "-" and nxt == "-":
-            while i < n and sql[i] != "\n":
-                buf.append(sql[i])
-                i += 1
-            continue
-        if ch == "'" and not in_single:
-            in_single = True
-            buf.append(ch)
-            i += 1
-            continue
-        if ch == "'" and in_single:
-            if nxt == "'":
-                buf.append("''")
-                i += 2
-                continue
-            in_single = False
-            buf.append(ch)
-            i += 1
-            continue
-        if ch == ";" and not in_single:
-            stmt = "".join(buf).strip()
-            if stmt:
-                statements.append(stmt)
-            buf = []
-            i += 1
-            continue
-        buf.append(ch)
-        i += 1
-    tail = "".join(buf).strip()
-    if tail:
-        statements.append(tail)
-    return statements
-
-
-def first_keyword(stmt: str):
-    text = stmt.strip()
-    while text.startswith("--"):
-        text = text.split("\n", 1)[-1].strip() if "\n" in text else ""
-    match = re.match(r"([a-zA-Z]+)", text)
-    return match.group(1).lower() if match else None
-
-
-def classify_statement(stmt: str):
-    head = first_keyword(stmt)
-    if not head:
-        return "empty"
-    if head in QUERY_HEADS and not (head == "with" and WRITE_KEYWORDS.search(stmt)):
-        return "query"
-    if head in WRITE_HEADS or (head == "with" and WRITE_KEYWORDS.search(stmt)):
-        return "write"
-    if head in BEGIN_HEADS:
-        return "begin"
-    if head in COMMIT_HEADS:
-        return "commit"
-    if head in ROLLBACK_HEADS:
-        return "rollback"
-    return "unknown"
-
-
-def jsonable_value(value):
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return value
-    if hasattr(value, "isoformat"):
-        return value.isoformat()
-    return str(value)
-
-
-def jsonable_rows(columns, rows):
-    out = []
-    for row in rows or []:
-        item = {}
-        if columns:
-            for col in columns:
-                try:
-                    item[str(col)] = jsonable_value(row[col])
-                except Exception:  # noqa: BLE001
-                    item[str(col)] = jsonable_value(row.get(col) if hasattr(row, "get") else None)
-        elif isinstance(row, dict):
-            for key, value in row.items():
-                if isinstance(key, str):
-                    item[key] = jsonable_value(value)
-        if item:
-            out.append(item)
-    return out
-
-
-def run_sql(sql: str, allow_write: bool = False):
-    """Führt SQL gegen Schema learn aus. DDL bleibt gesperrt."""
-    raw = (sql or "").strip()
-    if not raw:
-        return {"ok": False, "error": "Bitte gib eine SQL-Abfrage ein.", "columns": None, "rows": None, "pg_error": None}
-
-    if FORBIDDEN_KEYWORDS.search(strip_sql_line_comments(raw)):
-        return {
-            "ok": False,
-            "error": "Im Übungsbereich darfst du das Datenbank-Schema nicht ändern (kein DROP/ALTER/CREATE).",
-            "columns": None,
-            "rows": None,
-            "pg_error": None,
-        }
-
-    statements = split_statements(raw)
-    if not statements:
-        return {"ok": False, "error": "Bitte gib eine SQL-Abfrage ein.", "columns": None, "rows": None, "pg_error": None}
-
-    incomplete = next((s for s in statements if has_empty_select_list(s)), None)
-    if incomplete:
-        return {
-            "ok": False,
-            "error": "Nach SELECT fehlt noch, **was** du sehen möchtest — zum Beispiel `*` oder Spaltennamen.",
-            "columns": None,
-            "rows": None,
-            "empty_select": True,
-            "pg_error": None,
-        }
-
-    columns, rows, note = [], [], None
-    messages = []
-    try:
-        with get_connection() as conn:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                for stmt in statements:
-                    kind = classify_statement(stmt)
-                    if kind == "empty":
-                        continue
-                    if not allow_write and kind in {"write", "begin", "commit", "rollback"}:
-                        return {
-                            "ok": False,
-                            "error": (
-                                "Hier sind nur lesende Abfragen erlaubt: `SELECT`, `WITH` und `EXPLAIN`. "
-                                "Schreiben übst du in den späteren Kapiteln."
-                            ),
-                            "columns": None,
-                            "rows": None,
-                            "pg_error": None,
-                        }
-                    if kind == "unknown":
-                        allowed = (
-                            "Erlaubt sind SELECT, EXPLAIN, INSERT, UPDATE, DELETE und BEGIN/COMMIT/ROLLBACK."
-                            if allow_write
-                            else "Erlaubt sind SELECT, WITH und EXPLAIN."
-                        )
-                        return {
-                            "ok": False,
-                            "error": "Dieser Befehl ist hier nicht erlaubt. " + allowed,
-                            "columns": None,
-                            "rows": None,
-                            "pg_error": None,
-                        }
-                    if kind == "query":
-                        cur.execute(stmt)
-                        if not cur.description:
-                            messages.append("Ausgeführt.")
-                            continue
-                        fetched = cur.fetchmany(MAX_ROWS + 1)
-                        truncated = len(fetched) > MAX_ROWS
-                        fetched = fetched[:MAX_ROWS]
-                        columns = [d.name for d in cur.description]
-                        rows = jsonable_rows(columns, fetched)
-                        note = f"(Ergebnis auf {MAX_ROWS} Zeilen begrenzt.)" if truncated else None
-                    else:
-                        cur.execute(stmt)
-                        if kind == "write":
-                            messages.append(f"{cur.rowcount} Zeile(n) geändert.")
-                        elif kind == "begin":
-                            messages.append("Transaktion gestartet (BEGIN).")
-                        elif kind == "commit":
-                            messages.append("Änderung übernommen (COMMIT).")
-                        elif kind == "rollback":
-                            messages.append("Änderung verworfen (ROLLBACK).")
-    except Exception as e:  # noqa: BLE001
-        pg_error = str(e)
-        return {
-            "ok": False,
-            "error": friendly_sql_error(pg_error, raw),
-            "pg_error": pg_error,
-            "columns": None,
-            "rows": None,
-        }
-
-    return {
-        "ok": True,
-        "columns": columns,
-        "rows": rows,
-        "note": note,
-        "messages": messages,
-        "error": None,
-        "pg_error": None,
-    }
 
 
 def restore_learn_schema():
@@ -1034,42 +721,7 @@ def api_explain():
 
 @app.route("/api/schema")
 def api_schema():
-    try:
-        with get_connection() as conn:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute(
-                    """
-                    SELECT c.table_schema, c.table_name, c.column_name, c.data_type,
-                           c.ordinal_position
-                    FROM information_schema.columns c
-                    WHERE c.table_schema = 'learn'
-                    ORDER BY c.table_name, c.ordinal_position
-                    """
-                )
-                rows = cur.fetchall()
-    except Exception as e:  # noqa: BLE001
-        return jsonify({"ok": False, "error": str(e)})
-
-    tables = {}
-    for row in rows:
-        key = row["table_name"]
-        if key not in tables:
-            tables[key] = {
-                "schema": row["table_schema"],
-                "name": row["table_name"],
-                "short": row["table_name"],
-                "qualified": f"learn.{row['table_name']}",
-                "sandbox": "learn",
-                "label": TABLE_LABELS.get(row["table_name"], row["table_name"]),
-                "parent": "",
-                "kind": "Training",
-                "columns": [],
-            }
-        tables[key]["columns"].append({
-            "name": row["column_name"],
-            "type": row["data_type"],
-        })
-    return jsonify({"ok": True, "tables": list(tables.values())})
+    return jsonify(fetch_schema())
 
 
 @app.route("/api/preview", methods=["POST"])

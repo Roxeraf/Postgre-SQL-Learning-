@@ -71,7 +71,7 @@ def workshop_by_id(lesson_id: str):
     return None
 
 
-def save_workshop_lesson(data: dict) -> Path:
+def save_workshop_lesson(data: dict, folder: Path | None = None) -> Path:
     from lessons.academy_data import PATH_IDS
 
     lid = str(data.get("id") or "").strip()
@@ -81,7 +81,7 @@ def save_workshop_lesson(data: dict) -> Path:
         raise ValueError("Offizielle Kapitel darf der Playground nicht überschreiben.")
     if not (data.get("steps") or []):
         raise ValueError("steps darf nicht leer sein.")
-    folder = workshop_dir()
+    folder = Path(folder) if folder is not None else workshop_dir()
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / f"{lid}.json"
     payload = dict(data)

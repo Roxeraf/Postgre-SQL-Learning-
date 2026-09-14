@@ -76,6 +76,8 @@ Die App ruft kein LLM auf. Claude hängt als Client am MCP und legt **zusätzlic
 
 Was du sagen kannst: „Bau mir drei Playground-Übungen zu offenen Aufträgen mit GROUP BY.“ Danach `/playground` öffnen. Alte Karten löschst du in der App oder sagst Claude `delete_practice`.
 
+Claude soll zuerst `exercise_context` lesen, die Lösung mit `validate_exercise` prüfen und erst dann `save_practice` aufrufen. Extra-Tabellen in `learn` verschwinden beim Zurücksetzen (`DROP SCHEMA learn CASCADE`).
+
 Schritt-für-Schritt: [mcp/ANLEITUNG.md](mcp/ANLEITUNG.md)
 
 - Windows-Setup trägt Claude Desktop und Claude Code automatisch ein.
