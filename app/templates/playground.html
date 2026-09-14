@@ -34,6 +34,7 @@
   <div class="path path-playground">
     {% for p in practices %}
     <article class="path-card playground-card" data-practice-id="{{ p.id }}">
+      <button class="path-card-delete" type="button" data-id="{{ p.id }}" data-title="{{ p.title }}" aria-label="Übung löschen">×</button>
       <a class="path-card-body" href="/playground/{{ p.id }}">
         <div class="path-top">
           <span class="path-letter">P</span>
@@ -46,7 +47,6 @@
           {% if p.concepts %}<span>{{ p.concepts[0] }}</span>{% endif %}
         </div>
       </a>
-      <button class="path-card-delete" type="button" data-id="{{ p.id }}" data-title="{{ p.title }}">Löschen</button>
     </article>
     {% endfor %}
   </div>

@@ -1191,7 +1191,7 @@ function initPlaygroundDelete() {
     e.stopPropagation();
     const id = btn.dataset.id;
     const title = btn.dataset.title || id;
-    if (!id || !window.confirm(`Übung „${title}“ löschen?`)) return;
+    if (!id || !window.confirm(`Möchtest du die Übung „${title}“ wirklich löschen?`)) return;
     btn.disabled = true;
     try {
       const res = await fetch(`/api/playground/${encodeURIComponent(id)}/delete`, { method: "POST" });

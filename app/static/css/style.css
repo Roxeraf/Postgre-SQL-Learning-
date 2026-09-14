@@ -338,6 +338,7 @@ h3 { margin: 0 0 8px; font-size: 17px; }
 .playground-card {
   display: flex;
   flex-direction: column;
+  position: relative;
   min-width: 0;
 }
 .path-card-body {
@@ -345,20 +346,29 @@ h3 { margin: 0 0 8px; font-size: 17px; }
   text-decoration: none;
   color: inherit;
   flex: 1;
+  padding-right: 28px;
 }
 .path-playground .path-goals { min-height: 36px; }
 .path-card-delete {
-  align-self: flex-start;
-  margin-top: 10px;
-  padding: 4px 0;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   border: 0;
+  border-radius: 8px;
   background: transparent;
-  color: var(--muted);
+  color: var(--fail);
   font: inherit;
-  font-size: 12px;
+  font-size: 22px;
+  line-height: 1;
   cursor: pointer;
 }
-.path-card-delete:hover { color: var(--fail); }
+.path-card-delete:hover {
+  background: var(--fail-dim);
+}
 
 .conn-toggle {
   width: 100%;
