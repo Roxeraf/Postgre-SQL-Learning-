@@ -1757,5 +1757,13 @@ class DocsMatchRealityTests(unittest.TestCase):
                 self.assertNotIn(phrase, text, f"{name} still claims: {phrase}")
 
 
+class LearnerChromeTests(unittest.TestCase):
+    def test_open_lesson_status_dot_is_not_amber(self):
+        css = (REPO / "app" / "static" / "css" / "style.css").read_text(encoding="utf-8")
+        self.assertIn("li.active .lesson-status { background: var(--accent);", css)
+        self.assertIn(".ex-dot.done:not(.current)", css)
+        self.assertNotIn(".ex-dot.done { color: var(--ok);", css)
+
+
 if __name__ == "__main__":
     unittest.main()
