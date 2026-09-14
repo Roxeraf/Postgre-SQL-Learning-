@@ -172,6 +172,7 @@ body::before {
 }
 .lesson-list li.done .lesson-status { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
 .lesson-list li.started .lesson-status { background: var(--amber); }
+.lesson-list li.active .lesson-status { background: var(--accent); box-shadow: none; }
 .lesson-letter { color: var(--accent); font-weight: 700; font-size: 12px; }
 .lesson-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -649,7 +650,10 @@ kbd { color: var(--text); font-size: 11px; }
   color: var(--accent-ink);
   background: var(--accent);
 }
-.ex-dot.done { color: var(--ok); border-color: rgba(94, 224, 154, 0.4); }
+.ex-dot.done:not(.current) {
+  color: var(--text);
+  border-color: rgba(94, 224, 154, 0.45);
+}
 
 .exercise {
   display: none;
