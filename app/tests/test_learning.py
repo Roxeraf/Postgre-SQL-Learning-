@@ -835,7 +835,10 @@ class WorkshopAndMcpTests(unittest.TestCase):
                 self.assertIn("Deine Übungen", listing_html)
                 self.assertIn("path-card", listing_html)
                 self.assertIn("path-playground", listing_html)
-                self.assertIn("Löschen", listing_html)
+                self.assertIn("path-card-delete", listing_html)
+                self.assertIn("aria-label=\"Übung löschen\"", listing_html)
+                self.assertIn("×", listing_html)
+                self.assertNotIn(">Löschen</button>", listing_html)
                 if "Einrichten" in listing_html:
                     self.assertLess(listing_html.find("Deine Übungen"), listing_html.find("Einrichten"))
                 page = client.get("/playground/ws-player-label")
