@@ -11,7 +11,8 @@
     <p class="eyebrow">{% if lesson.workshop %}SQL-Playground{% else %}Kapitel {{ lesson.chapter }}{% endif %}{% if lesson.challenge %} · Challenge{% endif %} · ca. {{ lesson.minutes }} Min</p>
     <h1>{{ lesson.title }}</h1>
     <p class="lesson-path-copy">{% if lesson.quiz %}Verstehen → schreiben → Kurzcheck. {{ lesson.goal }}
-    {% else %}{{ lesson.goal }}{% endif %}</p>
+    {% else %}{{ lesson.goal }}{% endif %}
+    Claude erklärt mit, wenn etwas hakt.</p>
   </header>
 
   <div class="tabs phase-tabs" role="tablist">
@@ -26,7 +27,7 @@
     </button>
     {% endif %}
   </div>
-  <p class="phase-hint" id="phase-hint">Kurze Schritte: anschauen, vorhersagen, selbst schreiben.</p>
+  <p class="phase-hint" id="phase-hint">Kurze Schritte: anschauen, verstehen, vorhersagen, selbst schreiben. Claude hilft, wenn etwas unklar bleibt.</p>
 
   <section class="tab-panel active" data-panel="steps">
     <div class="academy-layout">
@@ -73,5 +74,5 @@
 {% endblock %}
 {% block page_scripts %}
 <script id="academy-data" type="application/json">{{ lesson | tojson }}</script>
-<script src="/static/js/academy.js?v=20"></script>
+<script src="/static/js/academy.js?v=21"></script>
 {% endblock %}

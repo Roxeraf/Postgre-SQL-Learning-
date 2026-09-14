@@ -98,14 +98,38 @@ VALID_PLAYGROUND_LESSON = {
     "concepts": ["SELECT"],
     "model": ["SELECT", "FROM"],
     "steps": [
-        {"type": "look", "title": "Frage", "text": "Schau dir die Aufträge an.", "cta": "Weiter"},
-        {"type": "explain", "title": "SQL", "text": "COUNT zählt Zeilen.", "sql": "SELECT COUNT(*) FROM orders;"},
+        {"type": "look", "title": "Frage", "text": "Schau dir die Aufträge an — jede Zeile ist ein Datensatz.", "cta": "Weiter"},
+        {
+            "type": "explain",
+            "title": "SQL",
+            "text": "COUNT zählt Zeilen. Tippe die Teile an.",
+            "sql": "SELECT COUNT(*) FROM orders;",
+            "plain": "Zähle alle Zeilen in der Auftragstabelle — jede Zeile zählt als eins.",
+            "parts": [
+                {
+                    "match": "SELECT COUNT(*)",
+                    "token": "SELECT",
+                    "question": "Was möchte ich sehen?",
+                    "answer": "Die Anzahl der Zeilen, nicht die einzelnen Aufträge.",
+                },
+                {
+                    "match": "FROM orders",
+                    "token": "FROM",
+                    "question": "Woher kommen die Daten?",
+                    "answer": "Aus der Auftragstabelle orders.",
+                },
+            ],
+        },
         {
             "type": "write",
             "title": "Zählen",
             "prompt": "Wie viele offene Aufträge?",
             "solution": "SELECT COUNT(*) FROM orders WHERE status = 'offen';",
             "hints": ["COUNT(*)", "WHERE status = 'offen'"],
+            "teach": (
+                "COUNT(*) zählt Zeilen. WHERE filtert vorher auf status = 'offen', "
+                "sonst würdest du alle Aufträge zählen, nicht nur die offenen."
+            ),
         },
     ],
     "quiz": [
@@ -552,6 +576,7 @@ class WorkshopAndMcpTests(unittest.TestCase):
             "schema", "run_sql", "search_wissen", "draft_exercise",
             "save_practice", "get_lesson", "step_schema", "delete_practice",
             "exercise_context", "validate_exercise", "table_rows",
+            "buddy_context", "help_with", "search_path", "coach_sql",
         ):
             self.assertIn(needed, names)
 
@@ -562,6 +587,9 @@ class WorkshopAndMcpTests(unittest.TestCase):
         self.assertIn("exercise_context", instructions)
         self.assertIn("draft_exercise", instructions)
         self.assertIn("step_schema", instructions)
+        self.assertIn("buddy_context", instructions)
+        self.assertIn("help_with", instructions)
+        self.assertIn("coach_sql", instructions)
         self.assertEqual(init["result"]["serverInfo"]["version"], mcp.BUILD)
         mentioned = set(re.findall(r"`([a-z][a-z0-9_]+)`", instructions))
         unknown = mentioned - names
@@ -578,6 +606,8 @@ class WorkshopAndMcpTests(unittest.TestCase):
         self.assertIn("steps", schema_payload["geruest"])
         self.assertGreaterEqual(len(schema_payload["geruest"]["steps"]), 3)
         self.assertIn("required", schema_payload["fields"]["write"])
+        self.assertIn("teach", schema_payload["fields"]["write"]["required"])
+        self.assertIn("plain", schema_payload["fields"]["explain"]["required"])
         self.assertIn("ordered", schema_payload["fields"]["write"]["optional"])
         self.assertIn("ordered", schema_payload["field_semantics"])
         self.assertEqual(schema_payload["build"], mcp.BUILD)
@@ -619,7 +649,13 @@ class WorkshopAndMcpTests(unittest.TestCase):
         types = [step["type"] for step in payload["steps"]]
         self.assertGreaterEqual(len(types), 3)
         self.assertIn("look", types)
+        self.assertIn("explain", types)
         self.assertIn("write", types)
+        explain = next(step for step in payload["steps"] if step["type"] == "explain")
+        self.assertTrue(explain.get("plain"))
+        self.assertGreaterEqual(len(explain.get("parts") or []), 2)
+        write = next(step for step in payload["steps"] if step["type"] == "write")
+        self.assertGreaterEqual(len(write.get("teach") or ""), 40)
         quiz_blob = json.dumps(payload["quiz"], ensure_ascii=False)
         self.assertNotIn("save_practice", quiz_blob)
         self.assertNotIn("PATH_IDS", quiz_blob)
@@ -703,7 +739,7 @@ class WorkshopAndMcpTests(unittest.TestCase):
         data = json.loads(first)
         self.assertEqual(data["id"], 1)
         self.assertEqual(data["result"]["serverInfo"]["name"], "learnsql")
-        self.assertEqual(data["result"]["serverInfo"]["version"], "1.1.0")
+        self.assertEqual(data["result"]["serverInfo"]["version"], "1.2.0")
 
 
 class McpAgentWorkflowTests(unittest.TestCase):
@@ -766,6 +802,9 @@ class McpAgentWorkflowTests(unittest.TestCase):
         self.assertIn("challenge-2", (payload.get("example_lesson") or {}).get("id", "challenge-2"))
         self.assertGreaterEqual(len(payload["minimal_valid"]["steps"]), 3)
         self.assertGreaterEqual(len(payload["minimal_valid"]["quiz"]), 4)
+        self.assertTrue(any(s.get("type") == "explain" for s in payload["minimal_valid"]["steps"]))
+        self.assertIn("buddy_tools", payload)
+        self.assertIn("buddy_context", payload["buddy_tools"])
         self.assertIn("required", payload["step_types"]["predict"])
         self.assertIn("ordered", payload["field_semantics"])
         self.assertEqual(payload["table"]["columns"], ["id", "status"])
@@ -1061,6 +1100,9 @@ class WorkshopRuntimeTests(unittest.TestCase):
         self.assertIn('<details class="card mcp-help mcp-setup">', shop_html)
         self.assertNotIn('<details class="card mcp-help mcp-setup" open>', shop_html)
         self.assertIn("MCP · nicht installiert", wissen_nav.data.decode("utf-8"))
+        self.assertIn("Claude-Buddy", shop_html)
+        self.assertIn("buddy-panel", shop_html)
+        self.assertIn('id="buddy-fab"', shop_html)
         with tempfile.TemporaryDirectory() as tmp:
             env = claude_sandbox_env(tmp)
             desktop = Path(tmp) / "Claude"
@@ -1080,6 +1122,11 @@ class WorkshopRuntimeTests(unittest.TestCase):
         lesson = client.get("/learn/ch-agg")
         self.assertEqual(lesson.status_code, 200)
         self.assertIn("Summen".encode("utf-8"), lesson.data)
+        lesson_html = lesson.data.decode("utf-8")
+        self.assertIn("Claude-Buddy", lesson_html)
+        self.assertIn("Claude erklärt mit", lesson_html)
+        self.assertIn("gleichartige Zeilen", lesson_html)
+        self.assertIn("buddy-panel", lesson_html)
         missing = client.get("/wissen/gibt-es-nicht")
         self.assertEqual(missing.status_code, 404)
 
@@ -1165,6 +1212,393 @@ class WorkshopRuntimeTests(unittest.TestCase):
             html = page.data.decode("utf-8")
             self.assertIn("verbunden mit Claude", html)
             self.assertNotIn("Einrichten", html)
+
+
+class BuddyAndExplainTests(unittest.TestCase):
+    def test_enrich_lesson_adds_teach_and_related(self):
+        from lessons.buddy import enrich_lesson
+
+        ch3 = enrich_lesson(lesson_by_id("ch3"))
+        writes = [s for s in ch3["steps"] if s["type"] == "write"]
+        self.assertTrue(writes)
+        self.assertGreaterEqual(len(writes[0].get("teach") or ""), 40)
+        self.assertTrue(ch3.get("related"))
+        self.assertTrue(any(s.get("related") for s in writes))
+
+    def test_buddy_context_roundtrip(self):
+        import app as flask_app
+
+        client = flask_app.app.test_client()
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict("os.environ", {"WORKSHOP_DIR": tmp}):
+                posted = client.post("/api/buddy/context", json={
+                    "page": "learn",
+                    "url": "/learn/ch3",
+                    "lesson_id": "ch3",
+                    "lesson_title": "WHERE",
+                    "step": 2,
+                    "step_type": "write",
+                    "step_title": "Offene Aufträge",
+                    "last_sql": "SELECT * FROM orders WHERE status = offen",
+                    "last_coach": "Textwerte brauchen Anführungszeichen.",
+                    "progress": {"completed": ["ch0"], "current": "ch3", "chapters_done": 1, "chapters_total": 20},
+                })
+                self.assertTrue(posted.get_json()["ok"])
+                got = client.get("/api/buddy/context")
+        payload = got.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["context"]["lesson_id"], "ch3")
+        self.assertIn("status = offen", payload["context"]["last_sql"])
+        self.assertEqual(payload["context"]["progress"]["completed"], ["ch0"])
+
+    def test_mcp_buddy_tools_and_explain_required(self):
+        sys.path.insert(0, str(REPO / "mcp"))
+        import learnsql_mcp as mcp
+        from lessons.buddy import save_learner_context
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict("os.environ", {"WORKSHOP_DIR": tmp}):
+                save_learner_context({
+                    "page": "learn",
+                    "lesson_id": "ch3",
+                    "lesson_title": "WHERE",
+                    "step": 0,
+                    "step_type": "look",
+                    "step_title": "Filter",
+                })
+                with patch.object(mcp, "sandbox_sql", side_effect=ok_sandbox_sql):
+                    buddy = mcp_call(mcp, "buddy_context", {})
+                    help_reply = mcp_call(mcp, "help_with", {"q": "Was macht WHERE?"})
+                    search = mcp_call(mcp, "search_path", {"q": "WHERE"})
+                    coach = mcp_call(mcp, "coach_sql", {"sql": "SELECT * FROM orders WHERE status = offen"})
+                    thin = copy.deepcopy(VALID_PLAYGROUND_LESSON)
+                    thin["id"] = "ws-no-explain"
+                    thin["steps"] = [
+                        {"type": "look", "title": "Frage", "text": "Nur schauen, keine Erklärung."},
+                        {
+                            "type": "write",
+                            "title": "Zählen",
+                            "prompt": "Wie viele offene Aufträge?",
+                            "solution": "SELECT COUNT(*) FROM orders WHERE status = 'offen';",
+                            "teach": "WHERE filtert Zeilen, COUNT zählt danach die übrig gebliebenen.",
+                        },
+                    ]
+                    rejected = mcp_call(mcp, "validate_exercise", {"lesson": thin})
+        self.assertFalse(mcp_is_error(buddy))
+        snap = mcp_payload(buddy)
+        self.assertEqual(snap["lesson"]["id"], "ch3")
+        self.assertIn("buddy_context", snap["how_to_help"])
+        self.assertFalse(mcp_is_error(help_reply))
+        pack = mcp_payload(help_reply)
+        self.assertTrue(pack.get("teach") or pack.get("hits") or pack.get("articles"))
+        self.assertFalse(mcp_is_error(search))
+        self.assertTrue(mcp_payload(search)["results"])
+        self.assertFalse(mcp_is_error(coach))
+        coach_payload = mcp_payload(coach)
+        self.assertTrue(coach_payload.get("plain") or coach_payload.get("coach"))
+        self.assertIsNone(coach_payload.get("solution"))
+        self.assertTrue(mcp_is_error(rejected))
+        blob = " ".join(mcp_payload(rejected).get("errors") or [])
+        self.assertIn("explain", blob)
+
+    def test_sql_coach_explain_parts(self):
+        from sql_coach import explain_step_parts
+
+        plain, parts = explain_step_parts("SELECT id FROM orders WHERE status = 'offen'")
+        self.assertIn("orders", plain.lower())
+        self.assertGreaterEqual(len(parts), 2)
+        tokens = {p["token"] for p in parts}
+        self.assertIn("SELECT", tokens)
+        self.assertIn("FROM", tokens)
+
+
+class ClaudeBuddyChatTests(unittest.TestCase):
+    """The in-app buddy runs the local `claude` CLI; none of this needs one."""
+
+    CANNED = [
+        json.dumps({"type": "active_goal", "value": None}),
+        # ~25 KB of housekeeping the CLI emits before anything useful.
+        json.dumps({"type": "system", "subtype": "commands_changed", "commands": ["x" * 400]}),
+        json.dumps({
+            "type": "system", "subtype": "init", "session_id": "sess-1",
+            "model": "claude-sonnet-5",
+            "mcp_servers": [{"name": "learnsql", "status": "connected"}],
+        }),
+        json.dumps({"type": "stream_event", "event": {
+            "type": "content_block_delta",
+            "delta": {"type": "text_delta", "text": "Weil WHERE "}}}),
+        json.dumps({"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "name": "ToolSearch"},
+            {"type": "tool_use", "name": "mcp__learnsql__buddy_context"}]}}),
+        # subagent chatter must not reach the learner
+        json.dumps({"type": "assistant", "parent_tool_use_id": "t1", "message": {"content": [
+            {"type": "tool_use", "name": "mcp__learnsql__run_sql"}]}}),
+        "das ist kein json",
+        json.dumps({"type": "stream_event", "event": {
+            "type": "content_block_delta",
+            "delta": {"type": "text_delta", "text": "filtert."}}}),
+        json.dumps({
+            "type": "result", "subtype": "success", "is_error": False,
+            "result": "Weil WHERE filtert.", "session_id": "sess-1",
+            "total_cost_usd": 0.01, "permission_denials": [],
+        }),
+    ]
+
+    def _fake_proc(self, lines, rc=0, stderr=""):
+        import io
+
+        class FakeProc:
+            pid = 4242
+
+            def __init__(self):
+                self.stdout = io.StringIO("".join(line + "\n" for line in lines))
+                self.stderr = io.StringIO(stderr)
+                self.returncode = rc
+
+            def poll(self):
+                return self.returncode
+
+            def wait(self, timeout=None):
+                return self.returncode
+
+        return FakeProc()
+
+    def test_iter_events_keeps_only_what_the_drawer_needs(self):
+        import claude_cli
+
+        events = list(claude_cli.iter_events(self.CANNED))
+        names = [name for name, _ in events]
+        self.assertEqual(names, ["init", "delta", "tool", "delta", "done"])
+
+        payloads = dict(zip(names, [p for _, p in events]))
+        self.assertTrue(payloads["init"]["mcp_ok"])
+        self.assertEqual(payloads["init"]["session_id"], "sess-1")
+        # ToolSearch is Claude Code plumbing, not buddy progress.
+        self.assertEqual([p["name"] for n, p in events if n == "tool"], ["buddy_context"])
+        self.assertEqual(payloads["done"]["session_id"], "sess-1")
+        self.assertTrue(payloads["done"]["ok"])
+
+    def test_allowed_tools_match_the_mcp_server(self):
+        """Adding a 21st MCP tool must not silently stay unreachable."""
+        import claude_cli
+
+        sys.path.insert(0, str(REPO / "mcp"))
+        import learnsql_mcp as mcp
+
+        listed = mcp.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+        names = {t["name"] for t in listed["result"]["tools"]}
+        self.assertEqual(set(claude_cli.ALLOWED_TOOLS), names)
+
+    def test_argv_is_locked_down(self):
+        import claude_cli
+
+        argv = claude_cli.build_argv(
+            "Frage", mcp_path="/tmp/m.json", cli_path="/x/claude", version=(2, 1, 270)
+        )
+        self.assertEqual(argv[0], "/x/claude")
+        self.assertEqual(argv[argv.index("-p") + 1], "Frage")
+        self.assertEqual(argv[argv.index("--output-format") + 1], "stream-json")
+        for flag in ("--verbose", "--include-partial-messages", "--strict-mcp-config"):
+            self.assertIn(flag, argv)
+        # --bare would refuse the OAuth login and demand an API key.
+        self.assertNotIn("--bare", argv)
+        self.assertNotIn("--resume", argv)
+
+        allowed = argv[argv.index("--allowedTools") + 1:argv.index("--disallowedTools")]
+        self.assertIn("mcp__learnsql__buddy_context", allowed)
+        self.assertIn("mcp__learnsql__save_practice", allowed)
+        self.assertNotIn("Bash", allowed)
+        self.assertIn("Bash", argv)  # ...but it is explicitly denied
+        self.assertIn("Write", argv)
+
+        resumed = claude_cli.build_argv(
+            "Frage", mcp_path="/tmp/m.json", session_id="abc-123",
+            cli_path="/x/claude", version=(2, 1, 270),
+        )
+        self.assertEqual(resumed[resumed.index("--resume") + 1], "abc-123")
+
+    def test_old_cli_does_not_get_unknown_flags(self):
+        """An unknown option makes the CLI exit before emitting any JSON."""
+        import claude_cli
+
+        old = claude_cli.build_argv("F", cli_path="/x/claude", version=(2, 1, 100))
+        self.assertNotIn("--permission-prompts", old)
+        new = claude_cli.build_argv("F", cli_path="/x/claude", version=(2, 1, 270))
+        self.assertIn("--permission-prompts", new)
+
+    def test_child_env_drops_inherited_claude_and_api_keys(self):
+        import claude_cli
+
+        dirty = {
+            "CLAUDE_CODE_SESSION_ID": "parent-session",
+            "CLAUDECODE": "1",
+            "ANTHROPIC_API_KEY": "sk-should-not-survive",
+            "PATH": os.environ.get("PATH", ""),
+        }
+        with patch.dict(os.environ, dirty, clear=False):
+            env = claude_cli.build_env()
+        self.assertEqual([k for k in env if k.startswith("CLAUDE")], [])
+        # The point of the feature is the subscription, not a billed API key.
+        self.assertNotIn("ANTHROPIC_API_KEY", env)
+        self.assertEqual(env.get("MCP_TIMEOUT"), "60000")
+
+    def test_mcp_config_points_at_the_apps_own_workshop(self):
+        """Otherwise buddy_context reads a different .learner-context.json."""
+        import claude_cli
+        from lessons.workshop import workshop_dir
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict(os.environ, {"WORKSHOP_DIR": tmp}, clear=False):
+                path = claude_cli.mcp_config_path(Path(tmp))
+                self.assertIsNotNone(path)
+                data = json.loads(Path(path).read_text(encoding="utf-8"))
+                entry = data["mcpServers"]["learnsql"]
+                self.assertTrue(entry["args"][-1].endswith("learnsql_mcp.py"))
+                self.assertEqual(entry["env"]["WORKSHOP_DIR"], str(workshop_dir()))
+
+    def test_mcp_child_runs_on_this_interpreter(self):
+        """A venv's python symlinks out to the system one.
+
+        install_mcp does Path(sys.executable).resolve(), which follows that
+        symlink to an interpreter without psycopg2 — every run_sql then dies
+        with "psycopg2 ist nicht installiert".
+        """
+        import claude_cli
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = claude_cli.mcp_config_path(Path(tmp))
+            entry = json.loads(Path(path).read_text(encoding="utf-8"))["mcpServers"]["learnsql"]
+        self.assertEqual(entry["command"], sys.executable)
+
+    def test_chat_route_streams_sse(self):
+        import app as flask_app
+        import claude_cli
+
+        status = {"available": True, "path": "/x/claude", "version": "2.1.270", "parsed": (2, 1, 270)}
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict(os.environ, {"WORKSHOP_DIR": tmp}, clear=False):
+                with patch.object(flask_app, "claude_status", return_value=status):
+                    with patch.object(flask_app, "spawn", return_value=self._fake_proc(self.CANNED)):
+                        with patch.object(flask_app, "terminate", return_value=None):
+                            client = flask_app.app.test_client()
+                            res = client.post("/api/buddy/chat", json={
+                                "question": "Warum WHERE?",
+                                "chat_id": "testchat1234",
+                                "context": {"page": "learn", "lesson_id": "ch3", "step": 2},
+                            })
+                            body = res.get_data(as_text=True)
+
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.headers["Content-Type"].split(";")[0], "text/event-stream")
+        for marker in ("event: start", "event: init", "event: delta", "event: done"):
+            self.assertIn(marker, body)
+        self.assertIn("Weil WHERE ", body)
+        # None of the CLI's housekeeping may reach the browser.
+        self.assertNotIn("commands_changed", body)
+        self.assertNotIn("ToolSearch", body)
+        self.assertNotIn("das ist kein json", body)
+
+    def test_chat_without_cli_is_a_clean_503(self):
+        import app as flask_app
+
+        with patch.object(flask_app, "claude_status", return_value={"available": False}):
+            client = flask_app.app.test_client()
+            res = client.post("/api/buddy/chat", json={
+                "question": "Hallo", "chat_id": "testchat1234",
+            })
+        self.assertEqual(res.status_code, 503)
+        self.assertEqual(res.get_json()["code"], "no_cli")
+
+    def test_chat_rejects_a_bogus_chat_id(self):
+        import app as flask_app
+
+        client = flask_app.app.test_client()
+        res = client.post("/api/buddy/chat", json={"question": "Hi", "chat_id": "../../etc"})
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.get_json()["code"], "bad_id")
+
+    def test_stale_session_is_explained_not_dumped(self):
+        import claude_cli
+
+        info = claude_cli.explain_failure(1, "No conversation found with session ID: dead", resumed=True)
+        self.assertEqual(info["code"], "stale_session")
+        auth = claude_cli.explain_failure(1, "Invalid API key · Please run /login", resumed=False)
+        self.assertEqual(auth["code"], "auth")
+        self.assertIn("anmelden", auth["text"])
+        old = claude_cli.explain_failure(1, "error: unknown option '--permission-prompts'", resumed=False)
+        self.assertEqual(old["code"], "old_cli")
+
+    def test_drawer_shows_chat_or_install_hint_and_never_the_clipboard(self):
+        import app as flask_app
+
+        client = flask_app.app.test_client()
+        for available, present, absent in (
+            (True, "buddy-send", "Claude Code nicht gefunden"),
+            (False, "Claude Code nicht gefunden", "buddy-send"),
+        ):
+            with patch.object(flask_app, "claude_status", return_value={"available": available}):
+                html = client.get("/learn/ch0").get_data(as_text=True)
+            self.assertIn(present, html)
+            self.assertNotIn(absent, html)
+            # The copy-the-prompt workaround is gone for good.
+            self.assertNotIn("Prompt für Claude kopieren", html)
+            self.assertNotIn("buddy-preview", html)
+            self.assertNotIn("buddy-copy", html)
+
+
+class InstallerPackagesEverythingTests(unittest.TestCase):
+    """The Windows package is built from an explicit file list.
+
+    app.py imports learn_db and claude_cli; a list that forgets one ships a
+    setup that dies with ModuleNotFoundError on the colleague's machine, and
+    nothing catches it until someone runs the .exe.
+    """
+
+    def test_build_script_stages_every_top_level_module(self):
+        build = (REPO / "installer" / "build.ps1").read_text(encoding="utf-8")
+        # Either spelling of "copy them all" is fine; what must not come back
+        # is an enumerated list that quietly drops a module.
+        if '-Filter "*.py"' in build or "app\\*.py" in build:
+            return
+        missing = [
+            path.name
+            for path in sorted((REPO / "app").glob("*.py"))
+            if f'app\\{path.name}"' not in build
+        ]
+        self.fail(f"build.ps1 kopiert diese Module nicht: {missing}")
+
+    def test_mcp_registration_still_targets_claude_code(self):
+        """The installer must keep writing mcpServers.learnsql into Claude Code."""
+        sys.path.insert(0, str(REPO / "mcp"))
+        import install_mcp
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict(os.environ, claude_sandbox_env(tmp), clear=False):
+                paths = install_mcp.claude_config_paths()
+                labels = {install_mcp.client_label(path) for path in paths}
+        self.assertIn("Claude Code", labels)
+        self.assertIn("Claude Desktop", labels)
+
+        iss = (REPO / "installer" / "FlowAppLearn.iss").read_text(encoding="utf-8")
+        self.assertIn("Configure-LearnSqlMcp.ps1", iss)
+        start = (REPO / "installer" / "runtime" / "Start-FlowAppLearn.ps1").read_text(encoding="utf-8")
+        self.assertIn("Register-LearnSqlMcp", start)
+
+
+class DocsMatchRealityTests(unittest.TestCase):
+    """The app used to call no model at all. It does now — say so."""
+
+    STALE = (
+        "Die App ruft kein LLM auf",
+        "Die App ruft kein Sprachmodell auf",
+        "Prompt für Claude kopieren",
+    )
+
+    def test_docs_do_not_claim_the_app_calls_no_model(self):
+        for name in ("README.md", "mcp/ANLEITUNG.md"):
+            text = (REPO / name).read_text(encoding="utf-8")
+            for phrase in self.STALE:
+                self.assertNotIn(phrase, text, f"{name} still claims: {phrase}")
 
 
 if __name__ == "__main__":

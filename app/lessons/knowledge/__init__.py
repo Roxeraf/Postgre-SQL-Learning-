@@ -64,3 +64,58 @@ def related_articles(art):
         if other:
             out.append(other)
     return out
+
+
+CONCEPT_SLUGS = {
+    "TABLE": "tabelle",
+    "SELECT": "select",
+    "FROM": "from",
+    "WHERE": "where",
+    "COMPARE": "vergleiche",
+    "AND": "and-or",
+    "ORDER BY": "order-by",
+    "LIMIT": "limit",
+    "NULL": "null",
+    "GROUP BY": "group-by",
+    "JOIN": "join-inner",
+    "HAVING": "having",
+    "CASE": "case",
+    "SUBQUERY": "unterabfrage",
+    "DML": "update",
+    "TX": "transaktion",
+}
+
+
+def articles_for_lesson(lesson_id, concepts=None, limit=3):
+    """Bible articles that belong to a chapter or its SQL concepts."""
+    scored = []
+    concepts = [str(c or "").strip() for c in (concepts or []) if str(c or "").strip()]
+    wanted_slugs = {CONCEPT_SLUGS[c] for c in concepts if c in CONCEPT_SLUGS}
+    for art in ARTICLES:
+        score = 0
+        if lesson_id and art.get("lesson_id") == lesson_id:
+            score += 6
+        if art.get("slug") in wanted_slugs:
+            score += 5
+        hay = f"{art.get('title') or ''} {art.get('summary') or ''} {art.get('slug') or ''}".lower()
+        for concept in concepts:
+            if concept.lower() in hay:
+                score += 2
+        if score:
+            scored.append((score, art))
+    scored.sort(key=lambda item: (-item[0], item[1]["title"]))
+    out = []
+    seen = set()
+    for _score, art in scored:
+        if art["slug"] in seen:
+            continue
+        seen.add(art["slug"])
+        out.append({
+            "slug": art["slug"],
+            "title": art["title"],
+            "summary": art["summary"],
+            "section": art.get("section_label") or art.get("section"),
+        })
+        if len(out) >= limit:
+            break
+    return out

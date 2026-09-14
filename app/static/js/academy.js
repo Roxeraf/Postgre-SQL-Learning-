@@ -180,7 +180,7 @@ function initAcademy() {
     if (hint) {
       hint.textContent = name === "quiz"
         ? "Eine Antwort tippen — danach kommt die Erklärung. Falsch ist ok."
-        : "Kurze Schritte: anschauen, vorhersagen, selbst schreiben.";
+        : "Kurze Schritte: anschauen, verstehen, vorhersagen, selbst schreiben. Claude hilft, wenn etwas unklar bleibt.";
     }
   }
 
@@ -233,10 +233,35 @@ function initAcademy() {
       const on = active.has(m.key) || stepTokens.has(m.key);
       return `<div class="model-row${on ? " is-on" : ""}"><strong>${ui().esc(m.key)}</strong><span>${ui().esc(m.q)}</span></div>`;
     }).join("");
+    const related = (step().related || lesson.related || []).slice(0, 3);
+    if (related.length) {
+      rail.innerHTML += `<p class="nav-label">Nachlesen</p><ul class="teach-links">` +
+        related.map((a) => `<li><a href="/wissen/${ui().esc(a.slug)}">${ui().esc(a.title)}</a></li>`).join("") +
+        `</ul>`;
+    }
+    rail.innerHTML += `<button type="button" class="btn ghost model-buddy js-buddy-open" data-ask="Erklär mir diesen Schritt, ohne die Lösung zu verraten.">Claude fragen</button>`;
   }
 
   function sqlBlock(sql) {
     return `<pre class="sql-pre">${ui().colorizeSql(sql || "")}</pre>`;
+  }
+
+  function teachBox(s) {
+    const teach = s.teach || "";
+    const related = s.related || lesson.related || [];
+    const writing = ["write", "apply", "challenge", "build", "fill"].includes(s.type);
+    const intro = ["look", "explain", "demo"].includes(s.type);
+    if (!writing && !intro) return "";
+    if (!teach && !related.length) return "";
+    let html = `<aside class="teach-box">`;
+    if (teach) html += `<p class="nav-label">Zum Verstehen</p><p>${rich(teach)}</p>`;
+    if (related.length) {
+      html += `<p class="nav-label">Nachlesen</p><ul class="teach-links">` +
+        related.slice(0, 3).map((a) => `<li><a href="/wissen/${ui().esc(a.slug)}">${ui().esc(a.title)}</a></li>`).join("") +
+        `</ul>`;
+    }
+    html += `<button type="button" class="btn ghost js-buddy-open" data-ask="Erklär mir diesen Schritt, ohne die Lösung zu verraten.">Claude fragen</button></aside>`;
+    return html;
   }
 
   function hintBox() {
@@ -266,7 +291,9 @@ function initAcademy() {
   }
 
   function failCard(body, extra = "") {
-    return `<div class="fail-card"><p class="verdict verdict-fail">Noch nicht</p><p>${rich(body)}</p>${extra}</div>`;
+    return `<div class="fail-card"><p class="verdict verdict-fail">Noch nicht</p><p>${rich(body)}</p>
+      <button type="button" class="btn ghost js-buddy-open" data-ask="Meine Query oder Antwort passt noch nicht. Was übersehe ich? Hinweise, nicht die Lösung.">Claude fragen</button>
+      ${extra}</div>`;
   }
 
   function successCard(note) {
@@ -342,9 +369,23 @@ function initAcademy() {
       ${s.text ? `<p class="step-text">${rich(s.text)}</p>` : ""}
       ${s.prompt ? `<p class="exercise-prompt">${rich(s.prompt)}</p>` : ""}
       ${s.question ? `<p class="quiz-q">${rich(s.question)}</p>` : ""}`;
+    const teach = teachBox(s);
+    if (ui().syncBuddyContext) {
+      ui().syncBuddyContext({
+        lesson_id: lesson.id,
+        lesson_title: lesson.title,
+        chapter: lesson.chapter,
+        workshop,
+        step: index,
+        step_type: s.type,
+        step_title: s.title || "",
+        prompt: s.prompt || s.text || "",
+        last_sql: local.sqlDraft || assembledSql() || "",
+      });
+    }
 
     if (s.type === "look") {
-      host.innerHTML = title + renderStepTables(s) + (s.note ? `<p class="coach">${rich(s.note)}</p>` : "");
+      host.innerHTML = title + teach + renderStepTables(s) + (s.note ? `<p class="coach">${rich(s.note)}</p>` : "");
       foot.innerHTML = footerHtml({ next: s.cta || "Weiter" });
       return;
     }
@@ -358,7 +399,7 @@ function initAcademy() {
           ${open ? `<span class="sql-part-a"><strong>${ui().esc(p.question)}</strong> ${rich(p.answer)}</span>` : `<span class="muted">Tippen zum Erklären</span>`}
         </button>`;
       }).join("");
-      host.innerHTML = title + sqlBlock(s.sql) + `<div class="sql-parts">${parts}</div>`
+      host.innerHTML = title + teach + sqlBlock(s.sql) + `<div class="sql-parts">${parts}</div>`
         + (s.plain ? `<p class="plain-sql">${rich(s.plain)}</p>` : "")
         + (s.before_table ? `<div class="split-tables"><div><p class="muted">Vorher</p>${renderDataTable(s.before_table)}</div><div><p class="muted">Nach der Query</p>${renderDataTable(s.after_table)}</div></div>` : "");
       const ready = local.explainOpen.size >= (s.parts || []).length;
@@ -397,7 +438,7 @@ function initAcademy() {
       const multiHint = (s.type === "predict" && !s.single)
         ? `<p class="muted table-select-hint">Klick wählt eine Zeile. Mit <kbd>Strg</kbd> weitere dazunehmen, mit <kbd>Umschalt</kbd> einen Bereich von oben nach unten.</p>`
         : "";
-      host.innerHTML = title + (s.sql ? sqlBlock(s.sql) : "") + renderStepTables(s, {
+      host.innerHTML = title + teach + (s.sql ? sqlBlock(s.sql) : "") + renderStepTables(s, {
         selectedIds: local.selectedIds,
         clickRows: s.type === "predict",
         keepColumns: s.keep_columns,
@@ -427,7 +468,7 @@ function initAcademy() {
         local.pool = a;
       }
       const used = local.built.slice();
-      host.innerHTML = title
+      host.innerHTML = title + teach
         + `<p class="sql-do">${used.length ? "Gebaute Query oben. Baustein dort antippen entfernt ihn." : "Bausteine in der richtigen Reihenfolge antippen."}</p>`
         + `<div class="token-line" id="token-line">${used.map((t, i) => `<button type="button" class="piece-chip" data-pop="${i}"><span class="piece-num">${i + 1}</span>${ui().esc(t)}</button>`).join("") || '<span class="muted">Noch leer — unten wählen</span>'}</div>`
         + `<div class="piece-row" id="token-pool">${local.pool.map((t) => `<button type="button" class="piece-chip" data-push="${ui().esc(t)}">${ui().esc(t)}</button>`).join("")}</div>`
@@ -445,13 +486,13 @@ function initAcademy() {
           html += `<input class="fill-blank" data-blank="${i}" value="${ui().esc(local.fillValues[i] || "")}" spellcheck="false" placeholder="…">`;
         }
       });
-      host.innerHTML = title + `<div class="sql-fill fill-template">${html}</div>`;
+      host.innerHTML = title + teach + `<div class="sql-fill fill-template">${html}</div>`;
       foot.innerHTML = footerHtml({ check: "Prüfen", run: "Ausführen" });
       return;
     }
 
     if (s.type === "write" || s.type === "apply" || s.type === "challenge") {
-      host.innerHTML = title
+      host.innerHTML = title + teach
         + `<label class="sr-only" for="academy-sql">SQL</label>`
         + `<textarea class="sql-editor" id="academy-sql" spellcheck="false" placeholder="${ui().esc(s.placeholder || "SELECT …")}">${ui().esc(local.sqlDraft || "")}</textarea>`;
       foot.innerHTML = footerHtml({ check: "Prüfen", run: "Ausführen" });
@@ -535,9 +576,22 @@ function initAcademy() {
     if (data.correct) {
       markStepDone();
       const why = s.feedback_ok || RESULT_OK;
-      showFeedback(successCard(why) + ui().renderSqlResult(data));
+      const expl = data.explain && data.explain.plain
+        ? `<p class="plain-sql">${rich(data.explain.plain)}</p>`
+        : "";
+      showFeedback(successCard(why) + expl + ui().renderSqlResult(data));
       renderMeter();
+      if (ui().syncBuddyContext) {
+        ui().syncBuddyContext({ last_sql: assembledSql(), last_coach: "", last_ok: true });
+      }
       return;
+    }
+    if (ui().syncBuddyContext) {
+      ui().syncBuddyContext({
+        last_sql: assembledSql(),
+        last_coach: data.coach || data.error || "",
+        last_ok: false,
+      });
     }
     showFeedback(resultHtml(data));
   }

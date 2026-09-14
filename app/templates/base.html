@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/css/style.css?v=25">
+<link rel="stylesheet" href="/static/css/style.css?v=28">
 <script src="/static/js/vendor/marked.min.js?v=1"></script>
 </head>
 <body>
@@ -34,6 +34,14 @@
     <div class="skill-pair" id="skill-pair">
       <div class="skill-row"><span>Pfad</span><span class="skill-bar"><i id="bar-sql" style="width:0%"></i></span><span id="pct-sql">0%</span></div>
     </div>
+    <button class="tool-link tool-link-stack js-buddy-open buddy-nav-top" type="button" id="nav-buddy">
+      <span>Claude-Buddy</span>
+      {% if claude_cli and claude_cli.available %}
+      <span class="mcp-nav-status is-on">fragt und erklärt</span>
+      {% else %}
+      <span class="mcp-nav-status is-off">Claude Code fehlt</span>
+      {% endif %}
+    </button>
 
     <p class="nav-label">Lernpfad</p>
     <ol class="lesson-list">
@@ -82,7 +90,57 @@
   <div class="schema-list" id="schema-list"></div>
 </aside>
 
-<script src="/static/js/app.js?v=23"></script>
+<button class="buddy-fab js-buddy-open" type="button" id="buddy-fab" aria-controls="buddy-panel" aria-expanded="false">
+  Claude
+</button>
+<aside class="drawer buddy-drawer" id="buddy-panel" hidden>
+  <div class="drawer-head">
+    <div>
+      <h2>Claude-Buddy</h2>
+      <p class="muted" id="buddy-mcp-copy">
+        {% if claude_cli and claude_cli.available %}
+        Claude antwortet hier direkt — über Claude Code auf diesem Rechner.
+        {% else %}
+        Claude Code nicht gefunden. Der Buddy braucht die CLI auf diesem Rechner.
+        {% endif %}
+      </p>
+    </div>
+    <button class="icon-btn" type="button" id="buddy-close" aria-label="Schließen">✕</button>
+  </div>
+  <p class="buddy-here" id="buddy-here">Öffne ein Kapitel — dann weiß Claude, woran du arbeitest.</p>
+{% if claude_cli and claude_cli.available %}
+  <div class="buddy-chat" id="buddy-chat" role="log" aria-live="polite"></div>
+  <p class="buddy-activity" id="buddy-activity" hidden></p>
+  <p class="buddy-error" id="buddy-error" hidden></p>
+  <div class="chip-row buddy-chips" id="buddy-chips">
+    <button type="button" class="section-chip js-buddy-chip" data-ask="Erklär mir diesen Schritt, ohne die Lösung zu verraten.">Diesen Schritt erklären</button>
+    <button type="button" class="section-chip js-buddy-chip" data-ask="Meine Query passt noch nicht. Was übersehe ich?">Meine Query verstehen</button>
+    <button type="button" class="section-chip js-buddy-chip" data-ask="Erklär das Konzept nochmal an der Auftragstabelle.">Konzept nochmal</button>
+    <button type="button" class="section-chip js-buddy-chip" data-ask="Welche Bibel-Stelle sollte ich dazu lesen?">Zur Bibel</button>
+  </div>
+  <label class="sr-only" for="buddy-ask">Frage an Claude</label>
+  <textarea class="sql-editor buddy-ask" id="buddy-ask" rows="3" placeholder="Was ist unklar? z. B. Warum braucht WHERE Anführungszeichen?"></textarea>
+  <div class="exercise-actions buddy-actions">
+    <button class="btn btn-primary" type="button" id="buddy-send">Fragen</button>
+    <button class="btn" type="button" id="buddy-stop" hidden>Stopp</button>
+    <button class="btn btn-ghost" type="button" id="buddy-reset" hidden>Neues Gespräch</button>
+  </div>
+{% else %}
+  <div class="buddy-missing" id="buddy-missing">
+    <h3>Claude Code nicht gefunden</h3>
+    <p class="muted">Der Buddy startet Claude Code auf diesem Rechner. Einmal installieren und
+      anmelden — es zählt dein normales Claude-Abo, ein API-Key ist nicht nötig.</p>
+    <pre class="sql-pre">npm install -g @anthropic-ai/claude-code</pre>
+    <p class="muted">Danach einmal <code>claude</code> im Terminal starten, anmelden und die App
+      neu starten. Liegt die CLI woanders: <code>CLAUDE_CLI=/pfad/zu/claude</code> setzen.</p>
+    <p><a class="btn" href="https://claude.com/product/claude-code" target="_blank" rel="noopener">Claude Code installieren</a></p>
+    <p class="muted">Claude Desktop geht weiterhin über den MCP-Eintrag unter
+      <a href="/playground#mcp-connect">SQL-Playground</a>.</p>
+  </div>
+{% endif %}
+</aside>
+
+<script src="/static/js/app.js?v=25"></script>
 {% block page_scripts %}{% endblock %}
 </body>
 </html>
