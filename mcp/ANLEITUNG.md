@@ -40,12 +40,13 @@ Als Buddy: zuerst `buddy_context`, Fragen mit `help_with` / `search_path`, SQL m
 (Der Buddy in der App bekommt das schon über seinen Systemprompt mit.)
 
 Als Übungsautor: zuerst `exercise_context` (Übungsdesign, Live-Sandbox, Beispiel, Ziel-URL).
+Eigene Lehr-Tabellen über `load_dataset` (kleines JSON mit name/columns/rows — kein Dump ausführen).
 Tabellenzeilen kommen über `table_rows`, IDs über `run_sql` mit `as_ids`.
 Vor dem Speichern prüft `validate_exercise` — ohne `explain` (plain + parts) und ohne `teach` am Schreib-Schritt wird nicht gespeichert.
-`save_practice` legt die Karte unter `/playground/{id}` ab. Die App aktualisiert den Playground selbst. `draft_exercise` ist nur ein Gerüst.
+`save_practice` legt die Karte unter `/playground/{id}` ab; `dataset` wird mitgespeichert. Die App aktualisiert den Playground selbst. `draft_exercise` ist nur ein Gerüst.
 
 Beim Zurücksetzen baut die App das Schema `learn` per `DROP SCHEMA learn CASCADE` neu auf.
-Zusätzliche Tabellen in `learn` sind danach weg.
+Extra-Tabellen liegen in `practice` und kommen aus dem `dataset` der aktuellen Übung — ohne Dataset ist `practice` leer.
 
 ## Windows-Installer
 

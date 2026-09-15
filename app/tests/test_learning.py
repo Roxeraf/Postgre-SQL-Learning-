@@ -224,6 +224,73 @@ class SqlCoachTests(unittest.TestCase):
         self.assertIn("order_items", msg)
         self.assertNotIn("instance_1", msg)
 
+    def test_unknown_table_message_can_list_custom_tables(self):
+        msg = friendly_sql_error(
+            'relation "foo" does not exist',
+            "SELECT * FROM foo",
+            tables=["orders", "order_head"],
+        )
+        self.assertIn("order_head", msg)
+        self.assertIn("orders", msg)
+
+
+class DatasetNormalizeTests(unittest.TestCase):
+    def test_core_table_name_is_rejected(self):
+        from learn_db import normalize_dataset
+
+        payload, errors = normalize_dataset({
+            "tables": [{"name": "orders", "columns": ["id"], "rows": [{"id": 1}]}],
+        })
+        self.assertIsNone(payload)
+        self.assertTrue(any("orders" in e for e in errors))
+
+    def test_varchar_maps_to_text_and_string_columns_work(self):
+        from learn_db import normalize_dataset
+
+        payload, errors = normalize_dataset({
+            "tables": [{
+                "name": "order_head",
+                "label": "Auftragskopf",
+                "columns": [
+                    {"name": "id", "type": "integer"},
+                    {"name": "reservation_status", "type": "varchar(50)"},
+                    "note",
+                ],
+                "rows": [{"id": 1, "reservation_status": "RESERVED", "extra": "ignore"}],
+            }],
+        })
+        self.assertEqual(errors, [])
+        table = payload["tables"][0]
+        types = {c["name"]: c["type"] for c in table["columns"]}
+        self.assertEqual(types["reservation_status"], "text")
+        self.assertEqual(types["note"], "text")
+        self.assertEqual(table["rows"][0]["reservation_status"], "RESERVED")
+        self.assertIsNone(table["rows"][0]["note"])
+        self.assertNotIn("extra", table["rows"][0])
+
+    def test_too_many_rows_and_reserved_schema_name(self):
+        from learn_db import DATASET_MAX_ROWS, normalize_dataset
+
+        payload, errors = normalize_dataset({
+            "tables": [{
+                "name": "practice",
+                "columns": ["id"],
+                "rows": [{"id": 1}],
+            }],
+        })
+        self.assertIsNone(payload)
+        self.assertTrue(any("practice" in e for e in errors))
+
+        payload, errors = normalize_dataset({
+            "tables": [{
+                "name": "order_head",
+                "columns": ["id"],
+                "rows": [{"id": i} for i in range(DATASET_MAX_ROWS + 1)],
+            }],
+        })
+        self.assertIsNone(payload)
+        self.assertTrue(any("Zeilen" in e for e in errors))
+
 
 class AcademyContentTests(unittest.TestCase):
     def test_path_covers_fundamentals(self):
@@ -381,6 +448,132 @@ class AcademyCheckRestoreTests(unittest.TestCase):
         self.assertTrue(data["ok"])
         self.assertIn("restore", calls)
         self.assertEqual(calls[0], "restore")
+
+    def test_select_check_applies_dataset_after_restore(self):
+        import app as flask_app
+        from lessons import workshop as ws
+
+        client = flask_app.app.test_client()
+        ok_result = {
+            "ok": True,
+            "columns": ["id"],
+            "rows": [{"id": 2}],
+            "empty_select": False,
+            "error": None,
+            "messages": [],
+        }
+        calls = []
+
+        def restore():
+            calls.append("restore")
+            return True, "ok"
+
+        def ensure(lesson):
+            calls.append("ensure:" + str((lesson or {}).get("id")))
+            self.assertTrue((lesson or {}).get("dataset"))
+            return {"ok": True}
+
+        def run_sql(*_a, **_k):
+            calls.append("run")
+            return ok_result
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict(os.environ, {"WORKSHOP_DIR": tmp}):
+                ws.save_workshop_lesson({
+                    "id": "ws-head-check",
+                    "title": "Kopf",
+                    "goal": "reservation_status lesen.",
+                    "steps": [
+                        {"type": "look", "title": "Look", "text": "Sieh hin.", "cta": "Weiter"},
+                        {
+                            "type": "explain",
+                            "title": "SQL",
+                            "text": "Filter.",
+                            "sql": "SELECT id FROM order_head",
+                            "plain": "Lies die Auftragsnummern aus dem Auftragskopf, jede Zeile zählt.",
+                            "parts": [
+                                {"token": "SELECT", "match": "SELECT id", "question": "Was?", "answer": "Die id jeder Zeile im Auftragskopf."},
+                                {"token": "FROM", "match": "FROM order_head", "question": "Woher?", "answer": "Aus der Extra-Tabelle order_head."},
+                            ],
+                        },
+                        {
+                            "type": "write",
+                            "title": "Filtern",
+                            "prompt": "Nicht reserviert.",
+                            "solution": "SELECT id FROM order_head WHERE reservation_status IS DISTINCT FROM 'RESERVED'",
+                            "teach": "IS DISTINCT FROM behandelt NULL als ungleich, anders als der Operator <>.",
+                        },
+                    ],
+                    "dataset": {
+                        "tables": [{
+                            "name": "order_head",
+                            "columns": [{"name": "id", "type": "integer"}, {"name": "reservation_status", "type": "text"}],
+                            "rows": [{"id": 1, "reservation_status": "RESERVED"}, {"id": 2, "reservation_status": None}],
+                        }],
+                    },
+                })
+                with patch.object(flask_app, "restore_learn_schema", side_effect=restore):
+                    with patch.object(flask_app, "ensure_lesson_sandbox", side_effect=ensure):
+                        with patch.object(flask_app, "run_sql", side_effect=run_sql):
+                            resp = client.post(
+                                "/api/academy/check",
+                                json={
+                                    "lesson_id": "ws-head-check",
+                                    "step": 2,
+                                    "sql": "SELECT id FROM order_head WHERE reservation_status IS DISTINCT FROM 'RESERVED'",
+                                },
+                            )
+        data = resp.get_json()
+        self.assertTrue(data["ok"])
+        self.assertEqual(calls[0], "restore")
+        self.assertEqual(calls[1], "ensure:ws-head-check")
+        self.assertIn("run", calls)
+
+    def test_api_run_uses_lesson_dataset_only_with_lesson_id(self):
+        import app as flask_app
+        from lessons import workshop as ws
+
+        client = flask_app.app.test_client()
+        seen = []
+
+        def ensure(lesson):
+            seen.append((lesson or {}).get("id") if lesson else None)
+            return {"ok": True}
+
+        ok_result = {
+            "ok": True,
+            "columns": ["id"],
+            "rows": [{"id": 1}],
+            "empty_select": False,
+            "error": None,
+            "messages": [],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict(os.environ, {"WORKSHOP_DIR": tmp}):
+                ws.save_workshop_lesson({
+                    "id": "ws-head-run",
+                    "title": "Kopf",
+                    "goal": "Lesen.",
+                    "steps": [{"type": "look", "title": "Look", "text": "Sieh hin.", "cta": "Weiter"}],
+                    "dataset": {
+                        "tables": [{
+                            "name": "order_head",
+                            "columns": ["id"],
+                            "rows": [{"id": 1}],
+                        }],
+                    },
+                })
+                with patch.object(flask_app, "ensure_lesson_sandbox", side_effect=ensure):
+                    with patch.object(flask_app, "run_sql", return_value=ok_result):
+                        with_id = client.post(
+                            "/api/run",
+                            json={"sql": "SELECT id FROM order_head", "lesson_id": "ws-head-run"},
+                        )
+                        without = client.post("/api/run", json={"sql": "SELECT 1"})
+        self.assertTrue(with_id.get_json()["ok"])
+        self.assertTrue(without.get_json()["ok"])
+        self.assertEqual(seen[0], "ws-head-run")
+        self.assertIsNone(seen[1])
 
     def test_select_check_surfaces_restore_failure(self):
         import app as flask_app
@@ -576,6 +769,7 @@ class WorkshopAndMcpTests(unittest.TestCase):
             "schema", "run_sql", "search_wissen", "draft_exercise",
             "save_practice", "get_lesson", "step_schema", "delete_practice",
             "exercise_context", "validate_exercise", "table_rows",
+            "load_dataset",
             "buddy_context", "help_with", "search_path", "coach_sql",
         ):
             self.assertIn(needed, names)
@@ -739,7 +933,9 @@ class WorkshopAndMcpTests(unittest.TestCase):
         data = json.loads(first)
         self.assertEqual(data["id"], 1)
         self.assertEqual(data["result"]["serverInfo"]["name"], "learnsql")
-        self.assertEqual(data["result"]["serverInfo"]["version"], "1.2.0")
+        sys.path.insert(0, str(REPO / "mcp"))
+        import learnsql_mcp as mcp
+        self.assertEqual(data["result"]["serverInfo"]["version"], mcp.BUILD)
 
 
 class McpAgentWorkflowTests(unittest.TestCase):
@@ -811,6 +1007,10 @@ class McpAgentWorkflowTests(unittest.TestCase):
         self.assertIn("ch8", payload["path_ids"])
         self.assertIn("DROP SCHEMA", payload["reset"])
         self.assertIn("learn CASCADE", payload["reset"])
+        self.assertIn("dataset", payload)
+        self.assertEqual(payload["dataset"]["tables"][0]["name"], "order_head")
+        self.assertIn("load_dataset", payload["tools"])
+        self.assertIn("load_dataset", payload["ablauf"])
 
     def test_validate_rejects_unknown_type_and_bad_quiz(self):
         mcp = self.mcp
@@ -876,6 +1076,110 @@ class McpAgentWorkflowTests(unittest.TestCase):
             self.assertEqual(payload.get("title"), VALID_PLAYGROUND_LESSON["title"])
             self.assertIn("http://127.0.0.1:8081/playground/ws-mcp-del", payload["url"])
             self.assertTrue((Path(tmp) / "ws-mcp-del.json").is_file())
+
+    def test_load_dataset_rejects_core_names_and_applies_custom(self):
+        mcp = self.mcp
+        bad = mcp_call(mcp, "load_dataset", {
+            "tables": [{"name": "orders", "columns": ["id"], "rows": [{"id": 1}]}],
+        })
+        self.assertTrue(mcp_is_error(bad))
+        self.assertIn("orders", " ".join(mcp_payload(bad).get("errors") or [mcp_payload(bad).get("error") or ""]))
+
+        applied = []
+
+        def fake_apply(dataset):
+            applied.append(dataset)
+            return {"ok": True, "tables": ["order_head"], "schema": "practice"}
+
+        with patch.object(mcp, "sandbox_apply_dataset", side_effect=fake_apply):
+            with patch.object(mcp, "sandbox_schema", return_value={
+                "ok": True,
+                "tables": [{"name": "order_head", "label": "Auftragskopf", "row_count": 2, "columns": [{"name": "id"}]}],
+            }):
+                reply = mcp_call(mcp, "load_dataset", {
+                    "dataset": {
+                        "tables": [{
+                            "name": "order_head",
+                            "label": "Auftragskopf",
+                            "columns": [{"name": "id", "type": "integer"}, {"name": "reservation_status", "type": "text"}],
+                            "rows": [
+                                {"id": 1, "reservation_status": "RESERVED"},
+                                {"id": 2, "reservation_status": None},
+                            ],
+                        }],
+                    }
+                })
+        self.assertFalse(mcp_is_error(reply))
+        payload = mcp_payload(reply)
+        self.assertEqual(payload["tables"], ["order_head"])
+        self.assertEqual(applied[0]["tables"][0]["name"], "order_head")
+
+    def test_validate_and_save_roundtrip_dataset(self):
+        mcp = self.mcp
+        lesson = copy.deepcopy(VALID_PLAYGROUND_LESSON)
+        lesson["id"] = "ws-order-head-reservation-status"
+        lesson["dataset"] = {
+            "tables": [{
+                "name": "order_head",
+                "label": "Auftragskopf",
+                "columns": [
+                    {"name": "id", "type": "integer"},
+                    {"name": "reservation_status", "type": "text"},
+                ],
+                "rows": [
+                    {"id": 1, "reservation_status": "RESERVED"},
+                    {"id": 2, "reservation_status": None},
+                ],
+            }],
+        }
+        lesson["steps"][0]["table"] = {
+            "name": "order_head",
+            "label": "Auftragskopf",
+            "columns": ["id", "reservation_status"],
+            "rows": [
+                {"id": 1, "reservation_status": "RESERVED"},
+                {"id": 2, "reservation_status": None},
+            ],
+        }
+
+        def fake_table(table, columns=None, where=None):
+            cols = list(columns) if columns else ["id", "reservation_status"]
+            rows = [
+                {"id": 1, "reservation_status": "RESERVED"},
+                {"id": 2, "reservation_status": None},
+            ]
+            trimmed = [{c: row[c] for c in cols} for row in rows]
+            return {"ok": True, "name": table, "label": "Auftragskopf", "columns": cols, "rows": trimmed}
+
+        with patch.object(mcp, "sandbox_apply_dataset", return_value={"ok": True, "tables": ["order_head"]}):
+            with patch.object(mcp, "sandbox_sql", side_effect=ok_sandbox_sql):
+                with patch.object(mcp, "sandbox_table", side_effect=fake_table):
+                    valid = mcp_call(mcp, "validate_exercise", {"lesson": lesson})
+        self.assertFalse(mcp_is_error(valid), mcp_payload(valid) if valid else valid)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            live = {
+                "home": tmp,
+                "workshop_dir": tmp,
+                "flaskPid": 1,
+                "appPort": 8081,
+                "pid_alive": True,
+                "http_ok": True,
+                "app_url": "http://127.0.0.1:8081",
+            }
+            with patch.object(mcp, "live_install", return_value=live):
+                with patch.object(mcp, "sandbox_apply_dataset", return_value={"ok": True, "tables": ["order_head"]}):
+                    with patch.object(mcp, "sandbox_sql", side_effect=ok_sandbox_sql):
+                        with patch.object(mcp, "sandbox_table", side_effect=fake_table):
+                            with patch.object(
+                                mcp, "http_get",
+                                return_value=(200, "http://127.0.0.1:8081/playground/ws-order-head-reservation-status"),
+                            ):
+                                saved = mcp_call(mcp, "save_practice", {"lesson": lesson})
+            self.assertFalse(mcp_is_error(saved), mcp_payload(saved))
+            written = json.loads((Path(tmp) / "ws-order-head-reservation-status.json").read_text(encoding="utf-8"))
+            self.assertEqual(written["dataset"]["tables"][0]["name"], "order_head")
+            self.assertEqual(written["dataset"]["tables"][0]["columns"][1]["type"], "text")
 
     def test_save_practice_uses_app_url_without_runtime(self):
         mcp = self.mcp

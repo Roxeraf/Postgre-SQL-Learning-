@@ -62,6 +62,7 @@ from learn_db import (  # noqa: E402
     ALLOWED_SCHEMAS,
     SAFE_IDENT,
     ensure_app_database,
+    ensure_lesson_sandbox,
     fetch_schema,
     get_connection,
     is_missing_database_error as _is_missing_database_error,
@@ -298,6 +299,28 @@ def _restore_error():
     }
 
 
+def _sandbox_error(lesson_obj):
+    """Apply or clear practice tables. Fail the request only if this lesson needs a dataset."""
+    dataset = (lesson_obj or {}).get("dataset") if isinstance(lesson_obj, dict) else None
+    result = ensure_lesson_sandbox(lesson_obj)
+    if dataset and not (result or {}).get("ok"):
+        return {
+            "ok": False,
+            "error": (
+                "Die Übungs-Tabellen konnten nicht geladen werden: "
+                + ((result or {}).get("error") or "")
+            ),
+        }
+    return None
+
+
+def _quiet_ensure_sandbox(lesson_obj):
+    try:
+        ensure_lesson_sandbox(lesson_obj)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def reset_learning_db():
     return restore_learn_schema()
 
@@ -454,6 +477,7 @@ def academy_lesson(lesson_id):
     lesson_obj = enrich_lesson(find_lesson(lesson_id))
     if not lesson_obj:
         return "Lektion nicht gefunden", 404
+    _quiet_ensure_sandbox(lesson_obj)
     prev_id, next_id = academy_nav(lesson_id)
     return render_template(
         "academy.html",
@@ -479,6 +503,7 @@ def playground_lesson(lesson_id):
     lesson_obj = enrich_lesson(workshop_by_id(lesson_id))
     if not lesson_obj:
         return "Übung nicht gefunden", 404
+    _quiet_ensure_sandbox(lesson_obj)
     prev_id, next_id = academy_nav(lesson_id)
     return render_template(
         "academy.html",
@@ -544,6 +569,11 @@ def wissen_article(slug):
 def api_run():
     data = request.get_json(force=True) or {}
     allow_write = bool(data.get("allow_write"))
+    lesson_id = data.get("lesson_id")
+    lesson_obj = find_lesson(lesson_id) if lesson_id else None
+    err = _sandbox_error(lesson_obj)
+    if err:
+        return jsonify(err)
     result = run_sql(data.get("sql", ""), allow_write=allow_write)
     if not result["ok"]:
         return jsonify({
@@ -648,8 +678,11 @@ def _fail_payload(user_sql, step, user):
     }
 
 
-def academy_write_check(user_sql, step):
+def academy_write_check(user_sql, step, lesson=None):
     err = _restore_error()
+    if err:
+        return err
+    err = _sandbox_error(lesson)
     if err:
         return err
     try:
@@ -663,6 +696,9 @@ def academy_write_check(user_sql, step):
         err = _restore_error()
         if err:
             return err
+        err = _sandbox_error(lesson)
+        if err:
+            return err
         user = run_sql(user_sql, allow_write=True)
         if user.get("empty_select") or not user["ok"]:
             return _fail_payload(user_sql, step, user)
@@ -674,6 +710,7 @@ def academy_write_check(user_sql, step):
         return payload
     finally:
         restore_learn_schema()
+        _quiet_ensure_sandbox(lesson)
 
 
 @app.route("/api/academy/check", methods=["POST"])
@@ -696,6 +733,9 @@ def api_academy_check():
     allow_write = bool(step.get("allow_write") or step.get("verify"))
 
     err = _restore_error()
+    if err:
+        return jsonify(err)
+    err = _sandbox_error(lesson_obj)
     if err:
         return jsonify(err)
 
@@ -728,7 +768,7 @@ def api_academy_check():
         })
 
     if step.get("verify"):
-        payload = academy_write_check(sql, step)
+        payload = academy_write_check(sql, step, lesson=lesson_obj)
         return jsonify(payload)
 
     user = run_sql(sql, allow_write=allow_write)
@@ -781,6 +821,10 @@ def api_reset():
     ok, message = reset_learning_db()
     if not ok:
         return jsonify({"ok": False, "error": message})
+    body = request.get_json(silent=True) or {}
+    lesson_id = body.get("lesson_id")
+    lesson_obj = find_lesson(lesson_id) if lesson_id else None
+    _quiet_ensure_sandbox(lesson_obj)
     return jsonify({"ok": True, "message": message})
 
 

@@ -740,6 +740,7 @@ const BUDDY_TOOL_LABELS = {
   exercise_context: "bereitet eine Übung vor",
   step_schema: "prüft den Aufbau der Übung",
   draft_exercise: "entwirft eine Übung",
+  load_dataset: "lädt Extra-Tabellen in die Übung",
   validate_exercise: "prüft die Übung",
   save_practice: "legt eine Übung im Playground an",
   list_workshop: "sieht sich die Playground-Übungen an",
@@ -1256,7 +1257,13 @@ function initResetDb() {
     if (!ok) return;
     if (btn) btn.disabled = true;
     try {
-      const res = await fetch("/api/reset", { method: "POST" });
+      const root = document.getElementById("academy-root");
+      const lessonId = root && root.dataset.lessonId;
+      const res = await fetch("/api/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(lessonId ? { lesson_id: lessonId } : {}),
+      });
       const data = await res.json();
       window.alert(data.ok ? data.message : `Zurücksetzen fehlgeschlagen: ${data.error}`);
     } catch {

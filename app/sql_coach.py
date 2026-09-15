@@ -327,8 +327,13 @@ def diagnose_structure(user_sql: str, solution_sql: str, step: dict | None = Non
     return None
 
 
-def friendly_sql_error(err: str, sql: str, sandbox: str = "learn") -> str:
+def friendly_sql_error(err: str, sql: str, sandbox: str = "learn", tables=None) -> str:
     low = (err or "").lower()
+    known = [str(n) for n in (tables or []) if n]
+    if not known:
+        known = ["orders", "clients", "stock", "order_items"]
+    known_lower = {n.lower() for n in known}
+    listed = ", ".join(f"`{n}`" for n in known)
     structural = diagnose_structure(sql, sql)
     if has_clause(sql, "SELECT") and not has_clause(sql, "FROM"):
         return diagnose_structure(sql, "SELECT 1 FROM orders")
@@ -351,7 +356,7 @@ def friendly_sql_error(err: str, sql: str, sandbox: str = "learn") -> str:
         near = re.search(r'syntax error at or near "([^"]+)"', err or "", re.I)
         token = near.group(1) if near else ""
         hint = f" Postgres stolpert bei `{token}`." if token else ""
-        if token.lower() in {"orders", "clients", "stock", "order_items"} and not has_clause(sql, "FROM"):
+        if token.lower() in known_lower and not has_clause(sql, "FROM"):
             return diagnose_structure(sql, "SELECT * FROM orders")
         return "Die Abfrage hat einen Syntaxfehler." + hint + " Lies die Query wie eine Frage: Was? Woher? Welche?"
     if "does not exist" in low and "column" in low:
@@ -362,7 +367,7 @@ def friendly_sql_error(err: str, sql: str, sandbox: str = "learn") -> str:
     if "does not exist" in low:
         return (
             "Diese Tabelle gibt es im Übungsbereich nicht. "
-            "Die Trainings-Tabellen heißen `orders`, `clients`, `stock` und `order_items`."
+            f"Aktuell gibt es: {listed}."
         )
     if "statement timeout" in low or "canceling statement" in low:
         return "Die Abfrage lief zu lange und wurde abgebrochen. Prüfe JOINs ohne `ON`-Bedingung."
