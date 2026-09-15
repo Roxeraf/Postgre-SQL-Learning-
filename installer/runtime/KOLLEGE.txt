@@ -20,13 +20,13 @@ in der Seitenleiste "Datenbank zurücksetzen".
 Der Claude-Buddy in der App
 ---------------------------
 In der App unten rechts auf "Claude" tippen, Frage eintippen, Antwort
-kommt direkt im Fenster. Dafür muss Claude Code auf diesem Rechner
-installiert und angemeldet sein — es zählt dein normales Claude-Abo,
-ein API-Key ist nicht nötig.
+kommt direkt im Fenster. Die App richtet Claude Code selbst ein, wenn
+es auf diesem Rechner noch fehlt — ohne Node, ohne npm. Einmal im
+Browser anmelden (dein normales Claude-Abo, Pro/Max/Team/Enterprise).
+Zeigt der Browser einen Code: ins schwarze Fenster einfügen, nicht
+in die Lern-App. Ein API-Key ist nicht nötig.
 
-Steht dort "Claude Code nicht gefunden", ist es noch nicht eingerichtet.
-Dann hilft die IT weiter, oder du nutzt Claude Desktop wie unten
-beschrieben.
+Wer Claude Code schon installiert und angemeldet hat, merkt davon nichts.
 
 SQL-Playground und Claude
 -------------------------

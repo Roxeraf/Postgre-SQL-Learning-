@@ -236,6 +236,85 @@ function Register-LearnSqlMcp {
     }
 }
 
+function Add-ClaudePath {
+    $native = Join-Path $env:USERPROFILE ".local\bin"
+    $env:PATH = "$native;" + $env:PATH
+}
+
+function Find-ClaudeCli {
+    if ($env:CLAUDE_CLI -and (Test-Path -LiteralPath $env:CLAUDE_CLI)) {
+        return $env:CLAUDE_CLI
+    }
+    $names = @("claude.exe", "claude.cmd", "claude.bat", "claude")
+    $dirs = @(
+        (Join-Path $env:USERPROFILE ".local\bin"),
+        (Join-Path $env:USERPROFILE ".claude\local"),
+        (Join-Path $env:USERPROFILE "bin")
+    )
+    if ($env:LOCALAPPDATA) { $dirs += (Join-Path $env:LOCALAPPDATA "Programs\claude") }
+    if ($env:APPDATA) { $dirs += (Join-Path $env:APPDATA "npm") }
+    foreach ($dir in $dirs) {
+        foreach ($name in $names) {
+            $candidate = Join-Path $dir $name
+            if (Test-Path -LiteralPath $candidate) { return $candidate }
+        }
+    }
+    $cmd = Get-Command claude -ErrorAction SilentlyContinue
+    if ($cmd -and $cmd.Source) { return $cmd.Source }
+    return $null
+}
+
+function Ensure-ClaudeCode {
+    Add-ClaudePath
+    $existing = Find-ClaudeCli
+    if ($existing) {
+        $env:CLAUDE_CLI = $existing
+        Write-Log "Claude Code vorhanden: $existing"
+        return $existing
+    }
+    $script = Join-Path $Root "Ensure-ClaudeCode.ps1"
+    if (-not (Test-Path $script)) {
+        Write-Log "Ensure-ClaudeCode.ps1 fehlt"
+        return $null
+    }
+    $splash = New-Object System.Windows.Forms.Form
+    $splash.Text = "plx.learnSQL"
+    $splash.Width = 420
+    $splash.Height = 140
+    $splash.StartPosition = "CenterScreen"
+    $splash.FormBorderStyle = "FixedDialog"
+    $splash.MaximizeBox = $false
+    $splash.MinimizeBox = $false
+    $splash.TopMost = $true
+    $label = New-Object System.Windows.Forms.Label
+    $label.Text = "Claude-Buddy wird vorbereitet...`nClaude Code wird eingerichtet, falls es fehlt."
+    $label.Dock = "Fill"
+    $label.TextAlign = "MiddleCenter"
+    $splash.Controls.Add($label)
+    $splash.Show()
+    $splash.Refresh()
+    try {
+        $out = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -HomeDir $Root -Quiet 2>&1
+        $code = $LASTEXITCODE
+        $cli = $null
+        if ($out) {
+            $cli = ($out | Select-Object -Last 1).ToString().Trim()
+        }
+        if ($code -eq 0 -and $cli -and (Test-Path -LiteralPath $cli)) {
+            $env:CLAUDE_CLI = $cli
+            Add-ClaudePath
+            Write-Log "Claude Code eingerichtet: $cli"
+            return $cli
+        }
+        Write-Log "Claude-Code-Setup uebersprungen (Exit $code): $out"
+    } catch {
+        Write-Log "Claude-Code-Setup uebersprungen: $($_.Exception.Message)"
+    } finally {
+        $splash.Close()
+    }
+    return $null
+}
+
 function Stop-Stack {
     param($Runtime)
     if ($Runtime -and $Runtime.flaskPid) {
@@ -276,6 +355,7 @@ try {
 
     # MCP unabhängig vom Flask-Start eintragen — sonst bleibt Claude leer, wenn die App abstürzt.
     Register-LearnSqlMcp
+    $claudeCli = Ensure-ClaudeCode
 
     $password = "postgres"
     $dbPort = 5432
@@ -343,9 +423,10 @@ try {
     }
 
     $runtime = [pscustomobject]@{
-        dbPort   = $dbPort
-        appPort  = $appPort
-        flaskPid = $(if ($flaskProc) { $flaskProc.Id } else { $null })
+        dbPort    = $dbPort
+        appPort   = $appPort
+        flaskPid  = $(if ($flaskProc) { $flaskProc.Id } else { $null })
+        claudeCli = $(if ($claudeCli) { $claudeCli } else { $env:CLAUDE_CLI })
     }
     Save-Runtime $runtime
     Write-Log "Bereit: App=$appPort DB=$dbPort"

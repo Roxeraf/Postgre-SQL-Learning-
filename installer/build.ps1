@@ -148,6 +148,7 @@ foreach ($name in @(
     "KOLLEGE.txt",
     "init-db.py",
     "Configure-LearnSqlMcp.ps1",
+    "Ensure-ClaudeCode.ps1",
     "Remove-LearnSqlMcp.ps1",
     "Clear-LearnSqlLeftovers.ps1"
 )) {

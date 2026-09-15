@@ -58,7 +58,7 @@
 <section class="playground-prompts" id="playground-prompts" {% if not practices %}hidden{% endif %}>
   <div class="section-head">
     <h2>Weitere anlegen</h2>
-    <p class="muted">{% if claude_cli and claude_cli.available %}Klick öffnet den Claude-Buddy.{% else %}Klick kopiert den Satz für Claude.{% endif %}</p>
+    <p class="muted">Klick öffnet den Claude-Buddy.</p>
   </div>
   <div class="chip-row playground-prompt-chips">
     {% for text in claude_prompts %}
@@ -75,7 +75,7 @@
     <button type="button" class="section-chip js-prompt-chip" data-prompt="{{ text }}">{{ text }}</button>
     {% endfor %}
   </div>
-  <p class="muted">{% if claude_cli and claude_cli.available %}Klick öffnet den Claude-Buddy.{% else %}Klick kopiert den Satz.{% endif %}</p>
+  <p class="muted">Klick öffnet den Claude-Buddy.</p>
 </section>
 
 {% if not mcp_ready %}

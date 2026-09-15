@@ -86,9 +86,12 @@ from claude_cli import (  # noqa: E402
     build_argv,
     claude_status,
     explain_failure,
+    install_claude_code,
     iter_events,
     mcp_config_path,
+    public_status,
     spawn,
+    start_login,
     terminate,
 )
 from sql_coach import (  # noqa: E402
@@ -1099,6 +1102,12 @@ def api_buddy_chat():
             "code": "no_cli",
             "error": "Claude Code wurde auf diesem Rechner nicht gefunden.",
         }), 503
+    if status.get("logged_in") is False:
+        return jsonify({
+            "ok": False,
+            "code": "auth",
+            "error": "Claude Code ist nicht angemeldet. Im Buddy auf Anmelden tippen.",
+        }), 503
 
     if not _claim(chat_id):
         return jsonify({
@@ -1141,6 +1150,26 @@ def api_buddy_chat():
             "Connection": "keep-alive",
         },
     )
+
+
+@app.route("/api/buddy/status", methods=["GET"])
+def api_buddy_status():
+    refresh = str(request.args.get("refresh") or "").strip().lower() in ("1", "true", "yes")
+    return jsonify({"ok": True, **public_status(refresh=refresh)})
+
+
+@app.route("/api/buddy/install", methods=["POST"])
+def api_buddy_install():
+    result = install_claude_code()
+    code = 200 if result.get("ok") else 503
+    return jsonify(result), code
+
+
+@app.route("/api/buddy/login", methods=["POST"])
+def api_buddy_login():
+    result = start_login()
+    code = 200 if result.get("ok") else 503
+    return jsonify(result), code
 
 
 @app.route("/api/buddy/reset", methods=["POST"])

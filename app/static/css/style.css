@@ -1609,6 +1609,18 @@ body.buddy-open .buddy-fab { display: none; }
   font-size: 12px;
   overflow-wrap: anywhere;
 }
+.buddy-login-steps {
+  margin: 0 0 14px;
+  padding-left: 1.2em;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--text);
+}
+.buddy-login-steps li { margin: 0 0 8px; }
+.buddy-setup-msg {
+  margin: 10px 0 0;
+  font-size: 13.5px;
+}
 
 @media (max-width: 1180px) {
   .practice-layout, .academy-layout, .dash-grid, .split-tables { grid-template-columns: 1fr; }

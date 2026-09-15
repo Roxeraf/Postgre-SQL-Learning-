@@ -89,6 +89,9 @@ laden, und erwähne `reachable` nicht — die App aktualisiert den Playground se
 
 _STATUS_CACHE: dict | None = None
 
+CLI_NAMES = ("claude.exe", "claude.cmd", "claude.bat", "claude")
+NATIVE_INSTALL_SH = "https://claude.ai/install.sh"
+
 
 def _install_mcp():
     """Import mcp/install_mcp.py — app.py already put the folder on sys.path."""
@@ -110,23 +113,52 @@ def user_home() -> Path:
     return Path.home()
 
 
-def _candidates() -> list[Path]:
-    """Places the CLI hides when it is not on PATH."""
+def native_bin_dir() -> Path:
+    return user_home() / ".local" / "bin"
+
+
+def package_home() -> Path:
+    env_home = (os.environ.get("LEARN_SQL_HOME") or "").strip()
+    if env_home:
+        return Path(env_home)
+    return Path(__file__).resolve().parent.parent
+
+
+def _candidate_dirs() -> list[Path]:
+    """Folders where a native, npm, or WinGet install may land."""
     home = user_home()
     out = [
-        home / ".claude" / "local" / "claude",
-        home / ".local" / "bin" / "claude",
-        home / "bin" / "claude",
+        native_bin_dir(),
+        home / ".claude" / "local",
+        home / "bin",
     ]
     local = (os.environ.get("LOCALAPPDATA") or "").strip()
     if local:
-        out.append(Path(local) / "Programs" / "claude" / "claude.exe")
-        out.append(Path(local) / "Programs" / "claude" / "claude.cmd")
+        out.append(Path(local) / "Programs" / "claude")
     appdata = (os.environ.get("APPDATA") or "").strip()
     if appdata:
-        out.append(Path(appdata) / "npm" / "claude.cmd")
-        out.append(Path(appdata) / "npm" / "claude.exe")
+        out.append(Path(appdata) / "npm")
     return out
+
+
+def _candidates() -> list[Path]:
+    """Places the CLI hides when it is not on PATH."""
+    out: list[Path] = []
+    for folder in _candidate_dirs():
+        for name in CLI_NAMES:
+            out.append(folder / name)
+    return out
+
+
+def path_with_cli_dirs(path_value: str | None = None) -> str:
+    """Put native install dirs first so Flask sees claude.exe without a reboot."""
+    raw = path_value if path_value is not None else (os.environ.get("PATH") or "")
+    parts = [p for p in raw.split(os.pathsep) if p]
+    extras = [str(folder) for folder in _candidate_dirs() if folder.is_dir()]
+    for extra in reversed(extras):
+        if extra not in parts:
+            parts.insert(0, extra)
+    return os.pathsep.join(parts)
 
 
 def find_claude() -> Path | None:
@@ -135,12 +167,13 @@ def find_claude() -> Path | None:
     if override:
         path = Path(override).expanduser()
         return path if path.exists() else None
-    found = shutil.which("claude")
+    search_path = path_with_cli_dirs()
+    found = shutil.which("claude", path=search_path)
     if found:
         return Path(found)
     if os.name == "nt":
         for suffix in (".cmd", ".exe", ".bat"):
-            found = shutil.which("claude" + suffix)
+            found = shutil.which("claude" + suffix, path=search_path)
             if found:
                 return Path(found)
     for cand in _candidates():
@@ -156,11 +189,67 @@ def parse_version(text: str) -> tuple[int, ...] | None:
     return tuple(int(part) for part in match.groups())
 
 
+def probe_logged_in(path: Path) -> bool | None:
+    """True / False from `claude auth status`. None if the CLI is too old to say."""
+    try:
+        proc = subprocess.run(
+            [str(path), "auth", "status"],
+            capture_output=True,
+            text=True,
+            timeout=20,
+            env=build_env(),
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    combined = f"{proc.stdout or ''}{proc.stderr or ''}"
+    low = combined.lower()
+    if "unknown" in low or "unrecognized" in low or "unknown command" in low:
+        return None
+    raw = (proc.stdout or "").strip()
+    if raw.startswith("{"):
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            data = None
+        if isinstance(data, dict) and "loggedIn" in data:
+            return bool(data.get("loggedIn"))
+    if proc.returncode == 0:
+        return True
+    return False
+
+
+def _status_payload(
+    *,
+    available: bool,
+    path: str | None,
+    version: str | None = None,
+    parsed: tuple[int, ...] | None = None,
+    logged_in: bool | None = None,
+    error: str | None = None,
+) -> dict:
+    if not available:
+        state = "not_found"
+    elif logged_in is False:
+        state = "not_logged_in"
+    else:
+        state = "ready"
+    return {
+        "available": available,
+        "path": path,
+        "version": version,
+        "parsed": parsed,
+        "logged_in": logged_in,
+        "state": state,
+        "ready": state == "ready",
+        "error": error,
+    }
+
+
 def probe_claude() -> dict:
-    """Ask the CLI for its version. Used for the badge and for feature gating."""
+    """Ask the CLI for its version and whether a subscription login exists."""
     path = find_claude()
     if not path:
-        return {"available": False, "path": None, "version": None, "error": "not_found"}
+        return _status_payload(available=False, path=None, error="not_found")
     try:
         proc = subprocess.run(
             [str(path), "--version"],
@@ -170,18 +259,21 @@ def probe_claude() -> dict:
             env=build_env(),
         )
     except (OSError, subprocess.SubprocessError) as exc:
-        return {"available": False, "path": str(path), "version": None, "error": str(exc)}
+        return _status_payload(available=False, path=str(path), error=str(exc))
     if proc.returncode != 0:
         detail = (proc.stderr or proc.stdout or "").strip()[:200]
-        return {"available": False, "path": str(path), "version": None, "error": detail or "exit"}
+        return _status_payload(available=False, path=str(path), error=detail or "exit")
     raw = (proc.stdout or "").strip()
-    return {
-        "available": True,
-        "path": str(path),
-        "version": raw.split()[0] if raw else None,
-        "parsed": parse_version(raw),
-        "error": None,
-    }
+    logged_in = probe_logged_in(path)
+    error = None if logged_in is not False else "not_logged_in"
+    return _status_payload(
+        available=True,
+        path=str(path),
+        version=raw.split()[0] if raw else None,
+        parsed=parse_version(raw),
+        logged_in=logged_in,
+        error=error,
+    )
 
 
 def claude_status(refresh: bool = False) -> dict:
@@ -190,6 +282,19 @@ def claude_status(refresh: bool = False) -> dict:
     if refresh or _STATUS_CACHE is None:
         _STATUS_CACHE = probe_claude()
     return _STATUS_CACHE
+
+
+def public_status(refresh: bool = False) -> dict:
+    """JSON for the drawer — no filesystem paths."""
+    status = claude_status(refresh=refresh)
+    return {
+        "state": status.get("state") or "not_found",
+        "available": bool(status.get("available")),
+        "logged_in": status.get("logged_in"),
+        "ready": bool(status.get("ready")),
+        "version": status.get("version"),
+        "error": status.get("error"),
+    }
 
 
 def build_env() -> dict:
@@ -216,6 +321,7 @@ def build_env() -> dict:
     env.setdefault("MCP_TOOL_TIMEOUT", "60000")
     env["PYTHONUNBUFFERED"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
+    env["PATH"] = path_with_cli_dirs(env.get("PATH") or env.get("Path") or "")
     return env
 
 
@@ -619,7 +725,7 @@ def explain_failure(returncode: int | None, stderr: str, resumed: bool) -> dict:
     if any(h in low for h in AUTH_HINTS):
         return {
             "code": "auth",
-            "text": "Claude Code ist nicht angemeldet. Einmal `claude` im Terminal starten und anmelden.",
+            "text": "Claude Code ist nicht angemeldet. Im Buddy auf Anmelden tippen.",
         }
     if any(h in low for h in QUOTA_HINTS):
         return {
@@ -629,9 +735,135 @@ def explain_failure(returncode: int | None, stderr: str, resumed: bool) -> dict:
     if "unknown option" in low or "unknown argument" in low:
         return {
             "code": "old_cli",
-            "text": "Claude Code ist zu alt. Bitte aktualisieren: npm update -g @anthropic-ai/claude-code",
+            "text": "Claude Code ist zu alt. Im Buddy auf Claude Code einrichten tippen, oder den Native Installer von claude.ai nutzen.",
         }
     return {
         "code": "failed",
         "text": f"Claude Code hat abgebrochen (Code {returncode}).",
     }
+
+
+def ensure_script_path() -> Path | None:
+    home = package_home()
+    for cand in (
+        home / "Ensure-ClaudeCode.ps1",
+        home / "installer" / "runtime" / "Ensure-ClaudeCode.ps1",
+    ):
+        if cand.is_file():
+            return cand
+    return None
+
+
+def install_claude_code() -> dict:
+    """Best-effort native CLI install. Never raises — the app must still start."""
+    if find_claude():
+        return {"ok": True, "status": public_status(refresh=True), "skipped": True}
+    timeout = 300
+    try:
+        if os.name == "nt":
+            script = ensure_script_path()
+            if not script:
+                return {
+                    "ok": False,
+                    "error": "Das Einrichten-Skript fehlt. Bitte plx.learnSQL neu installieren.",
+                    "status": public_status(refresh=True),
+                }
+            proc = subprocess.run(
+                [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script),
+                    "-HomeDir",
+                    str(package_home()),
+                    "-Quiet",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            if proc.returncode != 0:
+                detail = (proc.stderr or proc.stdout or "").strip()[:400]
+                return {
+                    "ok": False,
+                    "error": detail or "Claude Code konnte nicht eingerichtet werden.",
+                    "status": public_status(refresh=True),
+                }
+        else:
+            proc = subprocess.run(
+                ["bash", "-lc", f"curl -fsSL {NATIVE_INSTALL_SH} | bash"],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            if proc.returncode != 0:
+                detail = (proc.stderr or proc.stdout or "").strip()[:400]
+                return {
+                    "ok": False,
+                    "error": detail or "Claude Code konnte nicht eingerichtet werden.",
+                    "status": public_status(refresh=True),
+                }
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {
+            "ok": False,
+            "error": str(exc)[:300],
+            "status": public_status(refresh=True),
+        }
+    status = public_status(refresh=True)
+    return {"ok": bool(status.get("available")), "status": status, "skipped": False}
+
+
+def start_login() -> dict:
+    """Open a real console for `claude auth login` so a paste-code prompt works."""
+    path = find_claude()
+    if not path:
+        return {
+            "ok": False,
+            "code": "not_found",
+            "error": "Claude Code wurde auf diesem Rechner nicht gefunden.",
+            "status": public_status(refresh=True),
+        }
+    env = build_env()
+    try:
+        if os.name == "nt":
+            flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0x00000010)
+            subprocess.Popen(
+                [
+                    "cmd.exe",
+                    "/k",
+                    f'title plx.learnSQL - Claude anmelden & "{path}" auth login',
+                ],
+                creationflags=flags,
+                cwd=str(user_home()),
+                env=env,
+                close_fds=False,
+            )
+        else:
+            launched = False
+            for argv in (
+                ["x-terminal-emulator", "-e", str(path), "auth", "login"],
+                ["gnome-terminal", "--", str(path), "auth", "login"],
+                ["xterm", "-T", "plx.learnSQL - Claude anmelden", "-e", str(path), "auth", "login"],
+            ):
+                try:
+                    subprocess.Popen(
+                        argv,
+                        cwd=str(user_home()),
+                        env=env,
+                        start_new_session=True,
+                    )
+                    launched = True
+                    break
+                except FileNotFoundError:
+                    continue
+            if not launched:
+                return {
+                    "ok": False,
+                    "error": "Kein Terminal gefunden. Im Terminal ausführen: claude auth login",
+                    "status": public_status(),
+                }
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {"ok": False, "error": str(exc)[:300], "status": public_status()}
+    return {"ok": True, "status": public_status()}

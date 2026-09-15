@@ -15,8 +15,9 @@ zweite Weg — beide sehen dieselben Daten.
 
 - Nur `learnsql`-Werkzeuge: keine Datei-, Shell- oder Web-Zugriffe.
 - Ein Lauf gleichzeitig. **Stopp** bricht ab, **Neues Gespräch** vergisst den Verlauf.
-- Steht dort „Claude Code nicht gefunden": `npm install -g @anthropic-ai/claude-code`, einmal
-  `claude` starten und anmelden, App neu starten. Eigener Pfad über `CLAUDE_CLI`.
+- Steht dort „Claude Code einrichten" oder „Anmelden": die Windows-App lädt die CLI
+  selbst nach. Sonst Native Installer (`irm https://claude.ai/install.ps1 | iex`),
+  im Buddy auf **Anmelden**. Eigener Pfad über `CLAUDE_CLI`.
 
 **Voraussetzung:** plx.learnSQL (oder Docker) muss laufen, bevor Claude SQL-Werkzeuge nutzt.
 Wissensbasis lesen, Standort (`buddy_context`) und Übungen speichern geht auch ohne Datenbank.
