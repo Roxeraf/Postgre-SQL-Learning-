@@ -583,13 +583,12 @@ async function copyText(text) {
 }
 
 function initPromptChips() {
-  const buddyReady = Boolean(document.getElementById("buddy-send"));
   document.querySelectorAll(".js-prompt-chip").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const text = btn.getAttribute("data-prompt") || btn.textContent.trim();
-      if (buddyReady) {
+      if (document.getElementById("buddy-panel")) {
         openBuddy({ ask: text });
-        buddySend(text);
+        if (buddyIsReady()) buddySend(text);
         return;
       }
       await copyText(text);
@@ -809,6 +808,118 @@ function buddyWasOpen() {
   }
 }
 
+function buddyIsReady() {
+  return document.getElementById("buddy-panel")?.dataset.buddyState === "ready";
+}
+
+function buddySetupMsg(text) {
+  const el = document.getElementById("buddy-setup-msg");
+  if (!el) return;
+  el.hidden = !text;
+  el.textContent = text || "";
+}
+
+function applyBuddyStatus(status) {
+  if (!status) return;
+  const state = status.state
+    || (status.ready ? "ready" : status.available ? "not_logged_in" : "not_found");
+  const panel = document.getElementById("buddy-panel");
+  if (panel) panel.dataset.buddyState = state;
+  const chat = document.getElementById("buddy-chat-ui");
+  const missing = document.getElementById("buddy-missing");
+  const setupMissing = document.getElementById("buddy-setup-missing");
+  const setupLogin = document.getElementById("buddy-setup-login");
+  const copy = document.getElementById("buddy-mcp-copy");
+  const nav = document.getElementById("nav-buddy-status");
+  if (chat) chat.hidden = state !== "ready";
+  if (missing) missing.hidden = state === "ready";
+  if (setupMissing) setupMissing.hidden = state !== "not_found";
+  if (setupLogin) setupLogin.hidden = state !== "not_logged_in";
+  if (copy) {
+    if (state === "ready") {
+      copy.textContent = "Claude antwortet hier direkt — über Claude Code auf diesem Rechner.";
+    } else if (state === "not_logged_in") {
+      copy.textContent = "Einmal bei Claude anmelden — es zählt dein normales Abo, ein API-Key ist nicht nötig.";
+    } else {
+      copy.textContent = "Der Buddy richtet Claude Code auf diesem Rechner ein, falls es fehlt.";
+    }
+  }
+  if (nav) {
+    nav.classList.toggle("is-on", state === "ready");
+    nav.classList.toggle("is-off", state !== "ready");
+    nav.textContent = state === "ready"
+      ? "fragt und erklärt"
+      : state === "not_logged_in"
+        ? "einmal anmelden"
+        : "Claude Code fehlt";
+  }
+  if (state === "ready") {
+    stopBuddyStatusPoll();
+    buddySetupMsg("");
+    renderBuddyChips();
+  }
+}
+
+let buddyStatusTimer = null;
+function stopBuddyStatusPoll() {
+  window.clearInterval(buddyStatusTimer);
+  buddyStatusTimer = null;
+}
+
+async function refreshBuddyStatus() {
+  const res = await fetch("/api/buddy/status?refresh=1");
+  const data = await res.json();
+  applyBuddyStatus(data);
+  return data;
+}
+
+function startBuddyStatusPoll() {
+  stopBuddyStatusPoll();
+  buddyStatusTimer = window.setInterval(() => {
+    refreshBuddyStatus().catch(() => {});
+  }, 2000);
+}
+
+function initBuddySetup() {
+  document.getElementById("buddy-install")?.addEventListener("click", async () => {
+    const btn = document.getElementById("buddy-install");
+    if (btn) btn.disabled = true;
+    buddySetupMsg("Claude Code wird eingerichtet…");
+    try {
+      const res = await fetch("/api/buddy/install", { method: "POST" });
+      const data = await res.json();
+      applyBuddyStatus(data.status || data);
+      if (data.ok && (data.status?.available || data.available)) {
+        buddySetupMsg("CLI ist da. Als Nächstes einmal anmelden.");
+      } else {
+        buddySetupMsg(data.error || "Einrichten hat nicht geklappt. Später nochmal versuchen.");
+      }
+    } catch {
+      buddySetupMsg("Einrichten hat nicht geklappt.");
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  });
+  document.getElementById("buddy-login")?.addEventListener("click", async () => {
+    const btn = document.getElementById("buddy-login");
+    if (btn) btn.disabled = true;
+    buddySetupMsg("Schwarzes Fenster und Browser sollten aufgehen. Einen Code ins Fenster einfügen, nicht hier.");
+    try {
+      const res = await fetch("/api/buddy/login", { method: "POST" });
+      const data = await res.json();
+      if (!data.ok) {
+        buddySetupMsg(data.error || "Anmelden hat nicht geklappt.");
+      } else {
+        startBuddyStatusPoll();
+      }
+    } catch {
+      buddySetupMsg("Anmelden hat nicht geklappt.");
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  });
+}
+
 function openBuddy(opts = {}) {
   const panel = document.getElementById("buddy-panel");
   const fab = document.getElementById("buddy-fab");
@@ -821,7 +932,14 @@ function openBuddy(opts = {}) {
   document.body.classList.add("buddy-open");
   fab?.setAttribute("aria-expanded", "true");
   buddyKeepOpen(true);
-  if (!opts.quiet) document.getElementById("buddy-ask")?.focus();
+  if (!opts.quiet) {
+    if (buddyIsReady()) document.getElementById("buddy-ask")?.focus();
+    else if (document.getElementById("buddy-panel")?.dataset.buddyState === "not_logged_in") {
+      document.getElementById("buddy-login")?.focus();
+    } else {
+      document.getElementById("buddy-install")?.focus();
+    }
+  }
   syncBuddyContext({ question: document.getElementById("buddy-ask")?.value || "" });
 }
 
@@ -1099,6 +1217,10 @@ function buddyHandle(block, ctx) {
 }
 
 async function buddySend(ask) {
+  if (!buddyIsReady()) {
+    openBuddy({ ask: ask || "" });
+    return;
+  }
   if (buddyCtrl) return;
   const box = document.getElementById("buddy-ask");
   const question = (ask || box?.value || "").trim();
@@ -1213,6 +1335,7 @@ function initBuddy() {
     if (e.key === "Escape" && document.body.classList.contains("buddy-open")) closeBuddy();
   });
   buddyRestore();
+  initBuddySetup();
   if (buddyWasOpen()) openBuddy({ quiet: true });
   else syncBuddyContext();
 }

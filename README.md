@@ -25,6 +25,7 @@ Danach liegt `dist\plx.learnSQL-Setup.exe` bereit — diese Datei an den Kollege
 Installation: Doppelklick, Assistent durchklicken, Desktop-Verknüpfung **plx.learnSQL** starten.
 Beim ersten Start wird die Lern-Datenbank einmalig eingerichtet, danach öffnet sich http://localhost:8080.
 Das Setup trägt das MCP in Claude Desktop und Claude Code ein — Claude danach einmal komplett neu starten.
+Beim ersten Start lädt die Windows-App Claude Code nach, falls die CLI fehlt. Einmal im Buddy anmelden.
 Kurzanleitung: `mcp/ANLEITUNG.md` oder in der App **SQL-Playground**.
 Deinstallation (Windows-Einstellungen → Apps) räumt den Programmordner inkl. Datenbank, Logs und Playground ab.
 
@@ -48,15 +49,24 @@ APP_HOST=127.0.0.1 \
 python app/app.py
 ```
 
-Voraussetzung für den Buddy — einmalig:
+Voraussetzung für den Buddy — einmalig, falls Claude Code noch fehlt.
+Die Windows-App lädt die offizielle Native-CLI selbst nach. Manuell:
 
-```bash
-npm install -g @anthropic-ai/claude-code
-claude          # einmal starten und anmelden
+```powershell
+irm https://claude.ai/install.ps1 | iex
+claude auth login
 ```
 
+macOS/Linux:
+
+```bash
+curl -fsSL https://claude.ai/install.sh | bash
+claude auth login
+```
+
+Danach einmal anmelden (Browser, ggf. Anmeldecode ins Terminalfenster).
 `docker compose up --build` (alles im Container) funktioniert weiter, nur bleibt der
-Buddy-Drawer dann leer und zeigt „Claude Code nicht gefunden".
+Buddy-Drawer dann leer, bis Claude Code auf dem Rechner selbst liegt.
 
 Eine Installation = eine lernende Person: Lernstand und Claude-Login hängen am Rechner.
 
@@ -100,8 +110,9 @@ docker compose up --build
 
 Die App bringt kein eigenes Modell mit und braucht keinen API-Key. Für den Buddy startet sie die
 lokale `claude`-Kommandozeile (Claude Code) als Unterprozess und hängt ihr denselben
-`learnsql`-MCP an — es zählt dein normales Claude-Abo. Ohne installierte Claude-Code-CLI zeigt
-der Drawer nur einen Hinweis.
+`learnsql`-MCP an — es zählt dein normales Claude-Abo. Die Windows-App richtet die CLI selbst
+ein, wenn sie fehlt; danach einmal im Buddy anmelden. Ohne CLI oder Login zeigt der Drawer
+**Claude Code einrichten** bzw. **Anmelden**.
 
 In der App: Knopf **Claude** oder in der Seitenleiste **Claude-Buddy**. Frage eintippen, die
 Antwort läuft Wort für Wort ein. Claude liest über `buddy_context`, wo du stehst, prüft deine

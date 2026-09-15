@@ -1808,6 +1808,44 @@ class ClaudeBuddyChatTests(unittest.TestCase):
         names = {t["name"] for t in listed["result"]["tools"]}
         self.assertEqual(set(claude_cli.ALLOWED_TOOLS), names)
 
+    def test_find_claude_sees_native_exe_without_path(self):
+        import shutil
+        import claude_cli
+
+        with tempfile.TemporaryDirectory() as tmp:
+            user = Path(tmp) / "user"
+            native = user / ".local" / "bin"
+            native.mkdir(parents=True)
+            exe = native / "claude.exe"
+            exe.write_bytes(b"fake")
+            with patch.dict(os.environ, {
+                "HOME": str(user),
+                "USERPROFILE": str(user),
+                "CLAUDE_CLI": "",
+                "PATH": "/usr/bin",
+            }, clear=False):
+                with patch.object(claude_cli, "user_home", return_value=user):
+                    with patch.object(shutil, "which", return_value=None):
+                        found = claude_cli.find_claude()
+            self.assertEqual(found, exe)
+
+    def test_status_distinguishes_missing_and_logged_out(self):
+        import claude_cli
+
+        missing = claude_cli._status_payload(available=False, path=None, error="not_found")
+        self.assertEqual(missing["state"], "not_found")
+        self.assertFalse(missing["ready"])
+        logged_out = claude_cli._status_payload(
+            available=True, path="/x/claude", logged_in=False, error="not_logged_in"
+        )
+        self.assertEqual(logged_out["state"], "not_logged_in")
+        self.assertFalse(logged_out["ready"])
+        ready = claude_cli._status_payload(
+            available=True, path="/x/claude", logged_in=True
+        )
+        self.assertEqual(ready["state"], "ready")
+        self.assertTrue(ready["ready"])
+
     def test_argv_is_locked_down(self):
         import claude_cli
 
@@ -1896,7 +1934,10 @@ class ClaudeBuddyChatTests(unittest.TestCase):
         import app as flask_app
         import claude_cli
 
-        status = {"available": True, "path": "/x/claude", "version": "2.1.270", "parsed": (2, 1, 270)}
+        status = {
+            "available": True, "logged_in": True, "ready": True, "state": "ready",
+            "path": "/x/claude", "version": "2.1.270", "parsed": (2, 1, 270),
+        }
         with tempfile.TemporaryDirectory() as tmp:
             with patch.dict(os.environ, {"WORKSHOP_DIR": tmp}, clear=False):
                 with patch.object(flask_app, "claude_status", return_value=status):
@@ -1939,6 +1980,45 @@ class ClaudeBuddyChatTests(unittest.TestCase):
         self.assertEqual(res.status_code, 400)
         self.assertEqual(res.get_json()["code"], "bad_id")
 
+    def test_chat_without_login_is_a_clean_503(self):
+        import app as flask_app
+
+        with patch.object(flask_app, "claude_status", return_value={
+            "available": True, "logged_in": False, "ready": False, "state": "not_logged_in",
+            "path": "/x/claude",
+        }):
+            client = flask_app.app.test_client()
+            res = client.post("/api/buddy/chat", json={
+                "question": "Hallo", "chat_id": "testchat1234",
+            })
+        self.assertEqual(res.status_code, 503)
+        self.assertEqual(res.get_json()["code"], "auth")
+
+    def test_buddy_status_and_setup_routes(self):
+        import app as flask_app
+
+        status = {
+            "state": "not_logged_in", "available": True, "logged_in": False,
+            "ready": False, "version": "2.1.270", "error": "not_logged_in",
+        }
+        client = flask_app.app.test_client()
+        with patch.object(flask_app, "public_status", return_value=status):
+            res = client.get("/api/buddy/status")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.get_json()["state"], "not_logged_in")
+
+        with patch.object(flask_app, "install_claude_code", return_value={
+            "ok": True, "skipped": True, "status": status,
+        }):
+            res = client.post("/api/buddy/install")
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.get_json()["ok"])
+
+        with patch.object(flask_app, "start_login", return_value={"ok": True, "status": status}):
+            res = client.post("/api/buddy/login")
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.get_json()["ok"])
+
     def test_stale_session_is_explained_not_dumped(self):
         import claude_cli
 
@@ -1946,7 +2026,7 @@ class ClaudeBuddyChatTests(unittest.TestCase):
         self.assertEqual(info["code"], "stale_session")
         auth = claude_cli.explain_failure(1, "Invalid API key · Please run /login", resumed=False)
         self.assertEqual(auth["code"], "auth")
-        self.assertIn("anmelden", auth["text"])
+        self.assertIn("Anmelden", auth["text"])
         old = claude_cli.explain_failure(1, "error: unknown option '--permission-prompts'", resumed=False)
         self.assertEqual(old["code"], "old_cli")
 
@@ -1954,28 +2034,49 @@ class ClaudeBuddyChatTests(unittest.TestCase):
         import app as flask_app
 
         client = flask_app.app.test_client()
-        for available, present, absent in (
-            (True, "buddy-send", "Claude Code nicht gefunden"),
-            (False, "Claude Code nicht gefunden", "buddy-send"),
-        ):
-            with patch.object(flask_app, "claude_status", return_value={"available": available}):
-                html = client.get("/learn/ch0").get_data(as_text=True)
-            self.assertIn(present, html)
-            self.assertNotIn(absent, html)
-            if available:
-                self.assertIn("Neues Gespräch", html)
-                self.assertIn('id="buddy-reset"', html)
-                self.assertNotIn('id="buddy-reset" hidden', html)
-                reset_at = html.find('id="buddy-reset"')
-                send_at = html.find('id="buddy-send"')
-                close_at = html.find('id="buddy-close"')
-                self.assertGreater(reset_at, html.find('id="buddy-ask"'))
-                self.assertLess(reset_at, send_at)
-                self.assertLess(close_at, html.find('id="buddy-ask"'))
-            # The copy-the-prompt workaround is gone for good.
-            self.assertNotIn("Prompt für Claude kopieren", html)
-            self.assertNotIn("buddy-preview", html)
-            self.assertNotIn("buddy-copy", html)
+        ready = {
+            "available": True, "logged_in": True, "ready": True, "state": "ready",
+            "path": "/x/claude", "version": "2.1.270",
+        }
+        missing = {
+            "available": False, "logged_in": False, "ready": False, "state": "not_found",
+            "error": "not_found",
+        }
+        login = {
+            "available": True, "logged_in": False, "ready": False, "state": "not_logged_in",
+            "path": "/x/claude", "error": "not_logged_in",
+        }
+
+        with patch.object(flask_app, "claude_status", return_value=ready):
+            html = client.get("/learn/ch0").get_data(as_text=True)
+        self.assertIn('id="buddy-send"', html)
+        self.assertNotIn('id="buddy-chat-ui" hidden', html)
+        self.assertIn("Neues Gespräch", html)
+        self.assertNotIn('id="buddy-reset" hidden', html)
+        reset_at = html.find('id="buddy-reset"')
+        send_at = html.find('id="buddy-send"')
+        close_at = html.find('id="buddy-close"')
+        self.assertGreater(reset_at, html.find('id="buddy-ask"'))
+        self.assertLess(reset_at, send_at)
+        self.assertLess(close_at, html.find('id="buddy-ask"'))
+        self.assertNotIn("Prompt für Claude kopieren", html)
+        self.assertNotIn("buddy-preview", html)
+        self.assertNotIn("buddy-copy", html)
+        self.assertNotIn("npm install -g @anthropic-ai/claude-code", html)
+
+        with patch.object(flask_app, "claude_status", return_value=missing):
+            html = client.get("/learn/ch0").get_data(as_text=True)
+        self.assertIn('id="buddy-install"', html)
+        self.assertIn('id="buddy-chat-ui" hidden', html)
+        self.assertNotIn("npm install -g @anthropic-ai/claude-code", html)
+
+        with patch.object(flask_app, "claude_status", return_value=login):
+            html = client.get("/learn/ch0").get_data(as_text=True)
+        self.assertIn('id="buddy-login"', html)
+        self.assertIn("Umschalt+Einfg", html)
+        self.assertIn("Code", html)
+        self.assertIn('id="buddy-chat-ui" hidden', html)
+        self.assertNotIn("npm install -g @anthropic-ai/claude-code", html)
 
 
 class InstallerPackagesEverythingTests(unittest.TestCase):
@@ -2015,6 +2116,12 @@ class InstallerPackagesEverythingTests(unittest.TestCase):
         self.assertIn("Configure-LearnSqlMcp.ps1", iss)
         start = (REPO / "installer" / "runtime" / "Start-FlowAppLearn.ps1").read_text(encoding="utf-8")
         self.assertIn("Register-LearnSqlMcp", start)
+        self.assertIn("Ensure-ClaudeCode", start)
+        build = (REPO / "installer" / "build.ps1").read_text(encoding="utf-8")
+        self.assertIn("Ensure-ClaudeCode.ps1", build)
+        ensure = (REPO / "installer" / "runtime" / "Ensure-ClaudeCode.ps1").read_text(encoding="utf-8")
+        self.assertIn("claude.ai/install.ps1", ensure)
+        self.assertIn("Anthropic.ClaudeCode", ensure)
 
     def test_uninstall_clears_runtime_folders(self):
         """Inno only deletes files it installed; first run leaves data/logs/pycache."""
@@ -2054,7 +2161,16 @@ class DocsMatchRealityTests(unittest.TestCase):
         "Prompt für Claude kopieren",
     )
 
-    def test_docs_do_not_claim_the_app_calls_no_model(self):
+    def test_docs_point_at_native_cli_setup(self):
+        readme = (REPO / "README.md").read_text(encoding="utf-8")
+        anleitung = (REPO / "mcp" / "ANLEITUNG.md").read_text(encoding="utf-8")
+        kollege = (REPO / "installer" / "runtime" / "KOLLEGE.txt").read_text(encoding="utf-8")
+        self.assertIn("install.ps1", readme)
+        self.assertIn("auth login", readme)
+        self.assertNotIn("npm install -g @anthropic-ai/claude-code", readme)
+        self.assertIn("install.ps1", anleitung)
+        self.assertIn("Anmelden", anleitung)
+        self.assertIn("richtet Claude Code selbst ein", kollege)
         for name in ("README.md", "mcp/ANLEITUNG.md"):
             text = (REPO / name).read_text(encoding="utf-8")
             for phrase in self.STALE:
