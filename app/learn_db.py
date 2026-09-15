@@ -18,8 +18,41 @@ from sql_coach import friendly_sql_error, has_empty_select_list, strip_sql_line_
 
 MAX_ROWS = 200
 SAFE_IDENT = re.compile(r"^[a-zA-Z0-9_]+$")
-ALLOWED_SCHEMAS = ("learn",)
+ALLOWED_SCHEMAS = ("learn", "practice")
+PRACTICE_SCHEMA = "practice"
+SEARCH_PATH = "practice, learn, public"
 MAINTENANCE_DB = os.environ.get("DB_MAINTENANCE_NAME", "postgres")
+DATASET_MAX_TABLES = 8
+DATASET_MAX_COLUMNS = 24
+DATASET_MAX_ROWS = 80
+RESERVED_TABLE_NAMES = frozenset({"learn", "practice", "public", "pg_catalog", "information_schema"})
+DATASET_PG_TYPES = {
+    "integer": "integer",
+    "int": "integer",
+    "int4": "integer",
+    "bigint": "bigint",
+    "int8": "bigint",
+    "smallint": "integer",
+    "numeric": "numeric",
+    "decimal": "numeric",
+    "real": "numeric",
+    "double precision": "numeric",
+    "float": "numeric",
+    "text": "text",
+    "varchar": "text",
+    "character varying": "text",
+    "character": "text",
+    "char": "text",
+    "boolean": "boolean",
+    "bool": "boolean",
+    "date": "date",
+    "timestamp": "timestamp",
+    "timestamptz": "timestamp",
+    "timestamp without time zone": "timestamp",
+    "timestamp with time zone": "timestamp",
+    "json": "text",
+    "jsonb": "text",
+}
 
 TABLE_LABELS = {
     "orders": "Aufträge",
@@ -69,6 +102,8 @@ WRITE_HEADS = {"insert", "update", "delete"}
 BEGIN_HEADS = {"begin", "start"}
 COMMIT_HEADS = {"commit"}
 ROLLBACK_HEADS = {"rollback", "abort"}
+
+_DATASET_LABELS: dict[str, str] = {}
 
 
 def db_config() -> dict:
@@ -184,8 +219,17 @@ def get_connection(admin=False):
         conn = pg.connect(**cfg)
     conn.autocommit = True
     with conn.cursor() as cur:
-        cur.execute("SET search_path TO learn, public")
+        cur.execute(f"SET search_path TO {SEARCH_PATH}")
     return conn
+
+
+def core_table_names() -> set[str]:
+    return {t["name"] for t in CORE_SANDBOX}
+
+
+def table_label(name: str) -> str:
+    key = str(name or "")
+    return _DATASET_LABELS.get(key) or TABLE_LABELS.get(key, key)
 
 
 def split_statements(sql: str):
@@ -290,7 +334,7 @@ def describe_target() -> str:
 
 
 def run_sql(sql: str, allow_write: bool = False, as_ids: str | None = None):
-    """Führt SQL gegen Schema learn aus. DDL bleibt gesperrt."""
+    """Führt SQL gegen learn und practice aus. DDL bleibt gesperrt."""
     raw = (sql or "").strip()
     if not raw:
         return {"ok": False, "error": "Bitte gib eine SQL-Abfrage ein.", "columns": None, "rows": None, "pg_error": None}
@@ -377,7 +421,7 @@ def run_sql(sql: str, allow_write: bool = False, as_ids: str | None = None):
         pg_error = str(e)
         return {
             "ok": False,
-            "error": friendly_sql_error(pg_error, raw),
+            "error": friendly_sql_error(pg_error, raw, tables=_coach_table_names()),
             "pg_error": pg_error,
             "columns": None,
             "rows": None,
@@ -421,6 +465,14 @@ def run_sql(sql: str, allow_write: bool = False, as_ids: str | None = None):
     return result
 
 
+def _coach_table_names() -> list[str]:
+    try:
+        names = list_table_names()
+    except Exception:  # noqa: BLE001
+        names = []
+    return names or [t["name"] for t in CORE_SANDBOX]
+
+
 def fetch_schema():
     try:
         with get_connection() as conn:
@@ -430,40 +482,55 @@ def fetch_schema():
                     SELECT c.table_schema, c.table_name, c.column_name, c.data_type,
                            c.ordinal_position
                     FROM information_schema.columns c
-                    WHERE c.table_schema = 'learn'
-                    ORDER BY c.table_name, c.ordinal_position
+                    WHERE c.table_schema IN ('learn', 'practice')
+                    ORDER BY CASE c.table_schema WHEN 'practice' THEN 0 ELSE 1 END,
+                             c.table_name, c.ordinal_position
                     """
                 )
                 rows = cur.fetchall()
                 counts = {}
-                for name in sorted({r["table_name"] for r in rows}):
-                    if not SAFE_IDENT.match(name):
+                seen = set()
+                for row in rows:
+                    schema = row["table_schema"]
+                    name = row["table_name"]
+                    if not SAFE_IDENT.match(schema) or not SAFE_IDENT.match(name):
                         continue
-                    cur.execute(f"SELECT COUNT(*) AS n FROM learn.{name}")
-                    counts[name] = int(cur.fetchone()["n"])
+                    key = (schema, name)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    cur.execute(f"SELECT COUNT(*) AS n FROM {schema}.{name}")
+                    counts[key] = int(cur.fetchone()["n"])
     except Exception as e:  # noqa: BLE001
         return {"ok": False, "error": str(e), "target": describe_target(), "tables": []}
 
     tables = {}
     for row in rows:
-        key = row["table_name"]
-        if key not in tables:
-            tables[key] = {
-                "schema": row["table_schema"],
-                "name": row["table_name"],
-                "short": row["table_name"],
-                "qualified": f"learn.{row['table_name']}",
-                "sandbox": "learn",
-                "label": TABLE_LABELS.get(row["table_name"], row["table_name"]),
-                "parent": "",
-                "kind": "Training",
-                "row_count": counts.get(row["table_name"]),
-                "columns": [],
-            }
-        tables[key]["columns"].append({
-            "name": row["column_name"],
-            "type": row["data_type"],
-        })
+        name = row["table_name"]
+        schema = row["table_schema"]
+        if name in tables:
+            if tables[name]["schema"] != schema:
+                continue
+            tables[name]["columns"].append({
+                "name": row["column_name"],
+                "type": row["data_type"],
+            })
+            continue
+        tables[name] = {
+            "schema": schema,
+            "name": name,
+            "short": name,
+            "qualified": f"{schema}.{name}",
+            "sandbox": schema,
+            "label": table_label(name),
+            "parent": "",
+            "kind": "Übung" if schema == PRACTICE_SCHEMA else "Training",
+            "row_count": counts.get((schema, name)),
+            "columns": [{
+                "name": row["column_name"],
+                "type": row["data_type"],
+            }],
+        }
     return {"ok": True, "tables": list(tables.values())}
 
 
@@ -490,7 +557,7 @@ def table_block(table: str, columns=None, where: str | None = None):
                 return {"ok": False, "error": f"Ungültiger Spaltenname: {col}"}
             col_list.append(str(col))
         col_sql = ", ".join(col_list)
-    sql = f"SELECT {col_sql} FROM learn.{name}"
+    sql = f"SELECT {col_sql} FROM {name}"
     clause = (where or "").strip()
     if clause:
         if ";" in clause or FORBIDDEN_KEYWORDS.search(clause):
@@ -503,7 +570,235 @@ def table_block(table: str, columns=None, where: str | None = None):
     return {
         "ok": True,
         "name": name,
-        "label": TABLE_LABELS.get(name, name),
+        "label": table_label(name),
         "columns": cols,
         "rows": result.get("rows") or [],
     }
+
+
+def _pg_type(raw) -> str:
+    text = str(raw or "text").strip().lower()
+    text = re.sub(r"\s*\(.*\)$", "", text).strip()
+    return DATASET_PG_TYPES.get(text, "text")
+
+
+def _normalize_column(col, index: int, errors: list, prefix: str) -> dict | None:
+    if isinstance(col, str):
+        name = col.strip()
+        pg_type = "text"
+    elif isinstance(col, dict):
+        name = str(col.get("name") or "").strip()
+        pg_type = _pg_type(col.get("type"))
+    else:
+        errors.append(f"{prefix}.columns[{index}]: Spalte muss Name oder Objekt sein.")
+        return None
+    if not SAFE_IDENT.match(name):
+        errors.append(f"{prefix}.columns[{index}]: ungültiger Spaltenname {name!r}.")
+        return None
+    return {"name": name, "type": pg_type}
+
+
+def _normalize_row(row, columns: list, index: int, errors: list, prefix: str) -> dict | None:
+    names = [c["name"] for c in columns]
+    if isinstance(row, dict):
+        out = {name: row.get(name) for name in names}
+        return out
+    if isinstance(row, (list, tuple)):
+        if len(row) > len(names):
+            errors.append(
+                f"{prefix}.rows[{index}]: {len(row)} Werte, aber nur {len(names)} Spalten."
+            )
+            return None
+        out = {name: (row[i] if i < len(row) else None) for i, name in enumerate(names)}
+        return out
+    errors.append(f"{prefix}.rows[{index}]: Zeile muss Objekt oder Liste sein.")
+    return None
+
+
+def normalize_dataset(raw) -> tuple[dict | None, list[str]]:
+    """Validate and freeze a lesson dataset. Returns (payload, errors)."""
+    errors: list[str] = []
+    if raw in (None, "", {}, []):
+        return {"tables": []}, []
+    if isinstance(raw, list):
+        tables_in = raw
+    elif isinstance(raw, dict):
+        tables_in = raw.get("tables")
+        if tables_in is None:
+            errors.append("dataset.tables fehlt.")
+            return None, errors
+    else:
+        errors.append("dataset muss ein Objekt mit tables sein.")
+        return None, errors
+    if not isinstance(tables_in, list):
+        errors.append("dataset.tables muss eine Liste sein.")
+        return None, errors
+    if len(tables_in) > DATASET_MAX_TABLES:
+        errors.append(
+            f"dataset: höchstens {DATASET_MAX_TABLES} Tabellen (Lehrdaten, kein Dump)."
+        )
+        return None, errors
+
+    reserved = core_table_names() | RESERVED_TABLE_NAMES
+    seen_names = set()
+    tables = []
+    for ti, item in enumerate(tables_in):
+        prefix = f"dataset.tables[{ti}]"
+        if not isinstance(item, dict):
+            errors.append(f"{prefix}: muss ein Objekt sein.")
+            continue
+        name = str(item.get("name") or "").strip()
+        if not SAFE_IDENT.match(name):
+            errors.append(f"{prefix}: ungültiger Tabellenname {name!r}.")
+            continue
+        low = name.lower()
+        if low in reserved or name in reserved:
+            errors.append(
+                f"{prefix}: `{name}` ist eine Kern- oder Systemtabelle und darf nicht überschrieben werden."
+            )
+            continue
+        if low in seen_names:
+            errors.append(f"{prefix}: Tabellenname {name} ist doppelt.")
+            continue
+        seen_names.add(low)
+        raw_cols = item.get("columns")
+        if not raw_cols:
+            errors.append(f"{prefix}: columns fehlen.")
+            continue
+        if isinstance(raw_cols, str):
+            raw_cols = [c.strip() for c in raw_cols.split(",") if c.strip()]
+        if not isinstance(raw_cols, list):
+            errors.append(f"{prefix}: columns muss eine Liste sein.")
+            continue
+        if len(raw_cols) > DATASET_MAX_COLUMNS:
+            errors.append(f"{prefix}: höchstens {DATASET_MAX_COLUMNS} Spalten.")
+            continue
+        columns = []
+        col_seen = set()
+        for ci, col in enumerate(raw_cols):
+            parsed = _normalize_column(col, ci, errors, prefix)
+            if not parsed:
+                continue
+            if parsed["name"] in col_seen:
+                errors.append(f"{prefix}: Spalte {parsed['name']} ist doppelt.")
+                continue
+            col_seen.add(parsed["name"])
+            columns.append(parsed)
+        if not columns:
+            errors.append(f"{prefix}: keine gültigen Spalten.")
+            continue
+        raw_rows = item.get("rows") or []
+        if not isinstance(raw_rows, list):
+            errors.append(f"{prefix}: rows muss eine Liste sein.")
+            continue
+        if len(raw_rows) > DATASET_MAX_ROWS:
+            errors.append(f"{prefix}: höchstens {DATASET_MAX_ROWS} Zeilen.")
+            continue
+        rows = []
+        for ri, row in enumerate(raw_rows):
+            parsed_row = _normalize_row(row, columns, ri, errors, prefix)
+            if parsed_row is not None:
+                rows.append(parsed_row)
+        label = str(item.get("label") or "").strip() or name
+        tables.append({
+            "name": name,
+            "label": label,
+            "columns": columns,
+            "rows": rows,
+        })
+
+    if errors:
+        return None, errors
+    return {"tables": tables}, []
+
+
+def _create_practice_table(cur, table: dict):
+    name = table["name"]
+    cols = table["columns"]
+    parts = []
+    has_pk = False
+    for col in cols:
+        piece = f"{col['name']} {col['type']}"
+        if not has_pk and col["name"] == "id" and col["type"] in {"integer", "bigint"}:
+            piece += " PRIMARY KEY"
+            has_pk = True
+        parts.append(piece)
+    cur.execute(f"CREATE TABLE {PRACTICE_SCHEMA}.{name} ({', '.join(parts)})")
+    if not table["rows"]:
+        return
+    col_names = [c["name"] for c in cols]
+    placeholders = ", ".join(["%s"] * len(col_names))
+    sql = (
+        f"INSERT INTO {PRACTICE_SCHEMA}.{name} ({', '.join(col_names)}) "
+        f"VALUES ({placeholders})"
+    )
+    for row in table["rows"]:
+        cur.execute(sql, tuple(row.get(c) for c in col_names))
+
+
+def _grant_practice(cur):
+    cur.execute(f"GRANT USAGE ON SCHEMA {PRACTICE_SCHEMA} TO lernuser")
+    cur.execute(
+        f"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA {PRACTICE_SCHEMA} TO lernuser"
+    )
+    cur.execute(
+        f"ALTER DEFAULT PRIVILEGES IN SCHEMA {PRACTICE_SCHEMA} "
+        "GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO lernuser"
+    )
+
+
+def clear_dataset() -> dict:
+    """Leert Schema practice. Kern-Tabellen in learn bleiben."""
+    _DATASET_LABELS.clear()
+    try:
+        with get_connection(admin=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute(f"DROP SCHEMA IF EXISTS {PRACTICE_SCHEMA} CASCADE")
+                cur.execute(f"CREATE SCHEMA {PRACTICE_SCHEMA}")
+                _grant_practice(cur)
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": str(exc), "target": describe_target()}
+    return {"ok": True, "tables": [], "schema": PRACTICE_SCHEMA}
+
+
+def apply_dataset(dataset) -> dict:
+    """Materialisiert Lehr-Tabellen in Schema practice."""
+    if dataset in (None, "", {}, []):
+        return clear_dataset()
+    normalized, errors = normalize_dataset(dataset)
+    if errors:
+        return {"ok": False, "error": errors[0], "errors": errors}
+    tables = (normalized or {}).get("tables") or []
+    if not tables:
+        return clear_dataset()
+    _DATASET_LABELS.clear()
+    _DATASET_LABELS.update({t["name"]: t["label"] for t in tables})
+    try:
+        with get_connection(admin=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute(f"DROP SCHEMA IF EXISTS {PRACTICE_SCHEMA} CASCADE")
+                cur.execute(f"CREATE SCHEMA {PRACTICE_SCHEMA}")
+                _grant_practice(cur)
+                for table in tables:
+                    _create_practice_table(cur, table)
+                _grant_practice(cur)
+    except Exception as exc:  # noqa: BLE001
+        _DATASET_LABELS.clear()
+        return {"ok": False, "error": str(exc), "target": describe_target()}
+    return {
+        "ok": True,
+        "tables": [t["name"] for t in tables],
+        "schema": PRACTICE_SCHEMA,
+        "dataset": normalized,
+    }
+
+
+def ensure_lesson_sandbox(lesson) -> dict:
+    """Overlay der Übungs-Tabellen — ohne Dataset wird practice geleert."""
+    try:
+        dataset = (lesson or {}).get("dataset") if isinstance(lesson, dict) else None
+        if dataset:
+            return apply_dataset(dataset)
+        return clear_dataset()
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": str(exc)}

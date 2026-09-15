@@ -507,6 +507,7 @@ function initAcademy() {
     const data = await ui().postJson("/api/run", {
       sql,
       allow_write: Boolean(step().allow_write),
+      lesson_id: lesson.id,
     });
     return data;
   }

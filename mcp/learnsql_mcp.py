@@ -24,7 +24,13 @@ os.environ.setdefault("DB_HOST", "127.0.0.1")
 
 from learn_db import (  # noqa: E402
     CORE_SANDBOX,
+    DATASET_MAX_COLUMNS,
+    DATASET_MAX_ROWS,
+    DATASET_MAX_TABLES,
+    apply_dataset,
     describe_target,
+    fetch_schema,
+    normalize_dataset,
     run_sql,
     table_block,
 )
@@ -50,7 +56,7 @@ from lessons.workshop import (  # noqa: E402
 from sql_coach import diagnose_structure, explain_sql, explain_step_parts  # noqa: E402
 
 PROTOCOL = "2024-11-05"
-BUILD = "1.2.0"
+BUILD = "1.3.0"
 
 STEP_TYPES = [
     "look", "inspect", "explain", "demo", "predict", "predict-cols",
@@ -90,6 +96,13 @@ FIELD_SEMANTICS = {
     "match_value": "Wert in match_column, der die passenden Zeilen markiert (visualize=where).",
     "keep_columns": "Spalten, die bei visualize=columns hell bleiben.",
     "table": "Eingebetteter Sandbox-Ausschnitt {name, label, columns, rows} — nicht das SQL-Ergebnis.",
+    "dataset": (
+        "Optionale Extra-Tabellen der Übung {tables: [{name, label, columns, rows}]}. "
+        "Liegen in Schema practice neben den Kern-Tabellen. "
+        "Keine Kern-Namen, max. "
+        f"{DATASET_MAX_TABLES} Tabellen / {DATASET_MAX_COLUMNS} Spalten / {DATASET_MAX_ROWS} Zeilen. "
+        "Werte (Statusketten) stehen in rows, nicht im Spaltentyp."
+    ),
 }
 
 STEP_SPECS = {
@@ -158,6 +171,13 @@ LESSON_ENVELOPE = {
         ),
     },
     "quiz": {"required": True, "note": "Mindestens 4 Fachfragen. correct ist ein 0-basierter Index."},
+    "dataset": {
+        "required": False,
+        "note": (
+            "Optionale Extra-Tabellen. Claude darf sie erfinden oder aus einem Dump "
+            "als kleine Lehrdaten extrahieren. load_dataset materialisiert sie vor run_sql."
+        ),
+    },
 }
 
 TABLE_SHAPE = {
@@ -167,10 +187,27 @@ TABLE_SHAPE = {
     "rows": [{"id": 1, "status": "offen"}],
 }
 
+DATASET_SHAPE = {
+    "tables": [
+        {
+            "name": "order_head",
+            "label": "Auftragskopf",
+            "columns": [
+                {"name": "id", "type": "integer"},
+                {"name": "reservation_status", "type": "text"},
+            ],
+            "rows": [
+                {"id": 1, "reservation_status": "RESERVED"},
+                {"id": 2, "reservation_status": None},
+            ],
+        }
+    ]
+}
+
 RESET_NOTE = (
-    "Beim Zurücksetzen führt die App `DROP SCHEMA learn CASCADE` aus und baut "
-    "clients, orders, stock und order_items neu auf. Zusätzliche Tabellen in learn "
-    "sind danach weg."
+    "Beim Zurücksetzen führt die App DROP SCHEMA learn CASCADE aus und baut "
+    "clients, orders, stock und order_items neu auf. Extra-Tabellen liegen in Schema "
+    "practice und kommen aus dem dataset der aktuellen Übung — ohne dataset ist practice leer."
 )
 
 INSTRUCTIONS = (
@@ -188,11 +225,17 @@ INSTRUCTIONS = (
     "selbst schreiben (mit teach) → Kurzcheck.\n"
     "Jede Übung braucht: id (ws-…), title, goal, minutes, concepts, model, "
     "steps (mindestens look, explain, Schreib-Schritt) und quiz (mindestens 4 Fachfragen).\n"
-    "Sandbox learn (Reset: DROP SCHEMA learn CASCADE — Extra-Tabellen verschwinden):\n"
+    "Sandbox: Kern-Tabellen in learn bleiben, Extra-Tabellen kommen aus dataset "
+    "(Schema practice, search_path: practice dann learn).\n"
     "  clients      id, name, country (~4 Zeilen)\n"
     "  orders       id, order_number, client_id, client, status, quantity, note, created_at (~24 Zeilen)\n"
     "  stock        id, item, quantity, weight (~7 Zeilen)\n"
     "  order_items  id, order_id, sku, qty (~28 Zeilen)\n"
+    "Du darfst eigene Lehr-Tabellen anlegen: `load_dataset` (tables mit name, columns, rows), "
+    "dann `table_rows` / `run_sql`, dann dataset in die lesson legen und `save_practice`. "
+    "Kein WITH-VALUES als Ersatz für eine fehlende Tabelle. "
+    "Kern-Namen nicht überschreiben. Statuswerte stehen in den Zeilen, nicht im Spaltentyp — "
+    "bei einem Schema-Dump ohne Daten nach Beispielen fragen oder Lehrwerte setzen.\n"
     "Zuerst `exercise_context` (Step-Schema, Live-Sandbox, Beispiel, Ziel-URL). "
     "Tabellenzeilen für look/predict: `table_rows`. IDs: `run_sql` mit as_ids. "
     "Prüfen mit `validate_exercise`, speichern mit `save_practice`. "
@@ -360,6 +403,11 @@ def sandbox_schema():
 
 def sandbox_table(table, columns=None, where=None):
     return table_block(table, columns=columns, where=where)
+
+
+def sandbox_apply_dataset(dataset):
+    """Patch point for tests — materialisiert Extra-Tabellen in practice."""
+    return apply_dataset(dataset)
 
 
 def _ok_text(payload) -> dict:
@@ -608,7 +656,7 @@ def tool_sample_rows(args):
         "rows": (result.get("rows") or [])[:8],
         "name": result.get("name"),
         "label": result.get("label"),
-        "sql": f"SELECT * FROM learn.{table} LIMIT 8",
+        "sql": f"SELECT * FROM {table} LIMIT 8",
         "note": "Für den Step-table-Block table_rows verwenden — das ist copy-paste-fertig.",
     })
 
@@ -646,6 +694,38 @@ def tool_table_rows(args):
         "label": result.get("label"),
         "columns": result.get("columns"),
         "rows": result.get("rows"),
+    })
+
+
+def tool_load_dataset(args):
+    raw = args.get("dataset")
+    if raw is None and args.get("tables") is not None:
+        raw = {"tables": args.get("tables")}
+    if raw is None:
+        return _err("dataset fehlt (Objekt mit tables, oder tables direkt).")
+    normalized, errors = normalize_dataset(raw)
+    if errors:
+        return _err("dataset ungültig.", extra={"ok": False, "errors": errors})
+    try:
+        applied = sandbox_apply_dataset(normalized)
+    except Exception as exc:  # noqa: BLE001
+        return _err(environment_report("dataset konnte nicht geladen werden.", exc))
+    if not (applied or {}).get("ok"):
+        blob = str((applied or {}).get("error") or "konnte nicht geladen werden")
+        if _looks_like_connect_error(blob):
+            return _err(environment_report(f"dataset: {blob}"))
+        return _err(blob, extra={"ok": False, "errors": (applied or {}).get("errors") or [blob]})
+    live = _live_sandbox()
+    return _ok_text({
+        "ok": True,
+        "schema": "practice",
+        "dataset": normalized,
+        "tables": applied.get("tables") or [t["name"] for t in (normalized or {}).get("tables") or []],
+        "sandbox": live,
+        "note": (
+            "Extra-Tabellen liegen in practice und sind über den normalen Tabellennamen erreichbar. "
+            "Dasselbe Objekt als lesson.dataset an validate_exercise / save_practice übergeben."
+        ),
     })
 
 
@@ -721,6 +801,12 @@ def _step_schema_payload():
         },
         "field_semantics": FIELD_SEMANTICS,
         "table": TABLE_SHAPE,
+        "dataset": DATASET_SHAPE,
+        "dataset_limits": {
+            "max_tables": DATASET_MAX_TABLES,
+            "max_columns": DATASET_MAX_COLUMNS,
+            "max_rows": DATASET_MAX_ROWS,
+        },
         "quiz_item": {"q": "Frage", "options": ["A", "B", "C", "D"], "correct": 1, "explain": "Warum"},
         "hints": "Mindestens zwei. Der letzte Hint ist nicht die volle Lösung.",
         "geruest": _draft_payload({
@@ -778,7 +864,7 @@ def tool_exercise_context(args):
     example = lesson_by_id(example_id) or workshop_by_id(example_id)
     target = resolve_workshop()
     return _ok_text({
-        "ablauf": "exercise_context → table_rows → run_sql(as_ids) → validate_exercise → save_practice",
+        "ablauf": "exercise_context → load_dataset → table_rows → run_sql(as_ids) → validate_exercise → save_practice",
         "terminology": {
             "name": "SQL-Playground",
             "url_prefix": "/playground/",
@@ -789,6 +875,13 @@ def tool_exercise_context(args):
         "step_types": STEP_SPECS,
         "field_semantics": FIELD_SEMANTICS,
         "table": TABLE_SHAPE,
+        "dataset": DATASET_SHAPE,
+        "dataset_limits": {
+            "max_tables": DATASET_MAX_TABLES,
+            "max_columns": DATASET_MAX_COLUMNS,
+            "max_rows": DATASET_MAX_ROWS,
+            "core_names_reserved": True,
+        },
         "lesson_envelope": LESSON_ENVELOPE,
         "sandbox": _live_sandbox(),
         "core_sandbox": CORE_SANDBOX,
@@ -804,7 +897,7 @@ def tool_exercise_context(args):
         "example_lesson": example,
         "minimal_valid": MINIMAL_LESSON,
         "tools": [
-            "exercise_context", "table_rows", "run_sql", "validate_exercise",
+            "exercise_context", "load_dataset", "table_rows", "run_sql", "validate_exercise",
             "save_practice", "get_lesson", "draft_exercise", "delete_practice",
             "step_schema", "list_workshop",
         ],
@@ -1026,6 +1119,27 @@ def validate_lesson(lesson: dict, *, fill_ids: bool = False) -> dict:
                 errors.append(
                     f"quiz[{qi}]: correct={correct} liegt außerhalb von 0..{max(0, len(options) - 1)}."
                 )
+
+    raw_dataset = data.get("dataset")
+    if raw_dataset not in (None, "", {}, []):
+        normalized, ds_errors = normalize_dataset(raw_dataset)
+        if ds_errors:
+            errors.extend(ds_errors)
+        else:
+            data["dataset"] = normalized
+            try:
+                applied = sandbox_apply_dataset(normalized)
+            except Exception as exc:  # noqa: BLE001
+                sql_checked = False
+                warnings.append(f"dataset: nicht prüfbar ({exc}).")
+            else:
+                if not (applied or {}).get("ok"):
+                    blob = str((applied or {}).get("error") or "")
+                    if _looks_like_connect_error(blob):
+                        sql_checked = False
+                        warnings.append("dataset: Datenbank nicht erreichbar.")
+                    else:
+                        errors.append(f"dataset: {blob or 'konnte nicht geladen werden'}.")
 
     for idx, step in enumerate(steps):
         info = {"index": idx, "type": None, "ok": True, "notes": []}
@@ -1484,6 +1598,13 @@ LESSON_OBJECT_SCHEMA = {
             "description": "Mindestens 4 Fachfragen. correct ist 0-basiert.",
             "items": {"type": "object"},
         },
+        "dataset": {
+            "type": "object",
+            "description": (
+                "Optionale Extra-Tabellen {tables: [{name, label, columns, rows}]}. "
+                "Vorher mit load_dataset materialisieren. Kern-Tabellen nicht überschreiben."
+            ),
+        },
     },
 }
 
@@ -1498,19 +1619,20 @@ def _tools():
     sample_table = {
         "type": "string",
         "description": (
-            f"Tabelle in learn, z.B. {table_desc}. "
-            "Weitere Namen stehen in schema / exercise_context (kein festes Enum — Extra-Tabellen sind erlaubt)."
+            f"Tabelle in learn oder practice, z.B. {table_desc}. "
+            "Weitere Namen stehen in schema / exercise_context "
+            "(kein festes Enum — Extra-Tabellen über load_dataset sind erlaubt)."
         ),
     }
     return {
         "schema": {
-            "description": "Tabellen, Spalten und Zeilenzahlen im Schema learn (live).",
+            "description": "Tabellen, Spalten und Zeilenzahlen in learn und practice (live).",
             "inputSchema": {"type": "object", "properties": {}},
             "fn": tool_schema,
         },
         "sample_rows": {
             "description": (
-                f"Erste Zeilen einer learn-Tabelle ({table_desc}). "
+                f"Erste Zeilen einer Tabelle in learn oder practice ({table_desc}). "
                 "Für den Step-table-Block lieber table_rows nutzen."
             ),
             "inputSchema": {
@@ -1521,15 +1643,15 @@ def _tools():
         },
         "table_rows": {
             "description": (
-                "Zeilen einer learn-Tabelle im Step-table-Format "
+                "Zeilen einer Tabelle (learn oder practice) im Step-table-Format "
                 "{name, label, columns, rows} — copy-paste in look/predict."
             ),
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "table": {**sample_table, "description": (
-                        f"Tabellenname in learn, z.B. {table_desc}. "
-                        "Live-Liste: schema oder exercise_context."
+                        f"Tabellenname in learn oder practice, z.B. {table_desc}. "
+                        "Live-Liste: schema oder exercise_context. Extra-Tabellen: load_dataset."
                     )},
                     "columns": {
                         "type": "array",
@@ -1545,15 +1667,37 @@ def _tools():
             },
             "fn": tool_table_rows,
         },
+        "load_dataset": {
+            "description": (
+                "Extra-Tabellen in Schema practice materialisieren, damit run_sql und table_rows "
+                "sie sehen. Dieselbe Struktur danach als lesson.dataset speichern. "
+                "Keine Kern-Namen (orders, clients, stock, order_items)."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "dataset": {
+                        "type": "object",
+                        "description": "Objekt mit tables: [{name, label, columns, rows}].",
+                    },
+                    "tables": {
+                        "type": "array",
+                        "description": "Alternative zu dataset: die Tabellenliste direkt.",
+                        "items": {"type": "object"},
+                    },
+                },
+            },
+            "fn": tool_load_dataset,
+        },
         "run_sql": {
             "description": (
-                "SELECT/WITH/EXPLAIN gegen learn, damit erwartete Ergebnisse stimmen. "
+                "SELECT/WITH/EXPLAIN gegen learn und practice, damit erwartete Ergebnisse stimmen. "
                 "as_ids: Spaltenname — Antwort ist eine flache ID-Liste für expected_ids."
             ),
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "sql": {"type": "string", "description": "Lesende Abfrage gegen learn."},
+                    "sql": {"type": "string", "description": "Lesende Abfrage gegen learn und practice."},
                     "as_ids": {
                         "description": (
                             "Spaltenname (z.B. id). Liefert ids: [1,3,4] statt Zeilenobjekte. "
@@ -1592,7 +1736,7 @@ def _tools():
             "description": (
                 "Alles zum Schreiben einer Playground-Übung in einem Call: "
                 "Step-Typen mit Pflicht/Optional und Feldsemantik, table-Struktur, "
-                "Live-Sandbox, PATH_IDS, Reset, Ziel-URL, Beispiel-Lesson."
+                "dataset für Extra-Tabellen, Live-Sandbox, PATH_IDS, Reset, Ziel-URL, Beispiel-Lesson."
             ),
             "inputSchema": {
                 "type": "object",
@@ -1641,7 +1785,7 @@ def _tools():
         },
         "validate_exercise": {
             "description": (
-                "Dry-Run: SQL, expected_ids, eingebettete table-Blöcke, id, PATH_IDS, "
+                "Dry-Run: SQL, expected_ids, eingebettete table-Blöcke, dataset, id, PATH_IDS, "
                 "Step-/Quiz-Mindestzahl. Schreibt nichts."
             ),
             "inputSchema": {

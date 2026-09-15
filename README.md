@@ -127,7 +127,7 @@ und als Autor **zusätzlicher Übungen** im SQL-Playground.
 
 Was du sagen kannst: „Erklär mir diesen Schritt, ohne die Lösung zu verraten.“ oder „Bau mir drei Playground-Übungen zu offenen Aufträgen mit GROUP BY — mit explain-Schritt und teach.“ Alte Karten löschst du in der App oder sagst Claude `delete_practice`.
 
-Claude soll zuerst `buddy_context` (Lernen) oder `exercise_context` (Playground-Übungen) lesen. Übungen brauchen einen **explain**-Schritt (Alltagssprache + antippenbare SQL-Teile) und `teach` an den Schreib-Schritten. Vor dem Speichern `validate_exercise`. Extra-Tabellen in `learn` verschwinden beim Zurücksetzen (`DROP SCHEMA learn CASCADE`).
+Claude soll zuerst `buddy_context` (Lernen) oder `exercise_context` (Playground-Übungen) lesen. Übungen brauchen einen **explain**-Schritt (Alltagssprache + antippenbare SQL-Teile) und `teach` an den Schreib-Schritten. Vor dem Speichern `validate_exercise`. Extra-Tabellen kommen über `load_dataset` / `dataset` ins Schema `practice`; ein Reset baut nur `learn` neu und setzt `practice` aus der aktuellen Übung.
 
 Schritt-für-Schritt: [mcp/ANLEITUNG.md](mcp/ANLEITUNG.md)
 
@@ -140,4 +140,4 @@ Docker hängt `data/workshop` nach `/data/workshop` (`WORKSHOP_DIR`). Die Window
 
 - Sandbox `learn`: SELECT, WITH, EXPLAIN, plus INSERT/UPDATE/DELETE und BEGIN/COMMIT/ROLLBACK. Schema-Änderungen sind gesperrt.
 - SQL-Aufgaben werden über das **Abfrageergebnis** bewertet, nicht über einen exakten Musterstring.
-- Tabellen: `orders`, `clients`, `stock`, `order_items`.
+- Kern-Tabellen: `orders`, `clients`, `stock`, `order_items`. Playground-Übungen dürfen Extra-Tabellen im Feld `dataset` mitbringen (Schema `practice`).

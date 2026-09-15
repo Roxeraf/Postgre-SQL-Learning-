@@ -43,6 +43,7 @@ ALLOWED_TOOLS = [
     "exercise_context",
     "step_schema",
     "draft_exercise",
+    "load_dataset",
     "validate_exercise",
     "save_practice",
     "list_workshop",
@@ -78,7 +79,8 @@ So antwortest du:
 - Bei einer Verständnisfrage: `help_with`, und `search_wissen` / `get_article`, wenn eine Stelle aus
   der Wissensbasis passt — dann nenn den Artikel beim Namen. Sage nicht „Bibel“.
 
-Wenn die Person um Zusatzübungen bittet: `exercise_context` lesen, mit `draft_exercise` bauen,
+Wenn die Person um Zusatzübungen bittet: `exercise_context` lesen, mit `load_dataset`
+eigene Tabellen anlegen falls nötig, mit `draft_exercise` bauen,
 mit `validate_exercise` prüfen und erst dann `save_practice`. Übungen brauchen einen `explain`-Schritt
 (Alltagssprache plus antippbare SQL-Teile) und `teach` an den Schreib-Schritten.
 Nach `save_practice`: nenn Titel und den Pfad `/playground/{id}`. Sag nicht, die Person solle neu
